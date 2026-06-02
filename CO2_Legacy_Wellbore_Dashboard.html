@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>CO2 Legacy Wellbore Review Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.0/jspdf.plugin.autotable.min.js"></script>
+<style>
+:root{
+  --bg:#0b1220; --panel:#111a2c; --panel2:#172238; --line:#22304d;
+  --text:#e7eefc; --muted:#9fb0cf; --accent:#3aa0ff; --accent2:#5fd0ff;
+  --low:#1fbf75; --mod:#f0a93b; --high:#e85a4f; --crit:#a8324a;
+  --shadow:0 8px 24px rgba(0,0,0,.35);
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:linear-gradient(180deg,#070b16 0%,#0b1220 100%);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;font-size:14px}
+header.topbar{position:sticky;top:0;z-index:50;background:rgba(11,18,32,.92);backdrop-filter:blur(10px);border-bottom:1px solid var(--line);padding:14px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px}
+.brand{display:flex;align-items:center;gap:12px}
+.brand .mark{width:36px;height:36px;border-radius:8px;background:linear-gradient(135deg,#3aa0ff,#5fd0ff);display:grid;place-items:center;font-weight:800;color:#04101f}
+.brand h1{font-size:16px;margin:0;letter-spacing:.2px}
+.brand small{color:var(--muted);font-size:11px;display:block}
+.topbar .actions{display:flex;gap:10px;align-items:center}
+button,.btn{cursor:pointer;border:1px solid var(--line);background:var(--panel2);color:var(--text);padding:9px 14px;border-radius:8px;font-weight:600;font-size:13px;transition:.15s;display:inline-flex;align-items:center;gap:8px}
+button:hover,.btn:hover{border-color:var(--accent);transform:translateY(-1px)}
+button.primary{background:linear-gradient(135deg,#1f7ad6,#3aa0ff);border:none}
+button.danger{background:#3a1822;border:1px solid #6b2538;color:#ffb6c0}
+button.ghost{background:transparent}
+.layout{display:grid;grid-template-columns:340px 1fr;gap:20px;padding:20px 24px}
+@media (max-width:1100px){.layout{grid-template-columns:1fr}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:18px}
+.panel h2{margin:0 0 12px 0;font-size:14px;letter-spacing:.4px;text-transform:uppercase;color:var(--muted)}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
+.kpi .label{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.6px}
+.kpi .val{font-size:28px;font-weight:800;margin-top:4px}
+.kpi .sub{color:var(--muted);font-size:12px;margin-top:2px}
+.kpi.low{border-left:3px solid var(--low)}
+.kpi.mod{border-left:3px solid var(--mod)}
+.kpi.high{border-left:3px solid var(--high)}
+.kpi.total{border-left:3px solid var(--accent)}
+
+.grid2{display:grid;grid-template-columns:1.2fr .8fr;gap:16px}
+@media (max-width:1300px){.grid2{grid-template-columns:1fr}}
+.matrix{display:grid;grid-template-columns:64px repeat(5,1fr);grid-template-rows:36px repeat(5,46px);gap:4px}
+.cell{display:grid;place-items:center;border-radius:6px;font-weight:700;font-size:12px;color:#0b1220;position:relative;cursor:default}
+.cell.lbl{background:transparent;color:var(--muted);font-weight:600;font-size:11px}
+.cell.lbl.rot{writing-mode:vertical-rl;transform:rotate(180deg)}
+.cell.lo{background:#1fbf75}
+.cell.mo{background:#f0a93b}
+.cell.hi{background:#e85a4f}
+.cell.cr{background:#a8324a;color:#fff}
+.cell .count{position:absolute;top:3px;right:6px;background:rgba(0,0,0,.35);color:#fff;border-radius:10px;padding:1px 6px;font-size:10px}
+
+table.wells{width:100%;border-collapse:collapse;font-size:13px}
+table.wells th{background:#0e1729;color:var(--muted);text-align:left;padding:10px 8px;border-bottom:1px solid var(--line);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.4px;position:sticky;top:0}
+table.wells td{padding:10px 8px;border-bottom:1px solid #1a2740}
+table.wells tr:hover{background:#0e1729;cursor:pointer}
+.tag{display:inline-block;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.3px}
+.tag.low{background:rgba(31,191,117,.15);color:#5cf0a8;border:1px solid rgba(31,191,117,.4)}
+.tag.mod{background:rgba(240,169,59,.15);color:#ffd58a;border:1px solid rgba(240,169,59,.4)}
+.tag.high{background:rgba(232,90,79,.15);color:#ff9b91;border:1px solid rgba(232,90,79,.4)}
+.tag.crit{background:rgba(168,50,74,.25);color:#ffa3b3;border:1px solid rgba(168,50,74,.5)}
+
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+label{font-size:12px;color:var(--muted);display:block;margin-bottom:4px}
+input,select,textarea{width:100%;background:#0c1525;border:1px solid var(--line);color:var(--text);padding:8px 10px;border-radius:7px;font-size:13px;outline:none;font-family:inherit}
+input:focus,select:focus,textarea:focus{border-color:var(--accent)}
+.scoring{display:grid;gap:8px;margin-top:8px}
+.score-row{display:grid;grid-template-columns:1.5fr 2.2fr 60px;gap:8px;align-items:center;padding:8px;border:1px solid var(--line);border-radius:8px;background:#0c1525}
+.score-row .name{font-size:12px;font-weight:600}
+.score-row .name small{display:block;color:var(--muted);font-weight:400;font-size:10px;margin-top:2px}
+.seg{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px}
+.seg button{padding:6px 4px;font-size:11px;border-radius:6px;border:1px solid var(--line);background:#0c1525;color:var(--text)}
+.seg button.active.low{background:#1fbf75;color:#0b1220;border-color:#1fbf75}
+.seg button.active.med{background:#f0a93b;color:#0b1220;border-color:#f0a93b}
+.seg button.active.high{background:#e85a4f;color:#fff;border-color:#e85a4f}
+.score-row .pts{text-align:center;font-weight:800;font-size:14px;color:var(--accent2)}
+
+.detail{display:none}
+.detail.open{display:block}
+.detail-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.legend{display:flex;gap:12px;font-size:11px;color:var(--muted);flex-wrap:wrap}
+.legend .sw{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:middle}
+.empty{color:var(--muted);text-align:center;padding:40px 12px;font-size:13px}
+.tab-bar{display:flex;gap:6px;border-bottom:1px solid var(--line);margin-bottom:14px}
+.tab-bar button{border:none;background:transparent;border-bottom:2px solid transparent;border-radius:0;padding:8px 12px;color:var(--muted);font-size:13px}
+.tab-bar button.active{color:var(--text);border-bottom-color:var(--accent)}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.row.spread{justify-content:space-between}
+.muted{color:var(--muted);font-size:12px}
+.rec-card{padding:12px;border-radius:10px;border:1px solid var(--line);background:#0c1525;margin-top:8px;font-size:13px;line-height:1.55}
+.rec-card h4{margin:0 0 6px 0;font-size:13px;color:var(--accent2)}
+.bar{height:6px;background:#0c1525;border-radius:4px;overflow:hidden}
+.bar>div{height:100%;background:linear-gradient(90deg,#1fbf75,#f0a93b,#e85a4f)}
+.warn{background:rgba(232,90,79,.08);border:1px solid rgba(232,90,79,.4);padding:10px 12px;border-radius:8px;font-size:12px;color:#ffb6b0}
+.note{background:rgba(58,160,255,.08);border:1px solid rgba(58,160,255,.4);padding:10px 12px;border-radius:8px;font-size:12px;color:#bcdfff;margin-top:8px}
+.divider{height:1px;background:var(--line);margin:14px 0}
+.actions-row{display:flex;gap:8px;justify-content:flex-end}
+.chart-wrap{position:relative;height:240px}
+.well-id{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;color:var(--accent2)}
+.search{position:relative}
+.search input{padding-left:30px}
+.search svg{position:absolute;left:8px;top:8px;color:var(--muted)}
+footer{padding:18px 24px;color:var(--muted);font-size:11px;border-top:1px solid var(--line);text-align:center}
+.score-pill{display:inline-block;padding:2px 8px;border-radius:6px;font-weight:800;font-size:12px;background:#0c1525;border:1px solid var(--line)}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <div class="mark">CO₂</div>
+    <div>
+      <h1>Legacy Wellbore Risk Review — CCS</h1>
+      <small>Appendix D Calculator · § 7.2 Risk Scoring · CSA Z741 / EPA Class VI / AER D051</small>
+    </div>
+  </div>
+  <div class="actions">
+    <button class="ghost" onclick="loadDemo()" title="Seed with demo wells">Load Demo</button>
+    <button class="ghost" onclick="exportJSON()">Export JSON</button>
+    <label class="btn ghost" style="margin:0;cursor:pointer">
+      Import JSON
+      <input type="file" accept="application/json" onchange="importJSON(event)" style="display:none">
+    </label>
+    <button class="primary" onclick="exportPDF()">⬇ Download PDF Report</button>
+  </div>
+</header>
+
+<div class="kpis" style="padding:20px 24px 0 24px">
+  <div class="kpi total"><div class="label">Wells in Review</div><div class="val" id="kTotal">0</div><div class="sub">within AoR</div></div>
+  <div class="kpi low"><div class="label">Low Risk</div><div class="val" id="kLow">0</div><div class="sub">Score 9 – 18</div></div>
+  <div class="kpi mod"><div class="label">Moderate Risk</div><div class="val" id="kMod">0</div><div class="sub">Score 19 – 30</div></div>
+  <div class="kpi high"><div class="label">High / Critical</div><div class="val" id="kHigh">0</div><div class="sub">Score 31 – 45</div></div>
+</div>
+
+<div class="layout">
+
+  <!-- LEFT: Add/edit form -->
+  <aside>
+    <div class="panel">
+      <div class="row spread">
+        <h2 id="formTitle">Add Legacy Well</h2>
+        <button class="ghost" onclick="resetForm()" id="newBtn" style="font-size:11px;padding:5px 8px">+ New</button>
+      </div>
+
+      <div class="form-grid">
+        <div><label>Well ID / Licence #</label><input id="f_id" placeholder="e.g. 100/04-20-046-25W4"/></div>
+        <div><label>Operator (last known)</label><input id="f_op" placeholder="e.g. Orphan Well Assoc."/></div>
+        <div><label>Latitude</label><input id="f_lat" type="number" step="0.0001" placeholder="53.4321"/></div>
+        <div><label>Longitude</label><input id="f_lon" type="number" step="0.0001" placeholder="-113.4567"/></div>
+        <div><label>Well Type</label>
+          <select id="f_type">
+            <option>Oil Producer</option><option>Gas Producer</option><option>Injection</option>
+            <option>Disposal</option><option>Strat Test</option><option>Observation</option><option>Unknown</option>
+          </select>
+        </div>
+        <div><label>Trajectory</label>
+          <select id="f_traj"><option>Vertical</option><option>Deviated</option><option>Horizontal</option><option>Unknown</option></select>
+        </div>
+        <div><label>Legal Status</label>
+          <select id="f_status"><option>Active</option><option>Suspended</option><option>Abandoned (P&A)</option><option>Orphaned</option><option>Unknown</option></select>
+        </div>
+        <div><label>Classification (Type 1–9)</label>
+          <select id="f_class"><option>Type 1</option><option>Type 2</option><option>Type 3</option><option>Type 4</option><option>Type 5</option><option>Type 6</option><option>Type 7</option><option>Type 8</option><option>Type 9</option></select>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+      <h2 style="margin-bottom:4px">Risk Scoring — Appendix D</h2>
+      <div class="muted" style="margin-bottom:8px">Score each parameter: Low (1) · Medium (3) · High (5)</div>
+
+      <div class="scoring" id="scoringBlock"></div>
+
+      <div class="divider"></div>
+      <div class="row spread">
+        <div>
+          <div class="muted" style="font-size:11px">Total Risk Score</div>
+          <div style="font-size:28px;font-weight:800" id="liveTotal">9</div>
+          <div id="liveBadge"></div>
+        </div>
+        <div class="actions-row">
+          <button class="ghost" onclick="resetForm()">Clear</button>
+          <button class="primary" onclick="saveWell()" id="saveBtn">Save Well</button>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- RIGHT: Dashboard -->
+  <main>
+    <div class="tab-bar">
+      <button class="active" data-tab="overview" onclick="showTab('overview',this)">Overview</button>
+      <button data-tab="register" onclick="showTab('register',this)">Well Register</button>
+      <button data-tab="matrix" onclick="showTab('matrix',this)">5×5 Risk Matrix</button>
+      <button data-tab="detail" onclick="showTab('detail',this)">Well Detail</button>
+      <button data-tab="ref" onclick="showTab('ref',this)">Scoring Reference</button>
+    </div>
+
+    <!-- Overview -->
+    <section id="tab-overview">
+      <div class="grid2">
+        <div class="panel">
+          <h2>Risk Distribution</h2>
+          <div class="chart-wrap"><canvas id="distChart"></canvas></div>
+        </div>
+        <div class="panel">
+          <h2>Driver Heatmap — Avg score per parameter</h2>
+          <div class="chart-wrap"><canvas id="driverChart"></canvas></div>
+        </div>
+      </div>
+      <div class="panel" style="margin-top:16px">
+        <div class="row spread"><h2>Top Risk Wells</h2><span class="muted">Sorted by total score (desc)</span></div>
+        <div id="topList"></div>
+      </div>
+    </section>
+
+    <!-- Register -->
+    <section id="tab-register" style="display:none">
+      <div class="panel">
+        <div class="row spread" style="margin-bottom:10px">
+          <h2>Legacy Well Register</h2>
+          <div class="search">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+            <input id="search" placeholder="Filter by ID, operator, status…" oninput="render()"/>
+          </div>
+        </div>
+        <div style="max-height:540px;overflow:auto;border:1px solid var(--line);border-radius:10px">
+          <table class="wells" id="wellsTable">
+            <thead><tr>
+              <th>Well ID</th><th>Type</th><th>Status</th><th>Class</th><th>Age</th><th>Score</th><th>Category</th><th></th>
+            </tr></thead>
+            <tbody id="wellsBody"></tbody>
+          </table>
+        </div>
+        <div class="legend" style="margin-top:10px">
+          <span><span class="sw" style="background:var(--low)"></span>Low (9–18)</span>
+          <span><span class="sw" style="background:var(--mod)"></span>Moderate (19–30)</span>
+          <span><span class="sw" style="background:var(--high)"></span>High (31–40)</span>
+          <span><span class="sw" style="background:var(--crit)"></span>Critical (41–45)</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Matrix -->
+    <section id="tab-matrix" style="display:none">
+      <div class="panel">
+        <h2>5 × 5 Likelihood × Consequence Matrix</h2>
+        <p class="muted">Likelihood = barrier & data integrity factors (Plug Quality, Barriers, Cement, Age, Access, Data). Consequence = exposure factors (Proximity, Depth-vs-Reservoir, Depth-vs-Complex). § 7.1.</p>
+        <div class="matrix" id="matrix"></div>
+        <div class="legend" style="margin-top:14px">
+          <span><span class="sw" style="background:var(--low)"></span>Low</span>
+          <span><span class="sw" style="background:var(--mod)"></span>Moderate</span>
+          <span><span class="sw" style="background:var(--high)"></span>High</span>
+          <span><span class="sw" style="background:var(--crit)"></span>Critical</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Detail -->
+    <section id="tab-detail" style="display:none">
+      <div class="panel" id="detailPanel">
+        <div class="empty">Select a well from the register or top list to see its dossier.</div>
+      </div>
+    </section>
+
+    <!-- Reference -->
+    <section id="tab-ref" style="display:none">
+      <div class="panel">
+        <h2>Risk Scoring Reference — Appendix D & § 7.2</h2>
+        <div style="overflow:auto">
+        <table class="wells">
+          <thead><tr><th>Parameter</th><th>Low (1)</th><th>Medium (3)</th><th>High (5)</th></tr></thead>
+          <tbody id="refBody"></tbody>
+        </table>
+        </div>
+        <div class="note" style="margin-top:14px"><b>Risk Ranking = Likelihood × Consequence</b> — per § 7.2. Total Risk Score = Σ(parameter scores). Range: 9 (best case) — 45 (worst case). Tiering tuned from Appendix D's 8/16/28/40 thresholds, normalized to a 9-parameter scale.</div>
+        <div class="note"><b>Cement carbonation note (Fig. A-2):</b> CO₂ ingress converts cement hydrates → CaCO₃ → soluble bicarbonate; vertical degradation typically &lt;few metres over geological timescales — but the barrier credit collapses if cement was never placed above caprock. Score "Cement Coverage" conservatively when CBL/VDL is absent.</div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<footer>
+  Built on Enbridge NET <i>Legacy Well Review Guideline</i> GD-40-0B42-524E v1.0.0 (Khan & Christi, 2025) ·
+  cross-checked against EPA UIC Class VI 40 CFR §146.84, AER Directive 051/020, CSA Z741, ISO 27914, API RP 65-3 ·
+  Arbad et al., IJGGC vol. 133 (2024).
+</footer>
+
+<script>
+/* ============ SCORING MODEL — Appendix D + § 7.2 ============ */
+const PARAMS = [
+  {key:'plug',   name:'Plug Quality',          group:'L', desc:'Verified modern plugs vs. missing/unverifiable',
+    levels:{1:'Verified, modern, ≥2 barriers',3:'Unknown / old but present',5:'Missing or unverifiable'}},
+  {key:'barriers',name:'Number of Barriers',   group:'L', desc:'Permanent barriers across all flow zones',
+    levels:{1:'≥2 barriers',3:'1 barrier',5:'None'}},
+  {key:'cement', name:'Cement Coverage',       group:'L', desc:'TOC vs. caprock / storage complex',
+    levels:{1:'Full to caprock (CBL verified)',3:'Below caprock',5:'No data / likely absent'}},
+  {key:'prox',   name:'Proximity to CO₂ Plume',group:'C', desc:'Lateral distance from modeled plume',
+    levels:{1:'> 3.2 km',3:'1.6 – 3.2 km',5:'< 1.6 km'}},
+  {key:'depthR', name:'Depth vs. Reservoir',   group:'C', desc:'Penetration relative to storage reservoir',
+    levels:{1:'Far above primary seal',3:'Penetrates primary caprock',5:'Intersects storage reservoir'}},
+  {key:'depthC', name:'Depth vs. Storage Complex', group:'C', desc:'Penetration relative to complex final seal',
+    levels:{1:'Above storage complex final seal',3:'Penetrates non-primary seal',5:'Penetrates secondary/final reservoir'}},
+  {key:'age',    name:'Well Age',              group:'L', desc:'Carbon-steel corrosion / standards vintage',
+    levels:{1:'< 30 years',3:'30 – 50 years',5:'> 50 years'}},
+  {key:'access', name:'Access & Ownership',    group:'L', desc:'Ability to re-enter / re-abandon',
+    levels:{1:'Owned, licensee active, accessible',3:'Suspended / no marker',5:'Orphaned / unknown location'}},
+  {key:'data',   name:'Data Availability',     group:'L', desc:'Drilling/completion/abandonment records',
+    levels:{1:'Complete with logs',3:'Partial / incomplete',5:'None or analog only'}},
+];
+
+const TIERS = [
+  {min:9, max:18, label:'Low',      cls:'low',  color:'#1fbf75'},
+  {min:19,max:30, label:'Moderate', cls:'mod',  color:'#f0a93b'},
+  {min:31,max:40, label:'High',     cls:'high', color:'#e85a4f'},
+  {min:41,max:45, label:'Critical', cls:'crit', color:'#a8324a'},
+];
+
+function tierFor(s){ return TIERS.find(t=>s>=t.min && s<=t.max) || TIERS[0]; }
+
+/* ============ STATE ============ */
+let state = { wells: [], editingId: null, currentForm: defaultScores(), selected: null };
+
+function defaultScores(){ const o={}; PARAMS.forEach(p=>o[p.key]=1); return o; }
+function uid(){ return 'W-'+Math.random().toString(36).slice(2,8).toUpperCase(); }
+
+function save(){ localStorage.setItem('co2_legacy_wells', JSON.stringify(state.wells)); }
+function load(){
+  try{ const x=JSON.parse(localStorage.getItem('co2_legacy_wells')); if(Array.isArray(x)) state.wells=x; }catch(e){}
+}
+
+/* ============ FORM ============ */
+function buildScoring(){
+  const host = document.getElementById('scoringBlock');
+  host.innerHTML = '';
+  PARAMS.forEach(p=>{
+    const row = document.createElement('div'); row.className='score-row';
+    row.innerHTML = `
+      <div class="name">${p.name}<small>${p.desc}</small></div>
+      <div class="seg" data-key="${p.key}">
+        <button data-v="1" title="${p.levels[1]}">Low</button>
+        <button data-v="3" title="${p.levels[3]}">Med</button>
+        <button data-v="5" title="${p.levels[5]}">High</button>
+      </div>
+      <div class="pts" id="pts-${p.key}">1</div>`;
+    host.appendChild(row);
+    row.querySelectorAll('button').forEach(b=>{
+      b.addEventListener('click',()=>{
+        const v = +b.dataset.v;
+        state.currentForm[p.key] = v;
+        updateSeg(p.key);
+        updateLiveTotal();
+      });
+    });
+  });
+  updateAllSegs();
+}
+function updateSeg(key){
+  const seg = document.querySelector(`.seg[data-key="${key}"]`);
+  if(!seg) return;
+  const v = state.currentForm[key];
+  seg.querySelectorAll('button').forEach(b=>{
+    b.classList.remove('active','low','med','high');
+    if(+b.dataset.v===v){
+      b.classList.add('active');
+      b.classList.add(v===1?'low':v===3?'med':'high');
+    }
+  });
+  document.getElementById('pts-'+key).textContent = v;
+}
+function updateAllSegs(){ PARAMS.forEach(p=>updateSeg(p.key)); }
+function updateLiveTotal(){
+  const t = PARAMS.reduce((a,p)=>a+state.currentForm[p.key],0);
+  document.getElementById('liveTotal').textContent = t;
+  const tier = tierFor(t);
+  document.getElementById('liveBadge').innerHTML = `<span class="tag ${tier.cls}">${tier.label} Risk</span>`;
+}
+
+function readForm(){
+  return {
+    id: state.editingId || uid(),
+    licence: document.getElementById('f_id').value.trim() || 'UNNAMED',
+    operator: document.getElementById('f_op').value.trim() || 'Unknown',
+    lat: parseFloat(document.getElementById('f_lat').value)||null,
+    lon: parseFloat(document.getElementById('f_lon').value)||null,
+    type: document.getElementById('f_type').value,
+    traj: document.getElementById('f_traj').value,
+    status: document.getElementById('f_status').value,
+    klass: document.getElementById('f_class').value,
+    scores: {...state.currentForm},
+    total: PARAMS.reduce((a,p)=>a+state.currentForm[p.key],0),
+    createdAt: new Date().toISOString(),
+  };
+}
+
+function saveWell(){
+  const w = readForm();
+  if(state.editingId){
+    const i = state.wells.findIndex(x=>x.id===state.editingId);
+    if(i>=0) state.wells[i] = w;
+  } else {
+    state.wells.push(w);
+  }
+  state.editingId=null;
+  document.getElementById('formTitle').textContent='Add Legacy Well';
+  document.getElementById('saveBtn').textContent='Save Well';
+  resetForm(true);
+  save(); render();
+}
+
+function resetForm(keepScores){
+  state.editingId = null;
+  document.getElementById('formTitle').textContent='Add Legacy Well';
+  document.getElementById('saveBtn').textContent='Save Well';
+  ['f_id','f_op','f_lat','f_lon'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('f_type').selectedIndex=0;
+  document.getElementById('f_traj').selectedIndex=0;
+  document.getElementById('f_status').selectedIndex=0;
+  document.getElementById('f_class').selectedIndex=0;
+  if(!keepScores){ state.currentForm = defaultScores(); }
+  updateAllSegs(); updateLiveTotal();
+}
+
+function editWell(id){
+  const w = state.wells.find(x=>x.id===id); if(!w) return;
+  state.editingId = id;
+  document.getElementById('formTitle').textContent='Edit Well';
+  document.getElementById('saveBtn').textContent='Update Well';
+  document.getElementById('f_id').value=w.licence;
+  document.getElementById('f_op').value=w.operator;
+  document.getElementById('f_lat').value=w.lat||'';
+  document.getElementById('f_lon').value=w.lon||'';
+  document.getElementById('f_type').value=w.type;
+  document.getElementById('f_traj').value=w.traj;
+  document.getElementById('f_status').value=w.status;
+  document.getElementById('f_class').value=w.klass;
+  state.currentForm = {...w.scores};
+  updateAllSegs(); updateLiveTotal();
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function deleteWell(id){
+  if(!confirm('Delete this well?')) return;
+  state.wells = state.wells.filter(x=>x.id!==id);
+  save(); render();
+}
+
+/* ============ RENDER ============ */
+function render(){
+  // KPIs
+  document.getElementById('kTotal').textContent = state.wells.length;
+  let lo=0,mo=0,hi=0;
+  state.wells.forEach(w=>{
+    const t = tierFor(w.total);
+    if(t.cls==='low') lo++;
+    else if(t.cls==='mod') mo++;
+    else hi++;
+  });
+  document.getElementById('kLow').textContent=lo;
+  document.getElementById('kMod').textContent=mo;
+  document.getElementById('kHigh').textContent=hi;
+
+  // table
+  const q = (document.getElementById('search')?.value||'').toLowerCase();
+  const tbody = document.getElementById('wellsBody'); tbody.innerHTML='';
+  const filtered = state.wells.filter(w=>!q || [w.licence,w.operator,w.status,w.klass,w.type].join(' ').toLowerCase().includes(q));
+  if(!filtered.length){
+    tbody.innerHTML = `<tr><td colspan="8" class="empty">No wells. Click "Load Demo" or add a well using the form.</td></tr>`;
+  } else {
+    filtered.sort((a,b)=>b.total-a.total).forEach(w=>{
+      const t = tierFor(w.total);
+      const tr = document.createElement('tr');
+      const age = w.scores.age===1?'<30y':w.scores.age===3?'30–50y':'>50y';
+      tr.innerHTML = `
+        <td><span class="well-id">${w.licence}</span><br><small style="color:var(--muted)">${w.operator}</small></td>
+        <td>${w.type}</td>
+        <td>${w.status}</td>
+        <td>${w.klass}</td>
+        <td>${age}</td>
+        <td><span class="score-pill">${w.total}</span></td>
+        <td><span class="tag ${t.cls}">${t.label}</span></td>
+        <td style="text-align:right">
+          <button class="ghost" style="padding:4px 8px;font-size:11px" onclick="event.stopPropagation();openDetail('${w.id}')">View</button>
+          <button class="ghost" style="padding:4px 8px;font-size:11px" onclick="event.stopPropagation();editWell('${w.id}')">Edit</button>
+          <button class="danger" style="padding:4px 8px;font-size:11px" onclick="event.stopPropagation();deleteWell('${w.id}')">Del</button>
+        </td>`;
+      tr.addEventListener('click',()=>openDetail(w.id));
+      tbody.appendChild(tr);
+    });
+  }
+
+  // top list
+  const top = [...state.wells].sort((a,b)=>b.total-a.total).slice(0,5);
+  const host = document.getElementById('topList');
+  if(!top.length){ host.innerHTML = `<div class="empty">Add wells to see ranking.</div>`; }
+  else host.innerHTML = top.map(w=>{
+    const t = tierFor(w.total);
+    const pct = ((w.total-9)/(45-9))*100;
+    return `<div onclick="openDetail('${w.id}')" style="cursor:pointer;padding:10px;border:1px solid var(--line);border-radius:10px;margin-bottom:8px;background:#0c1525">
+      <div class="row spread"><div><span class="well-id">${w.licence}</span> <span class="tag ${t.cls}">${t.label}</span></div><div style="font-weight:800">${w.total}/45</div></div>
+      <div class="muted" style="font-size:11px;margin:4px 0">${w.operator} · ${w.type} · ${w.status} · ${w.klass}</div>
+      <div class="bar"><div style="width:${pct}%"></div></div>
+    </div>`;
+  }).join('');
+
+  drawCharts(); drawMatrix(); renderRef();
+  if(state.selected) openDetail(state.selected);
+}
+
+/* ============ CHARTS ============ */
+let distChart, driverChart;
+function drawCharts(){
+  const lo = state.wells.filter(w=>tierFor(w.total).cls==='low').length;
+  const mo = state.wells.filter(w=>tierFor(w.total).cls==='mod').length;
+  const hi = state.wells.filter(w=>tierFor(w.total).cls==='high').length;
+  const cr = state.wells.filter(w=>tierFor(w.total).cls==='crit').length;
+
+  const ctx1 = document.getElementById('distChart').getContext('2d');
+  if(distChart) distChart.destroy();
+  distChart = new Chart(ctx1,{
+    type:'doughnut',
+    data:{labels:['Low','Moderate','High','Critical'],datasets:[{data:[lo,mo,hi,cr],backgroundColor:['#1fbf75','#f0a93b','#e85a4f','#a8324a'],borderWidth:0}]},
+    options:{plugins:{legend:{position:'right',labels:{color:'#e7eefc',font:{size:12}}}},cutout:'62%'}
+  });
+
+  const avgs = PARAMS.map(p=>{
+    if(!state.wells.length) return 0;
+    return state.wells.reduce((a,w)=>a+w.scores[p.key],0)/state.wells.length;
+  });
+  const ctx2 = document.getElementById('driverChart').getContext('2d');
+  if(driverChart) driverChart.destroy();
+  driverChart = new Chart(ctx2,{
+    type:'bar',
+    data:{labels:PARAMS.map(p=>p.name),
+      datasets:[{data:avgs, backgroundColor:avgs.map(v=>v<2?'#1fbf75':v<3.5?'#f0a93b':'#e85a4f'),borderRadius:4}]},
+    options:{
+      indexAxis:'y',
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>'Avg score: '+c.parsed.x.toFixed(2)}}},
+      scales:{
+        x:{min:0,max:5,grid:{color:'#1a2740'},ticks:{color:'#9fb0cf'}},
+        y:{grid:{display:false},ticks:{color:'#e7eefc',font:{size:11}}}
+      }
+    }
+  });
+}
+
+/* ============ MATRIX (L x C) ============ */
+function drawMatrix(){
+  // Likelihood bin (1-5) from L-group params avg → bucket
+  function bucket(avg){
+    if(avg<=1.5) return 1; if(avg<=2.5) return 2; if(avg<=3.5) return 3; if(avg<=4.5) return 4; return 5;
+  }
+  const grid = Array.from({length:5},()=>Array(5).fill(0));
+  state.wells.forEach(w=>{
+    const Lp = PARAMS.filter(p=>p.group==='L');
+    const Cp = PARAMS.filter(p=>p.group==='C');
+    const L = bucket(Lp.reduce((a,p)=>a+w.scores[p.key],0)/Lp.length);
+    const C = bucket(Cp.reduce((a,p)=>a+w.scores[p.key],0)/Cp.length);
+    grid[5-L][C-1]++;
+  });
+  const host = document.getElementById('matrix'); host.innerHTML='';
+  // header row
+  host.appendChild(makeCell('',true));
+  ['C1','C2','C3','C4','C5'].forEach(t=>host.appendChild(makeCell(t,true)));
+  for(let r=0;r<5;r++){
+    host.appendChild(makeCell('L'+(5-r),true,true));
+    for(let c=0;c<5;c++){
+      const score = (5-r)*(c+1); // L * C
+      const cls = score<=4?'lo':score<=9?'mo':score<=16?'hi':'cr';
+      const cell = document.createElement('div'); cell.className='cell '+cls;
+      cell.textContent = score;
+      if(grid[r][c]) cell.innerHTML += `<span class="count">${grid[r][c]}</span>`;
+      host.appendChild(cell);
+    }
+  }
+}
+function makeCell(t,lbl,rot){
+  const d = document.createElement('div');
+  d.className = 'cell '+(lbl?'lbl':'')+(rot?' rot':'');
+  d.textContent=t; return d;
+}
+
+/* ============ DETAIL ============ */
+function openDetail(id){
+  state.selected = id;
+  const w = state.wells.find(x=>x.id===id); if(!w) return;
+  // switch tab
+  document.querySelectorAll('.tab-bar button').forEach(b=>b.classList.remove('active'));
+  document.querySelector('[data-tab="detail"]').classList.add('active');
+  document.querySelectorAll('main > section').forEach(s=>s.style.display='none');
+  document.getElementById('tab-detail').style.display='block';
+
+  const t = tierFor(w.total);
+  const rec = recommend(w);
+  const scoresHtml = PARAMS.map(p=>{
+    const v = w.scores[p.key];
+    const col = v===1?'#1fbf75':v===3?'#f0a93b':'#e85a4f';
+    return `<tr>
+      <td style="padding:6px 8px">${p.name}</td>
+      <td style="padding:6px 8px;color:var(--muted)">${p.levels[v]}</td>
+      <td style="padding:6px 8px;text-align:right"><span class="score-pill" style="color:${col};border-color:${col}">${v}</span></td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('detailPanel').innerHTML = `
+    <div class="detail-head">
+      <div>
+        <div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.5px">Legacy Well Dossier</div>
+        <h2 style="font-size:20px;color:var(--text);text-transform:none;margin:4px 0">${w.licence}</h2>
+        <div class="muted">${w.operator} · ${w.type} · ${w.traj} · ${w.status} · ${w.klass}</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:34px;font-weight:800">${w.total}<span style="color:var(--muted);font-size:16px">/45</span></div>
+        <span class="tag ${t.cls}">${t.label} Risk</span>
+      </div>
+    </div>
+
+    <div class="grid2" style="margin-top:10px">
+      <div>
+        <h2>Score Breakdown</h2>
+        <table class="wells"><tbody>${scoresHtml}</tbody></table>
+      </div>
+      <div>
+        <h2>Spatial / Identification</h2>
+        <table class="wells"><tbody>
+          <tr><td>Latitude</td><td>${w.lat ?? '—'}</td></tr>
+          <tr><td>Longitude</td><td>${w.lon ?? '—'}</td></tr>
+          <tr><td>Type</td><td>${w.type}</td></tr>
+          <tr><td>Trajectory</td><td>${w.traj}</td></tr>
+          <tr><td>Status</td><td>${w.status}</td></tr>
+          <tr><td>Classification</td><td>${w.klass} (Fig. A-4 / Table A-1)</td></tr>
+        </tbody></table>
+        <h2 style="margin-top:14px">Recommended Action — § 8</h2>
+        <div class="rec-card"><h4>${rec.title}</h4>${rec.body}</div>
+        ${rec.warn?`<div class="warn" style="margin-top:8px">${rec.warn}</div>`:''}
+      </div>
+    </div>
+
+    <div class="actions-row" style="margin-top:14px">
+      <button class="ghost" onclick="editWell('${w.id}')">Edit</button>
+      <button class="primary" onclick="exportPDF('${w.id}')">⬇ Download Well PDF</button>
+    </div>
+  `;
+}
+
+/* Recommendation engine — first-principles wiring of Appendix D output into § 8 actions */
+function recommend(w){
+  const s = w.scores; const T = tierFor(w.total);
+  // critical drivers
+  const drivers = PARAMS.filter(p=>s[p.key]===5).map(p=>p.name);
+  if(T.cls==='crit' || T.cls==='high'){
+    let body = `<b>Tier ${T.label}</b> — re-entry diagnostics + mitigation candidate. Critical drivers: ${drivers.join(', ')||'none flagged'}.<br>`;
+    const actions = [];
+    if(s.plug===5 || s.barriers===5) actions.push('Pressure-test surface casing vent + annular buildup (§ 8.1); if leak confirmed → squeeze cement or full re-abandonment (§ 8.2).');
+    if(s.cement===5) actions.push('Run CBL/VDL or ultrasonic imaging across caprock interval; top-up annular cement via perforate-and-squeeze if TOC is below caprock.');
+    if(s.prox===5 || s.depthR===5 || s.depthC===5) actions.push('Stage dedicated monitoring well + soil-gas + satellite CO₂ surveillance — well is inside high-consequence corridor.');
+    if(s.access===5) actions.push('Engage Orphan Well Association / regulator (§ 9–10); if inaccessible, default to long-term flux + satellite monitoring (§ 8.3).');
+    if(s.age===5) actions.push('Treat all pre-1976 tubulars as analog to API 5L pre-NACE; assume corrosion-prone carbon steel and de-rate barrier credit.');
+    if(s.data===5) actions.push('Flag as "Undocumented / Unverified abandonment" (§ 6.6) and carry conservative analog assumptions until logged.');
+    body += '<ul style="margin:6px 0 0 18px;padding:0">'+actions.map(a=>`<li style="margin:4px 0">${a}</li>`).join('')+'</ul>';
+    return {title:'Re-entry + Mitigation Required', body,
+      warn:'Per CSA Z741 § 9 / EPA Class VI 40 CFR 146.84(d), high-risk wells inside AoR require corrective action plan before injection authorization.'};
+  }
+  if(T.cls==='mod'){
+    return {title:'Targeted Diagnostics + Watchlist',
+      body:`<b>Moderate Tier.</b> Add to MMV watchlist (§ 8.3). Recommended diagnostics: SCVF pressure test, annular surveillance, CBL across caprock if cement data is partial. Re-score on every MMV re-evaluation (3-year AER / 5-year EPA cadence). Drivers worth closing: ${drivers.join(', ')||'data gaps only'}.`};
+  }
+  return {title:'No Further Action — Monitor at MMV Cycle',
+    body:`<b>Low Tier.</b> Well is adequately documented and unlikely to act as a migration pathway. Carry through as background population; re-evaluate on AoR refresh or if plume forecast shifts.`};
+}
+
+/* ============ REFERENCE TABLE ============ */
+function renderRef(){
+  const body = document.getElementById('refBody');
+  body.innerHTML = PARAMS.map(p=>`<tr>
+    <td><b>${p.name}</b><br><small style="color:var(--muted)">${p.desc}</small></td>
+    <td>${p.levels[1]}</td><td>${p.levels[3]}</td><td>${p.levels[5]}</td>
+  </tr>`).join('');
+}
+
+/* ============ TABS ============ */
+function showTab(t,btn){
+  document.querySelectorAll('.tab-bar button').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('main > section').forEach(s=>s.style.display='none');
+  document.getElementById('tab-'+t).style.display='block';
+}
+
+/* ============ DEMO / IO ============ */
+function loadDemo(){
+  state.wells = [
+    {id:uid(),licence:'100/04-20-046-25W4',operator:'Orphan Well Assoc.',lat:53.4123,lon:-113.5421,type:'Oil Producer',traj:'Vertical',status:'Orphaned',klass:'Type 2',
+     scores:{plug:5,barriers:5,cement:5,prox:5,depthR:5,depthC:5,age:5,access:5,data:5},total:45,createdAt:new Date().toISOString()},
+    {id:uid(),licence:'102/11-08-046-26W4',operator:'Cenovus Energy',lat:53.4501,lon:-113.6011,type:'Gas Producer',traj:'Vertical',status:'Abandoned (P&A)',klass:'Type 7',
+     scores:{plug:1,barriers:1,cement:1,prox:3,depthR:5,depthC:1,age:3,access:1,data:1},total:17,createdAt:new Date().toISOString()},
+    {id:uid(),licence:'07-22-045-25W4',operator:'CNRL',lat:53.3811,lon:-113.5200,type:'Disposal',traj:'Deviated',status:'Suspended',klass:'Type 4',
+     scores:{plug:3,barriers:3,cement:3,prox:3,depthR:5,depthC:3,age:3,access:3,data:3},total:29,createdAt:new Date().toISOString()},
+    {id:uid(),licence:'14-31-047-25W4',operator:'Unknown',lat:53.4921,lon:-113.4805,type:'Unknown',traj:'Unknown',status:'Unknown',klass:'Type 1',
+     scores:{plug:5,barriers:5,cement:5,prox:3,depthR:3,depthC:3,age:5,access:5,data:5},total:39,createdAt:new Date().toISOString()},
+    {id:uid(),licence:'06-15-046-25W4',operator:'Imperial Oil',lat:53.4250,lon:-113.5108,type:'Strat Test',traj:'Vertical',status:'Abandoned (P&A)',klass:'Type 9',
+     scores:{plug:1,barriers:1,cement:1,prox:1,depthR:1,depthC:1,age:1,access:1,data:1},total:9,createdAt:new Date().toISOString()},
+    {id:uid(),licence:'09-27-046-25W4',operator:'Husky / Cenovus',lat:53.4402,lon:-113.5320,type:'Injection',traj:'Vertical',status:'Suspended',klass:'Type 5',
+     scores:{plug:3,barriers:3,cement:5,prox:5,depthR:5,depthC:3,age:5,access:3,data:3},total:35,createdAt:new Date().toISOString()},
+  ];
+  save(); render();
+}
+function exportJSON(){
+  const blob = new Blob([JSON.stringify(state.wells,null,2)],{type:'application/json'});
+  const a = document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download='legacy_wells_'+new Date().toISOString().slice(0,10)+'.json'; a.click();
+}
+function importJSON(e){
+  const f=e.target.files[0]; if(!f) return;
+  const r=new FileReader(); r.onload=()=>{
+    try{ const d=JSON.parse(r.result); if(Array.isArray(d)){state.wells=d;save();render();}}catch(err){alert('Invalid JSON');}
+  }; r.readAsText(f);
+}
+
+/* ============ PDF EXPORT ============ */
+async function exportPDF(singleId){
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({unit:'pt',format:'letter'});
+  const W = doc.internal.pageSize.getWidth();
+  const H = doc.internal.pageSize.getHeight();
+  const M = 40;
+  let y = M;
+
+  // Cover
+  doc.setFillColor(11,18,32); doc.rect(0,0,W,90,'F');
+  doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(20);
+  doc.text('CO₂ Legacy Wellbore Review Report', M, 50);
+  doc.setFont('helvetica','normal'); doc.setFontSize(10);
+  doc.text('Per Enbridge NET GD-40-0B42-524E · Appendix D · § 7.2', M, 70);
+  doc.text(new Date().toLocaleString(), W-M, 70, {align:'right'});
+  y = 120;
+  doc.setTextColor(0,0,0);
+
+  const wells = singleId ? state.wells.filter(w=>w.id===singleId) : state.wells;
+
+  // Portfolio summary (only on multi)
+  if(!singleId){
+    doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.text('Portfolio Summary', M, y); y+=18;
+    doc.setFont('helvetica','normal'); doc.setFontSize(10);
+    const lo=wells.filter(w=>tierFor(w.total).cls==='low').length;
+    const mo=wells.filter(w=>tierFor(w.total).cls==='mod').length;
+    const hi=wells.filter(w=>tierFor(w.total).cls==='high').length;
+    const cr=wells.filter(w=>tierFor(w.total).cls==='crit').length;
+    doc.text(`Total wells reviewed: ${wells.length}`, M, y); y+=14;
+    doc.text(`Low: ${lo}   Moderate: ${mo}   High: ${hi}   Critical: ${cr}`, M, y); y+=20;
+
+    doc.autoTable({
+      startY: y, margin:{left:M,right:M},
+      head:[['Well ID','Operator','Type','Status','Class','Score','Tier']],
+      body: [...wells].sort((a,b)=>b.total-a.total).map(w=>[
+        w.licence, w.operator, w.type, w.status, w.klass, String(w.total), tierFor(w.total).label
+      ]),
+      styles:{font:'helvetica',fontSize:9,cellPadding:4},
+      headStyles:{fillColor:[23,34,56],textColor:255},
+      alternateRowStyles:{fillColor:[245,247,250]},
+      didParseCell: (data)=>{
+        if(data.section==='body' && data.column.index===6){
+          const v=data.cell.raw;
+          const c = v==='Low'?[31,191,117]:v==='Moderate'?[240,169,59]:v==='High'?[232,90,79]:[168,50,74];
+          data.cell.styles.fillColor=c; data.cell.styles.textColor=255; data.cell.styles.fontStyle='bold';
+        }
+      }
+    });
+    y = doc.lastAutoTable.finalY + 24;
+
+    // Reference table
+    if(y > H-200){ doc.addPage(); y=M; }
+    doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.text('Risk Scoring Reference (Appendix D)', M, y); y+=10;
+    doc.autoTable({
+      startY: y+6, margin:{left:M,right:M},
+      head:[['Parameter','Low (1)','Medium (3)','High (5)']],
+      body: PARAMS.map(p=>[p.name, p.levels[1], p.levels[3], p.levels[5]]),
+      styles:{font:'helvetica',fontSize:8,cellPadding:4},
+      headStyles:{fillColor:[23,34,56],textColor:255}
+    });
+  }
+
+  // Per-well dossiers
+  wells.forEach((w,idx)=>{
+    doc.addPage(); y = M;
+    const t = tierFor(w.total);
+    doc.setFillColor(...hexToRgb(t.color));
+    doc.rect(0,0,W,12,'F');
+    doc.setFont('helvetica','bold'); doc.setFontSize(16);
+    doc.text(`Well Dossier: ${w.licence}`, M, y); y+=22;
+    doc.setFont('helvetica','normal'); doc.setFontSize(10);
+    doc.text(`Operator: ${w.operator}`, M, y); y+=14;
+    doc.text(`Type: ${w.type}   Trajectory: ${w.traj}   Status: ${w.status}   Class: ${w.klass}`, M, y); y+=14;
+    doc.text(`Coordinates: ${w.lat ?? '—'}, ${w.lon ?? '—'}`, M, y); y+=14;
+
+    doc.setFont('helvetica','bold'); doc.setFontSize(13);
+    doc.text(`Risk Score: ${w.total}/45 — ${t.label}`, M, y); y+=18;
+
+    doc.autoTable({
+      startY:y, margin:{left:M,right:M},
+      head:[['Parameter','Justification','Score']],
+      body: PARAMS.map(p=>[p.name, p.levels[w.scores[p.key]], String(w.scores[p.key])]),
+      styles:{font:'helvetica',fontSize:9,cellPadding:4},
+      headStyles:{fillColor:[23,34,56],textColor:255},
+      columnStyles:{2:{halign:'center',cellWidth:50}},
+      didParseCell: (data)=>{
+        if(data.section==='body' && data.column.index===2){
+          const v=+data.cell.raw;
+          const c = v===1?[31,191,117]:v===3?[240,169,59]:[232,90,79];
+          data.cell.styles.fillColor=c; data.cell.styles.textColor=255; data.cell.styles.fontStyle='bold';
+        }
+      }
+    });
+    y = doc.lastAutoTable.finalY + 18;
+
+    const rec = recommend(w);
+    doc.setFont('helvetica','bold'); doc.setFontSize(12);
+    doc.text('Recommended Action (§ 8)', M, y); y+=14;
+    doc.setFont('helvetica','bold'); doc.setFontSize(10);
+    doc.text(rec.title, M, y); y+=12;
+    doc.setFont('helvetica','normal'); doc.setFontSize(9);
+    const cleanBody = rec.body.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim();
+    const lines = doc.splitTextToSize(cleanBody, W-2*M);
+    doc.text(lines, M, y); y += lines.length*11 + 6;
+    if(rec.warn){
+      doc.setFillColor(250,225,225); doc.rect(M, y-2, W-2*M, 22,'F');
+      doc.setTextColor(120,30,40); doc.text(rec.warn, M+6, y+12, {maxWidth:W-2*M-12});
+      doc.setTextColor(0,0,0); y+=28;
+    }
+  });
+
+  // Footer page numbers
+  const total = doc.internal.getNumberOfPages();
+  for(let i=1;i<=total;i++){
+    doc.setPage(i);
+    doc.setFontSize(8); doc.setTextColor(120);
+    doc.text(`Page ${i} of ${total}  ·  Generated by CO₂ Legacy Wellbore Review Dashboard  ·  Reference: GD-40-0B42-524E`, W/2, H-20, {align:'center'});
+  }
+
+  doc.save(`CO2_Legacy_Well_Review_${new Date().toISOString().slice(0,10)}.pdf`);
+}
+function hexToRgb(h){ const v=h.replace('#',''); return [parseInt(v.slice(0,2),16),parseInt(v.slice(2,4),16),parseInt(v.slice(4,6),16)]; }
+
+/* ============ INIT ============ */
+load();
+buildScoring();
+updateLiveTotal();
+render();
+</script>
+</body>
+</html>
