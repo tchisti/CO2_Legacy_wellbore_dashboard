@@ -119,13 +119,19 @@ footer{padding:18px 24px;color:var(--muted);font-size:11px;border-top:1px solid 
     </div>
   </div>
   <div class="actions">
-    <button class="ghost" onclick="loadDemo()" title="Seed with demo wells">Load Demo</button>
-    <button class="ghost" onclick="exportJSON()">Export JSON</button>
+    <button class="ghost" onclick="loadDemo()" title="Seed dashboard with six sample legacy wells">Load Demo</button>
+    <button class="ghost" onclick="downloadCSVTemplate()" title="Download a CSV template prefilled with a sample legacy well — edit it, then re-upload via Import CSV">📄 CSV Template</button>
+    <label class="btn primary" style="margin:0;cursor:pointer;background:linear-gradient(135deg,#1f7ad6,#3aa0ff);border:none" title="Bulk upload legacy wells from a CSV file">
+      ⬆ Import CSV
+      <input type="file" accept=".csv,text/csv" onchange="importCSV(event)" style="display:none">
+    </label>
+    <button class="ghost" onclick="exportCSV()" title="Export all wells in the register to a CSV file">Export CSV</button>
+    <button class="ghost" onclick="exportJSON()" title="Export full dataset (incl. metadata) as JSON">Export JSON</button>
     <label class="btn ghost" style="margin:0;cursor:pointer">
       Import JSON
       <input type="file" accept="application/json" onchange="importJSON(event)" style="display:none">
     </label>
-    <button class="primary" onclick="exportPDF()">⬇ Download PDF Report</button>
+    <button class="primary" onclick="exportPDF()" title="Generate the full portfolio PDF review report">⬇ Download PDF Report</button>
   </div>
 </header>
 
@@ -144,6 +150,10 @@ footer{padding:18px 24px;color:var(--muted);font-size:11px;border-top:1px solid 
       <div class="row spread">
         <h2 id="formTitle">Add Legacy Well</h2>
         <button class="ghost" onclick="resetForm()" id="newBtn" style="font-size:11px;padding:5px 8px">+ New</button>
+      </div>
+
+      <div class="note" style="margin-bottom:10px;font-size:11px">
+        <b>Tip:</b> have many wells? Download the <a href="#" onclick="event.preventDefault();downloadCSVTemplate()" style="color:var(--accent2)">CSV template</a>, fill it in (one row per well, scores as Low/Medium/High), and use <b>Import CSV</b> in the top bar to bulk-load the register.
       </div>
 
       <div class="form-grid">
@@ -166,6 +176,9 @@ footer{padding:18px 24px;color:var(--muted);font-size:11px;border-top:1px solid 
         <div><label>Classification (Type 1–9)</label>
           <select id="f_class"><option>Type 1</option><option>Type 2</option><option>Type 3</option><option>Type 4</option><option>Type 5</option><option>Type 6</option><option>Type 7</option><option>Type 8</option><option>Type 9</option></select>
         </div>
+        <div><label>Spud / Completion Year (optional)</label><input id="f_year" type="number" min="1900" max="2100" placeholder="e.g. 1972"/></div>
+        <div><label>Reviewer (optional)</label><input id="f_reviewer" placeholder="e.g. T. Khan"/></div>
+        <div style="grid-column:1/-1"><label>Notes / Justification (optional)</label><textarea id="f_notes" rows="2" placeholder="Field observations, surface conditions, regulatory file numbers, references…"></textarea></div>
       </div>
 
       <div class="divider"></div>
@@ -380,28 +393,44 @@ function updateLiveTotal(){
 }
 
 function readForm(){
+  const latRaw = document.getElementById('f_lat').value;
+  const lonRaw = document.getElementById('f_lon').value;
+  const yearRaw = document.getElementById('f_year').value;
+  let lat = latRaw==='' ? null : parseFloat(latRaw);
+  let lon = lonRaw==='' ? null : parseFloat(lonRaw);
+  if(lat!==null && (isNaN(lat) || lat<-90 || lat>90)){ alert('Latitude must be between -90 and 90'); throw new Error('bad lat'); }
+  if(lon!==null && (isNaN(lon) || lon<-180 || lon>180)){ alert('Longitude must be between -180 and 180'); throw new Error('bad lon'); }
+  let year = yearRaw==='' ? null : parseInt(yearRaw,10);
+  if(year!==null && (isNaN(year) || year<1850 || year>new Date().getFullYear()+1)){ alert('Year must be between 1850 and the current year'); throw new Error('bad year'); }
+  const prev = state.editingId ? state.wells.find(x=>x.id===state.editingId) : null;
   return {
     id: state.editingId || uid(),
     licence: document.getElementById('f_id').value.trim() || 'UNNAMED',
     operator: document.getElementById('f_op').value.trim() || 'Unknown',
-    lat: parseFloat(document.getElementById('f_lat').value)||null,
-    lon: parseFloat(document.getElementById('f_lon').value)||null,
+    lat, lon, year,
     type: document.getElementById('f_type').value,
     traj: document.getElementById('f_traj').value,
     status: document.getElementById('f_status').value,
     klass: document.getElementById('f_class').value,
+    reviewer: document.getElementById('f_reviewer').value.trim() || '',
+    notes: document.getElementById('f_notes').value.trim() || '',
     scores: {...state.currentForm},
     total: PARAMS.reduce((a,p)=>a+state.currentForm[p.key],0),
-    createdAt: new Date().toISOString(),
+    createdAt: prev?.createdAt || new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
   };
 }
 
 function saveWell(){
-  const w = readForm();
+  let w;
+  try { w = readForm(); } catch(e){ return; }
   if(state.editingId){
     const i = state.wells.findIndex(x=>x.id===state.editingId);
     if(i>=0) state.wells[i] = w;
   } else {
+    // dedupe by licence
+    const dup = state.wells.find(x=>x.licence===w.licence && w.licence!=='UNNAMED');
+    if(dup && !confirm(`A well with licence "${w.licence}" already exists. Save as a new entry anyway?`)) return;
     state.wells.push(w);
   }
   state.editingId=null;
@@ -415,7 +444,7 @@ function resetForm(keepScores){
   state.editingId = null;
   document.getElementById('formTitle').textContent='Add Legacy Well';
   document.getElementById('saveBtn').textContent='Save Well';
-  ['f_id','f_op','f_lat','f_lon'].forEach(id=>document.getElementById(id).value='');
+  ['f_id','f_op','f_lat','f_lon','f_year','f_reviewer','f_notes'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('f_type').selectedIndex=0;
   document.getElementById('f_traj').selectedIndex=0;
   document.getElementById('f_status').selectedIndex=0;
@@ -431,8 +460,11 @@ function editWell(id){
   document.getElementById('saveBtn').textContent='Update Well';
   document.getElementById('f_id').value=w.licence;
   document.getElementById('f_op').value=w.operator;
-  document.getElementById('f_lat').value=w.lat||'';
-  document.getElementById('f_lon').value=w.lon||'';
+  document.getElementById('f_lat').value=(w.lat===null||w.lat===undefined)?'':w.lat;
+  document.getElementById('f_lon').value=(w.lon===null||w.lon===undefined)?'':w.lon;
+  document.getElementById('f_year').value=(w.year===null||w.year===undefined)?'':w.year;
+  document.getElementById('f_reviewer').value=w.reviewer||'';
+  document.getElementById('f_notes').value=w.notes||'';
   document.getElementById('f_type').value=w.type;
   document.getElementById('f_traj').value=w.traj;
   document.getElementById('f_status').value=w.status;
@@ -626,13 +658,17 @@ function openDetail(id){
       <div>
         <h2>Spatial / Identification</h2>
         <table class="wells"><tbody>
-          <tr><td>Latitude</td><td>${w.lat ?? '—'}</td></tr>
-          <tr><td>Longitude</td><td>${w.lon ?? '—'}</td></tr>
+          <tr><td>Latitude</td><td>${(w.lat===null||w.lat===undefined)?'—':w.lat}</td></tr>
+          <tr><td>Longitude</td><td>${(w.lon===null||w.lon===undefined)?'—':w.lon}</td></tr>
           <tr><td>Type</td><td>${w.type}</td></tr>
           <tr><td>Trajectory</td><td>${w.traj}</td></tr>
           <tr><td>Status</td><td>${w.status}</td></tr>
           <tr><td>Classification</td><td>${w.klass} (Fig. A-4 / Table A-1)</td></tr>
+          <tr><td>Spud / Completion Year</td><td>${w.year || '—'}</td></tr>
+          <tr><td>Reviewer</td><td>${escapeHtml(w.reviewer)||'—'}</td></tr>
+          <tr><td>Assessed</td><td>${(w.updatedAt||w.createdAt||'').slice(0,10)||'—'}</td></tr>
         </tbody></table>
+        ${w.notes?`<h2 style="margin-top:14px">Notes</h2><div class="rec-card" style="white-space:pre-wrap">${escapeHtml(w.notes)}</div>`:''}
         <h2 style="margin-top:14px">Recommended Action — § 8</h2>
         <div class="rec-card"><h4>${rec.title}</h4>${rec.body}</div>
         ${rec.warn?`<div class="warn" style="margin-top:8px">${rec.warn}</div>`:''}
@@ -691,19 +727,27 @@ function showTab(t,btn){
 
 /* ============ DEMO / IO ============ */
 function loadDemo(){
+  const now = new Date().toISOString();
+  const mk = (o)=>({id:uid(), reviewer:'T. Khan', createdAt:now, updatedAt:now, ...o});
   state.wells = [
-    {id:uid(),licence:'100/04-20-046-25W4',operator:'Orphan Well Assoc.',lat:53.4123,lon:-113.5421,type:'Oil Producer',traj:'Vertical',status:'Orphaned',klass:'Type 2',
-     scores:{plug:5,barriers:5,cement:5,prox:5,depthR:5,depthC:5,age:5,access:5,data:5},total:45,createdAt:new Date().toISOString()},
-    {id:uid(),licence:'102/11-08-046-26W4',operator:'Cenovus Energy',lat:53.4501,lon:-113.6011,type:'Gas Producer',traj:'Vertical',status:'Abandoned (P&A)',klass:'Type 7',
-     scores:{plug:1,barriers:1,cement:1,prox:3,depthR:5,depthC:1,age:3,access:1,data:1},total:17,createdAt:new Date().toISOString()},
-    {id:uid(),licence:'07-22-045-25W4',operator:'CNRL',lat:53.3811,lon:-113.5200,type:'Disposal',traj:'Deviated',status:'Suspended',klass:'Type 4',
-     scores:{plug:3,barriers:3,cement:3,prox:3,depthR:5,depthC:3,age:3,access:3,data:3},total:29,createdAt:new Date().toISOString()},
-    {id:uid(),licence:'14-31-047-25W4',operator:'Unknown',lat:53.4921,lon:-113.4805,type:'Unknown',traj:'Unknown',status:'Unknown',klass:'Type 1',
-     scores:{plug:5,barriers:5,cement:5,prox:3,depthR:3,depthC:3,age:5,access:5,data:5},total:39,createdAt:new Date().toISOString()},
-    {id:uid(),licence:'06-15-046-25W4',operator:'Imperial Oil',lat:53.4250,lon:-113.5108,type:'Strat Test',traj:'Vertical',status:'Abandoned (P&A)',klass:'Type 9',
-     scores:{plug:1,barriers:1,cement:1,prox:1,depthR:1,depthC:1,age:1,access:1,data:1},total:9,createdAt:new Date().toISOString()},
-    {id:uid(),licence:'09-27-046-25W4',operator:'Husky / Cenovus',lat:53.4402,lon:-113.5320,type:'Injection',traj:'Vertical',status:'Suspended',klass:'Type 5',
-     scores:{plug:3,barriers:3,cement:5,prox:5,depthR:5,depthC:3,age:5,access:3,data:3},total:35,createdAt:new Date().toISOString()},
+    mk({licence:'100/04-20-046-25W4',operator:'Orphan Well Assoc.',lat:53.4123,lon:-113.5421,year:1958,type:'Oil Producer',traj:'Vertical',status:'Orphaned',klass:'Type 2',
+     notes:'Worst-case orphan: no surface marker, no records, no licensee. Inside modeled AoR (< 1.6 km).',
+     scores:{plug:5,barriers:5,cement:5,prox:5,depthR:5,depthC:5,age:5,access:5,data:5},total:45}),
+    mk({licence:'102/11-08-046-26W4',operator:'Cenovus Energy',lat:53.4501,lon:-113.6011,year:1998,type:'Gas Producer',traj:'Vertical',status:'Abandoned (P&A)',klass:'Type 7',
+     notes:'Modern P&A, CBL verified to top of caprock, two cement plugs. Within plume buffer but barriers sound.',
+     scores:{plug:1,barriers:1,cement:1,prox:3,depthR:5,depthC:1,age:3,access:1,data:1},total:17}),
+    mk({licence:'07-22-045-25W4',operator:'CNRL',lat:53.3811,lon:-113.5200,year:1985,type:'Disposal',traj:'Deviated',status:'Suspended',klass:'Type 4',
+     notes:'Suspended disposal well; partial cement data; pressure test pending under MMV cycle.',
+     scores:{plug:3,barriers:3,cement:3,prox:3,depthR:5,depthC:3,age:3,access:3,data:3},total:29}),
+    mk({licence:'14-31-047-25W4',operator:'Unknown',lat:53.4921,lon:-113.4805,year:null,type:'Unknown',traj:'Unknown',status:'Unknown',klass:'Type 1',
+     notes:'Undocumented well discovered via legacy aerial survey; default to analog assumptions until logged.',
+     scores:{plug:5,barriers:5,cement:5,prox:3,depthR:3,depthC:3,age:5,access:5,data:5},total:39}),
+    mk({licence:'06-15-046-25W4',operator:'Imperial Oil',lat:53.4250,lon:-113.5108,year:2010,type:'Strat Test',traj:'Vertical',status:'Abandoned (P&A)',klass:'Type 9',
+     notes:'Strat test with full log suite, modern materials, far above caprock — background population.',
+     scores:{plug:1,barriers:1,cement:1,prox:1,depthR:1,depthC:1,age:1,access:1,data:1},total:9}),
+    mk({licence:'09-27-046-25W4',operator:'Husky / Cenovus',lat:53.4402,lon:-113.5320,year:1972,type:'Injection',traj:'Vertical',status:'Suspended',klass:'Type 5',
+     notes:'Pre-NACE carbon steel tubulars; cement coverage absent above caprock; re-entry diagnostics scheduled.',
+     scores:{plug:3,barriers:3,cement:5,prox:5,depthR:5,depthC:3,age:5,access:3,data:3},total:35}),
   ];
   save(); render();
 }
@@ -716,51 +760,358 @@ function importJSON(e){
   const f=e.target.files[0]; if(!f) return;
   const r=new FileReader(); r.onload=()=>{
     try{ const d=JSON.parse(r.result); if(Array.isArray(d)){state.wells=d;save();render();}}catch(err){alert('Invalid JSON');}
+    e.target.value='';
   }; r.readAsText(f);
 }
 
+/* ============ HTML / TEXT HELPERS ============ */
+function escapeHtml(s){
+  if(s===null||s===undefined) return '';
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+/* ============ CSV IMPORT / EXPORT ============ */
+/* CSV columns map directly to UI fields. Score columns accept:
+   - numeric: 1 / 3 / 5
+   - text: Low / L / Medium / Med / M / High / H (case-insensitive)
+   - descriptive Appendix-D phrasing (matched against the level dictionary)
+*/
+const CSV_COLS = [
+  {key:'licence',  hdr:'Well ID / Licence',          sample:'100/04-20-046-25W4'},
+  {key:'operator', hdr:'Operator',                   sample:'Orphan Well Assoc.'},
+  {key:'lat',      hdr:'Latitude',                   sample:'53.4123'},
+  {key:'lon',      hdr:'Longitude',                  sample:'-113.5421'},
+  {key:'year',     hdr:'Spud / Completion Year',     sample:'1968'},
+  {key:'type',     hdr:'Well Type',                  sample:'Oil Producer',
+    enum:['Oil Producer','Gas Producer','Injection','Disposal','Strat Test','Observation','Unknown']},
+  {key:'traj',     hdr:'Trajectory',                 sample:'Vertical',
+    enum:['Vertical','Deviated','Horizontal','Unknown']},
+  {key:'status',   hdr:'Legal Status',               sample:'Orphaned',
+    enum:['Active','Suspended','Abandoned (P&A)','Orphaned','Unknown']},
+  {key:'klass',    hdr:'Classification (Type 1-9)',  sample:'Type 2',
+    enum:['Type 1','Type 2','Type 3','Type 4','Type 5','Type 6','Type 7','Type 8','Type 9']},
+  {key:'reviewer', hdr:'Reviewer',                   sample:'T. Khan'},
+  // 9 scoring parameters — Low/Med/High or 1/3/5
+  {key:'sc_plug',     hdr:'Plug Quality (Low/Med/High)',           sample:'High',  score:'plug'},
+  {key:'sc_barriers', hdr:'Number of Barriers (Low/Med/High)',     sample:'High',  score:'barriers'},
+  {key:'sc_cement',   hdr:'Cement Coverage (Low/Med/High)',        sample:'High',  score:'cement'},
+  {key:'sc_prox',     hdr:'Proximity to CO2 Plume (Low/Med/High)', sample:'High',  score:'prox'},
+  {key:'sc_depthR',   hdr:'Depth vs Reservoir (Low/Med/High)',     sample:'High',  score:'depthR'},
+  {key:'sc_depthC',   hdr:'Depth vs Storage Complex (Low/Med/High)', sample:'High',score:'depthC'},
+  {key:'sc_age',      hdr:'Well Age (Low/Med/High)',               sample:'High',  score:'age'},
+  {key:'sc_access',   hdr:'Access & Ownership (Low/Med/High)',     sample:'High',  score:'access'},
+  {key:'sc_data',     hdr:'Data Availability (Low/Med/High)',      sample:'High',  score:'data'},
+  {key:'notes',       hdr:'Notes / Justification',                 sample:'Orphan well, no surface marker, no abandonment records on file.'},
+];
+
+function csvEscape(v){
+  if(v===null||v===undefined) return '';
+  const s = String(v);
+  if(/[",\n\r]/.test(s)) return '"'+s.replace(/"/g,'""')+'"';
+  return s;
+}
+function csvJoin(rows){ return rows.map(r=>r.map(csvEscape).join(',')).join('\r\n'); }
+
+// Robust CSV parser: handles quoted fields, embedded commas, CRLF
+function csvParse(text){
+  const rows = []; let row = []; let cur = ''; let i=0; let inQ=false;
+  // strip UTF-8 BOM
+  if(text.charCodeAt(0)===0xFEFF) text = text.slice(1);
+  while(i<text.length){
+    const ch = text[i];
+    if(inQ){
+      if(ch==='"'){
+        if(text[i+1]==='"'){ cur+='"'; i+=2; continue; }
+        inQ=false; i++; continue;
+      }
+      cur+=ch; i++; continue;
+    }
+    if(ch==='"'){ inQ=true; i++; continue; }
+    if(ch===','){ row.push(cur); cur=''; i++; continue; }
+    if(ch==='\r'){ i++; continue; }
+    if(ch==='\n'){ row.push(cur); cur=''; rows.push(row); row=[]; i++; continue; }
+    cur+=ch; i++;
+  }
+  if(cur.length||row.length){ row.push(cur); rows.push(row); }
+  return rows.filter(r=>r.length && !(r.length===1 && r[0].trim()==='')); // drop empties
+}
+
+function parseScoreCell(v){
+  if(v===null||v===undefined) return null;
+  const s = String(v).trim().toLowerCase();
+  if(!s) return null;
+  if(s==='1' || s==='low' || s==='l') return 1;
+  if(s==='3' || s==='med' || s==='medium' || s==='moderate' || s==='m') return 3;
+  if(s==='5' || s==='high' || s==='h' || s==='critical') return 5;
+  // tolerate "1 (low)" or similar
+  if(s.startsWith('1')) return 1;
+  if(s.startsWith('3')) return 3;
+  if(s.startsWith('5')) return 5;
+  return null;
+}
+
+function downloadCSVTemplate(){
+  const header = CSV_COLS.map(c=>c.hdr);
+  // Two realistic sample rows so users see exactly how to fill it in
+  const sampleA = CSV_COLS.map(c=>c.sample);
+  const sampleB = CSV_COLS.map(c=>{
+    switch(c.key){
+      case 'licence': return '102/11-08-046-26W4';
+      case 'operator': return 'Cenovus Energy';
+      case 'lat': return '53.4501';
+      case 'lon': return '-113.6011';
+      case 'year': return '1998';
+      case 'type': return 'Gas Producer';
+      case 'traj': return 'Vertical';
+      case 'status': return 'Abandoned (P&A)';
+      case 'klass': return 'Type 7';
+      case 'reviewer': return 'T. Khan';
+      case 'sc_plug': return 'Low';
+      case 'sc_barriers': return 'Low';
+      case 'sc_cement': return 'Low';
+      case 'sc_prox': return 'Medium';
+      case 'sc_depthR': return 'High';
+      case 'sc_depthC': return 'Low';
+      case 'sc_age': return 'Medium';
+      case 'sc_access': return 'Low';
+      case 'sc_data': return 'Low';
+      case 'notes': return 'Modern P&A (2018), CBL verified to caprock, full records on file.';
+      default: return '';
+    }
+  });
+  const csv = '﻿' + csvJoin([header, sampleA, sampleB]);
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
+  const a = document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download='legacy_wells_template.csv'; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
+}
+
+function exportCSV(){
+  if(!state.wells.length){ alert('No wells to export. Add wells or click "Load Demo" first.'); return; }
+  const header = CSV_COLS.map(c=>c.hdr);
+  const scoreLabel = v=> v===1?'Low':v===3?'Medium':v===5?'High':'';
+  const rows = state.wells.map(w => CSV_COLS.map(c=>{
+    if(c.score) return scoreLabel(w.scores[c.score]);
+    switch(c.key){
+      case 'licence': return w.licence;
+      case 'operator': return w.operator;
+      case 'lat': return w.lat ?? '';
+      case 'lon': return w.lon ?? '';
+      case 'year': return w.year ?? '';
+      case 'type': return w.type;
+      case 'traj': return w.traj;
+      case 'status': return w.status;
+      case 'klass': return w.klass;
+      case 'reviewer': return w.reviewer ?? '';
+      case 'notes': return w.notes ?? '';
+      default: return '';
+    }
+  }));
+  const csv = '﻿' + csvJoin([header, ...rows]);
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
+  const a = document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download='legacy_wells_'+new Date().toISOString().slice(0,10)+'.csv'; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
+}
+
+function importCSV(e){
+  const f = e.target.files[0]; if(!f) return;
+  const r = new FileReader();
+  r.onload = () => {
+    try {
+      const rows = csvParse(r.result);
+      if(rows.length < 2){ alert('CSV appears empty. Please use the CSV Template.'); e.target.value=''; return; }
+      const headerRow = rows[0].map(h=>h.trim());
+      // Map header → column key by case/space-insensitive match
+      const norm = s => String(s).toLowerCase().replace(/[^a-z0-9]+/g,'');
+      const colIdx = {};
+      CSV_COLS.forEach(c => {
+        const target = norm(c.hdr);
+        const idx = headerRow.findIndex(h => norm(h)===target);
+        if(idx>=0) colIdx[c.key] = idx;
+      });
+      // Require licence column
+      if(colIdx.licence===undefined){
+        alert('CSV is missing required header "Well ID / Licence". Please download the CSV Template and edit it.');
+        e.target.value=''; return;
+      }
+      const imported = [];
+      const errors = [];
+      const enumNormalize = (val, allowed)=>{
+        if(!val) return allowed[allowed.length-1]==='Unknown' ? 'Unknown' : allowed[0];
+        const v = norm(val);
+        const hit = allowed.find(a=>norm(a)===v);
+        return hit || (allowed.includes('Unknown')?'Unknown':allowed[0]);
+      };
+      for(let i=1;i<rows.length;i++){
+        const row = rows[i];
+        // skip fully empty rows
+        if(row.every(c=>!String(c||'').trim())) continue;
+        try {
+          const get = k => colIdx[k]!==undefined ? (row[colIdx[k]]||'').trim() : '';
+          const licence = get('licence') || 'UNNAMED';
+          const operator = get('operator') || 'Unknown';
+          const latRaw = get('lat'); const lonRaw = get('lon'); const yearRaw = get('year');
+          let lat = latRaw===''?null:parseFloat(latRaw);
+          let lon = lonRaw===''?null:parseFloat(lonRaw);
+          let year = yearRaw===''?null:parseInt(yearRaw,10);
+          if(lat!==null && (isNaN(lat)||lat<-90||lat>90)) throw new Error('latitude out of range');
+          if(lon!==null && (isNaN(lon)||lon<-180||lon>180)) throw new Error('longitude out of range');
+          if(year!==null && (isNaN(year)||year<1850||year>new Date().getFullYear()+1)) year=null;
+          const typeCol  = CSV_COLS.find(c=>c.key==='type');
+          const trajCol  = CSV_COLS.find(c=>c.key==='traj');
+          const statCol  = CSV_COLS.find(c=>c.key==='status');
+          const klassCol = CSV_COLS.find(c=>c.key==='klass');
+          const scores = {};
+          PARAMS.forEach(p=>scores[p.key]=1);
+          CSV_COLS.filter(c=>c.score).forEach(c=>{
+            const v = parseScoreCell(get(c.key));
+            if(v!==null) scores[c.score] = v;
+          });
+          const total = PARAMS.reduce((a,p)=>a+scores[p.key],0);
+          const well = {
+            id: uid(),
+            licence, operator, lat, lon, year,
+            type:  enumNormalize(get('type'),  typeCol.enum),
+            traj:  enumNormalize(get('traj'),  trajCol.enum),
+            status:enumNormalize(get('status'),statCol.enum),
+            klass: enumNormalize(get('klass'), klassCol.enum),
+            reviewer: get('reviewer'),
+            notes: get('notes'),
+            scores, total,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+          imported.push(well);
+        } catch(rowErr){
+          errors.push(`Row ${i+1}: ${rowErr.message}`);
+        }
+      }
+      if(!imported.length){
+        alert('No wells could be imported.\n\n'+(errors.join('\n')||'CSV had no data rows.'));
+      } else {
+        const append = confirm(`Parsed ${imported.length} well(s) from CSV.\n\nOK = append to existing ${state.wells.length} well(s)\nCancel = replace existing register with the CSV contents.${errors.length?'\n\nSkipped '+errors.length+' row(s):\n'+errors.slice(0,5).join('\n'):''}`);
+        state.wells = append ? state.wells.concat(imported) : imported;
+        save(); render();
+      }
+    } catch(err){
+      alert('Failed to parse CSV: '+err.message);
+    } finally {
+      e.target.value='';
+    }
+  };
+  r.readAsText(f);
+}
+
 /* ============ PDF EXPORT ============ */
+/* jsPDF's standard "helvetica" font is WinAnsi only; characters outside that set
+   render as blanks or wrong glyphs and corrupt downstream kerning (visible as
+   "extra spaces" between words). We normalize all PDF strings to ASCII first. */
+function pdfSafe(s){
+  if(s===null||s===undefined) return '';
+  return String(s)
+    // subscripts / superscripts
+    .replace(/CO₂/g,'CO2').replace(/H₂O/g,'H2O').replace(/O₂/g,'O2').replace(/N₂/g,'N2')
+    .replace(/[₀-₉]/g, c => String.fromCharCode(0x30 + c.charCodeAt(0) - 0x2080))
+    .replace(/[⁰¹²³⁴-⁹]/g, c => {
+      const map = {'⁰':'0','¹':'1','²':'2','³':'3','⁴':'4','⁵':'5','⁶':'6','⁷':'7','⁸':'8','⁹':'9'};
+      return map[c]||c;
+    })
+    // dashes, quotes, ellipsis
+    .replace(/[–—−]/g,'-')
+    .replace(/[‘’‚‛]/g,"'")
+    .replace(/[“”„‟]/g,'"')
+    .replace(/…/g,'...')
+    // bullets / section markers
+    .replace(/·/g,' - ')   // middle dot
+    .replace(/•/g,'- ')    // bullet
+    .replace(/§/g,'Sec.')  // §
+    .replace(/°/g,' deg ') // degree
+    // math
+    .replace(/≥/g,'>=').replace(/≤/g,'<=')
+    .replace(/≠/g,'!=').replace(/×/g,'x').replace(/÷/g,'/')
+    .replace(/→/g,'->').replace(/←/g,'<-')
+    // collapse double spaces created by the substitutions
+    .replace(/[ \t]{2,}/g,' ')
+    .trim();
+}
+function pdfHtmlToText(html){
+  return pdfSafe(
+    String(html)
+      .replace(/<br\s*\/?>/gi,'\n')
+      .replace(/<\/p>/gi,'\n\n')
+      .replace(/<li[^>]*>/gi,'\n  - ')
+      .replace(/<\/li>/gi,'')
+      .replace(/<ul[^>]*>|<\/ul>/gi,'\n')
+      .replace(/<b>|<\/b>|<strong>|<\/strong>/gi,'')
+      .replace(/<[^>]+>/g,' ')
+      .replace(/&nbsp;/gi,' ')
+      .replace(/&amp;/gi,'&').replace(/&lt;/gi,'<').replace(/&gt;/gi,'>')
+      .replace(/[ \t]+/g,' ')
+      .replace(/\n[ \t]+/g,'\n')
+      .replace(/\n{3,}/g,'\n\n')
+      .trim()
+  );
+}
+function hexToRgb(h){ const v=h.replace('#',''); return [parseInt(v.slice(0,2),16),parseInt(v.slice(2,4),16),parseInt(v.slice(4,6),16)]; }
+
 async function exportPDF(singleId){
+  if(!state.wells.length){ alert('No wells in the register yet. Add a well or click "Load Demo" first.'); return; }
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({unit:'pt',format:'letter'});
   const W = doc.internal.pageSize.getWidth();
   const H = doc.internal.pageSize.getHeight();
   const M = 40;
+  const CONTENT_W = W - 2*M;
   let y = M;
 
-  // Cover
+  const ensure = (need) => {
+    if(y + need > H - 36){ doc.addPage(); y = M; }
+  };
+
+  // Cover banner
   doc.setFillColor(11,18,32); doc.rect(0,0,W,90,'F');
   doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(20);
-  doc.text('CO₂ Legacy Wellbore Review Report', M, 50);
+  doc.text(pdfSafe('CO2 Legacy Wellbore Review Report'), M, 50);
   doc.setFont('helvetica','normal'); doc.setFontSize(10);
-  doc.text('Per Enbridge NET GD-40-0B42-524E · Appendix D · § 7.2', M, 70);
-  doc.text(new Date().toLocaleString(), W-M, 70, {align:'right'});
+  doc.text(pdfSafe('Per Enbridge NET GD-40-0B42-524E  |  Appendix D  |  Sec. 7.2 Risk Scoring'), M, 70);
+  const now = new Date();
+  const stamp = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0')+' '+now.toLocaleTimeString();
+  doc.text(stamp, W-M, 70, {align:'right'});
   y = 120;
   doc.setTextColor(0,0,0);
 
   const wells = singleId ? state.wells.filter(w=>w.id===singleId) : state.wells;
 
-  // Portfolio summary (only on multi)
+  // Portfolio summary (multi-well only)
   if(!singleId){
-    doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.text('Portfolio Summary', M, y); y+=18;
+    doc.setFont('helvetica','bold'); doc.setFontSize(14);
+    doc.text('Portfolio Summary', M, y); y+=18;
     doc.setFont('helvetica','normal'); doc.setFontSize(10);
     const lo=wells.filter(w=>tierFor(w.total).cls==='low').length;
     const mo=wells.filter(w=>tierFor(w.total).cls==='mod').length;
     const hi=wells.filter(w=>tierFor(w.total).cls==='high').length;
     const cr=wells.filter(w=>tierFor(w.total).cls==='crit').length;
     doc.text(`Total wells reviewed: ${wells.length}`, M, y); y+=14;
-    doc.text(`Low: ${lo}   Moderate: ${mo}   High: ${hi}   Critical: ${cr}`, M, y); y+=20;
+    doc.text(`Low: ${lo}    Moderate: ${mo}    High: ${hi}    Critical: ${cr}`, M, y); y+=18;
 
     doc.autoTable({
       startY: y, margin:{left:M,right:M},
       head:[['Well ID','Operator','Type','Status','Class','Score','Tier']],
       body: [...wells].sort((a,b)=>b.total-a.total).map(w=>[
-        w.licence, w.operator, w.type, w.status, w.klass, String(w.total), tierFor(w.total).label
+        pdfSafe(w.licence), pdfSafe(w.operator), pdfSafe(w.type),
+        pdfSafe(w.status), pdfSafe(w.klass), String(w.total), tierFor(w.total).label
       ]),
-      styles:{font:'helvetica',fontSize:9,cellPadding:4},
-      headStyles:{fillColor:[23,34,56],textColor:255},
+      styles:{font:'helvetica',fontSize:9,cellPadding:5,overflow:'linebreak',valign:'middle'},
+      headStyles:{fillColor:[23,34,56],textColor:255,fontStyle:'bold'},
       alternateRowStyles:{fillColor:[245,247,250]},
-      didParseCell: (data)=>{
+      columnStyles:{
+        0:{cellWidth:110}, 1:{cellWidth:95}, 2:{cellWidth:72}, 3:{cellWidth:78},
+        4:{cellWidth:46}, 5:{cellWidth:42,halign:'center'}, 6:{halign:'center'}
+      },
+      didParseCell:(data)=>{
         if(data.section==='body' && data.column.index===6){
           const v=data.cell.raw;
           const c = v==='Low'?[31,191,117]:v==='Moderate'?[240,169,59]:v==='High'?[232,90,79]:[168,50,74];
@@ -770,78 +1121,134 @@ async function exportPDF(singleId){
     });
     y = doc.lastAutoTable.finalY + 24;
 
-    // Reference table
-    if(y > H-200){ doc.addPage(); y=M; }
-    doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.text('Risk Scoring Reference (Appendix D)', M, y); y+=10;
+    ensure(220);
+    doc.setFont('helvetica','bold'); doc.setFontSize(14);
+    doc.text('Risk Scoring Reference (Appendix D)', M, y); y+=8;
     doc.autoTable({
-      startY: y+6, margin:{left:M,right:M},
+      startY: y+8, margin:{left:M,right:M},
       head:[['Parameter','Low (1)','Medium (3)','High (5)']],
-      body: PARAMS.map(p=>[p.name, p.levels[1], p.levels[3], p.levels[5]]),
-      styles:{font:'helvetica',fontSize:8,cellPadding:4},
-      headStyles:{fillColor:[23,34,56],textColor:255}
+      body: PARAMS.map(p=>[pdfSafe(p.name), pdfSafe(p.levels[1]), pdfSafe(p.levels[3]), pdfSafe(p.levels[5])]),
+      styles:{font:'helvetica',fontSize:8.5,cellPadding:5,overflow:'linebreak',valign:'top'},
+      headStyles:{fillColor:[23,34,56],textColor:255,fontStyle:'bold',halign:'left'},
+      columnStyles:{0:{cellWidth:120,fontStyle:'bold'}}
     });
+    y = doc.lastAutoTable.finalY + 12;
   }
 
   // Per-well dossiers
-  wells.forEach((w,idx)=>{
+  wells.forEach((w)=>{
     doc.addPage(); y = M;
     const t = tierFor(w.total);
     doc.setFillColor(...hexToRgb(t.color));
-    doc.rect(0,0,W,12,'F');
+    doc.rect(0,0,W,10,'F');
+
     doc.setFont('helvetica','bold'); doc.setFontSize(16);
-    doc.text(`Well Dossier: ${w.licence}`, M, y); y+=22;
+    doc.text(pdfSafe('Well Dossier: '+w.licence), M, y); y+=22;
+
     doc.setFont('helvetica','normal'); doc.setFontSize(10);
-    doc.text(`Operator: ${w.operator}`, M, y); y+=14;
-    doc.text(`Type: ${w.type}   Trajectory: ${w.traj}   Status: ${w.status}   Class: ${w.klass}`, M, y); y+=14;
-    doc.text(`Coordinates: ${w.lat ?? '—'}, ${w.lon ?? '—'}`, M, y); y+=14;
+    doc.text(pdfSafe('Operator: '+w.operator), M, y); y+=14;
+    doc.text(pdfSafe(`Type: ${w.type}    Trajectory: ${w.traj}    Status: ${w.status}    Class: ${w.klass}`), M, y); y+=14;
+    const coord = (w.lat===null||w.lat===undefined?'-':w.lat) + ', ' + (w.lon===null||w.lon===undefined?'-':w.lon);
+    doc.text(pdfSafe('Coordinates: '+coord), M, y); y+=14;
+    if(w.year){ doc.text(pdfSafe('Spud / Completion Year: '+w.year), M, y); y+=14; }
+    if(w.reviewer){ doc.text(pdfSafe('Reviewer: '+w.reviewer), M, y); y+=14; }
+    const assessed = (w.updatedAt||w.createdAt||'').slice(0,10);
+    if(assessed){ doc.text('Assessed: '+assessed, M, y); y+=14; }
 
-    doc.setFont('helvetica','bold'); doc.setFontSize(13);
-    doc.text(`Risk Score: ${w.total}/45 — ${t.label}`, M, y); y+=18;
+    y+=4;
+    // Tier badge bar
+    doc.setFillColor(...hexToRgb(t.color));
+    doc.roundedRect(M, y, 200, 22, 4, 4, 'F');
+    doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(12);
+    doc.text(pdfSafe(`Risk Score ${w.total}/45  -  ${t.label}`), M+10, y+15);
+    doc.setTextColor(0,0,0);
+    y += 32;
 
+    // Score breakdown table
     doc.autoTable({
       startY:y, margin:{left:M,right:M},
-      head:[['Parameter','Justification','Score']],
-      body: PARAMS.map(p=>[p.name, p.levels[w.scores[p.key]], String(w.scores[p.key])]),
-      styles:{font:'helvetica',fontSize:9,cellPadding:4},
-      headStyles:{fillColor:[23,34,56],textColor:255},
-      columnStyles:{2:{halign:'center',cellWidth:50}},
-      didParseCell: (data)=>{
+      head:[['Parameter','Justification (Appendix D)','Score']],
+      body: PARAMS.map(p=>[pdfSafe(p.name), pdfSafe(p.levels[w.scores[p.key]]), String(w.scores[p.key])]),
+      styles:{font:'helvetica',fontSize:9,cellPadding:5,overflow:'linebreak',valign:'middle',lineColor:[210,215,225],lineWidth:0.3},
+      headStyles:{fillColor:[23,34,56],textColor:255,fontStyle:'bold'},
+      columnStyles:{
+        0:{cellWidth:140,fontStyle:'bold'},
+        1:{cellWidth:'auto'},
+        2:{halign:'center',cellWidth:50,fontStyle:'bold'}
+      },
+      didParseCell:(data)=>{
         if(data.section==='body' && data.column.index===2){
           const v=+data.cell.raw;
           const c = v===1?[31,191,117]:v===3?[240,169,59]:[232,90,79];
-          data.cell.styles.fillColor=c; data.cell.styles.textColor=255; data.cell.styles.fontStyle='bold';
+          data.cell.styles.fillColor=c; data.cell.styles.textColor=255;
         }
       }
     });
     y = doc.lastAutoTable.finalY + 18;
 
+    // Notes block
+    if(w.notes){
+      ensure(60);
+      doc.setFont('helvetica','bold'); doc.setFontSize(12);
+      doc.text('Notes', M, y); y+=14;
+      doc.setFont('helvetica','normal'); doc.setFontSize(10);
+      const noteLines = doc.splitTextToSize(pdfSafe(w.notes), CONTENT_W);
+      ensure(noteLines.length*12 + 8);
+      doc.text(noteLines, M, y);
+      y += noteLines.length*12 + 10;
+    }
+
+    // Recommended action
     const rec = recommend(w);
+    ensure(80);
     doc.setFont('helvetica','bold'); doc.setFontSize(12);
-    doc.text('Recommended Action (§ 8)', M, y); y+=14;
-    doc.setFont('helvetica','bold'); doc.setFontSize(10);
-    doc.text(rec.title, M, y); y+=12;
-    doc.setFont('helvetica','normal'); doc.setFontSize(9);
-    const cleanBody = rec.body.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim();
-    const lines = doc.splitTextToSize(cleanBody, W-2*M);
-    doc.text(lines, M, y); y += lines.length*11 + 6;
+    doc.text(pdfSafe('Recommended Action (Sec. 8)'), M, y); y+=16;
+    doc.setFont('helvetica','bold'); doc.setFontSize(10.5);
+    const titleLines = doc.splitTextToSize(pdfSafe(rec.title), CONTENT_W);
+    doc.text(titleLines, M, y); y += titleLines.length*12 + 4;
+
+    doc.setFont('helvetica','normal'); doc.setFontSize(9.5);
+    const bodyText = pdfHtmlToText(rec.body);
+    const bodyLines = doc.splitTextToSize(bodyText, CONTENT_W);
+    // page-break safe: emit line by line
+    bodyLines.forEach(line=>{
+      ensure(13);
+      doc.text(line, M, y); y += 12;
+    });
+    y += 6;
+
     if(rec.warn){
-      doc.setFillColor(250,225,225); doc.rect(M, y-2, W-2*M, 22,'F');
-      doc.setTextColor(120,30,40); doc.text(rec.warn, M+6, y+12, {maxWidth:W-2*M-12});
-      doc.setTextColor(0,0,0); y+=28;
+      const warnText = pdfSafe(rec.warn);
+      const warnLines = doc.splitTextToSize(warnText, CONTENT_W - 14);
+      const boxH = warnLines.length*12 + 14;
+      ensure(boxH + 4);
+      doc.setFillColor(252,228,228);
+      doc.setDrawColor(232,90,79); doc.setLineWidth(0.6);
+      doc.roundedRect(M, y, CONTENT_W, boxH, 4, 4, 'FD');
+      doc.setTextColor(120,30,40); doc.setFont('helvetica','bold'); doc.setFontSize(9);
+      doc.text('Compliance Notice', M+7, y+12);
+      doc.setFont('helvetica','normal');
+      doc.text(warnLines, M+7, y+24);
+      doc.setTextColor(0,0,0); doc.setDrawColor(0); doc.setLineWidth(0.2);
+      y += boxH + 8;
     }
   });
 
-  // Footer page numbers
-  const total = doc.internal.getNumberOfPages();
-  for(let i=1;i<=total;i++){
+  // Footer page numbers (run after all pages exist)
+  const totalPages = doc.internal.getNumberOfPages();
+  for(let i=1;i<=totalPages;i++){
     doc.setPage(i);
-    doc.setFontSize(8); doc.setTextColor(120);
-    doc.text(`Page ${i} of ${total}  ·  Generated by CO₂ Legacy Wellbore Review Dashboard  ·  Reference: GD-40-0B42-524E`, W/2, H-20, {align:'center'});
+    doc.setFontSize(8); doc.setTextColor(120,120,120); doc.setFont('helvetica','normal');
+    const footer = pdfSafe(`Page ${i} of ${totalPages}  |  CO2 Legacy Wellbore Review Dashboard  |  Ref: GD-40-0B42-524E`);
+    doc.text(footer, W/2, H-20, {align:'center'});
   }
+  doc.setTextColor(0,0,0);
 
-  doc.save(`CO2_Legacy_Well_Review_${new Date().toISOString().slice(0,10)}.pdf`);
+  const fname = singleId
+    ? `Well_Dossier_${(wells[0]?.licence||'well').replace(/[^A-Za-z0-9._-]+/g,'_')}_${new Date().toISOString().slice(0,10)}.pdf`
+    : `CO2_Legacy_Well_Review_${new Date().toISOString().slice(0,10)}.pdf`;
+  doc.save(fname);
 }
-function hexToRgb(h){ const v=h.replace('#',''); return [parseInt(v.slice(0,2),16),parseInt(v.slice(2,4),16),parseInt(v.slice(4,6),16)]; }
 
 /* ============ INIT ============ */
 load();
