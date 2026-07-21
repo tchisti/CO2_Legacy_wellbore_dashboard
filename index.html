@@ -106,6 +106,22 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
 .search svg{position:absolute;left:8px;top:8px;color:var(--muted)}
 footer{padding:18px 24px;color:var(--muted);font-size:11px;border-top:1px solid var(--line);text-align:center}
 .score-pill{display:inline-block;padding:2px 8px;border-radius:6px;font-weight:800;font-size:12px;background:#0c1525;border:1px solid var(--line)}
+
+/* team sync */
+#syncPill{font-size:12px}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+.dot.live{background:var(--low);box-shadow:0 0 6px rgba(31,191,117,.8)}
+.dot.view{background:var(--accent)}
+.dot.local{background:var(--muted)}
+.dot.err{background:var(--high)}
+.dot.syncing{background:var(--mod);animation:syncpulse 1s infinite}
+@keyframes syncpulse{50%{opacity:.3}}
+.modal-back{position:fixed;inset:0;background:rgba(4,8,16,.65);backdrop-filter:blur(3px);z-index:100;display:none;place-items:center}
+.modal-back.open{display:grid}
+.modal{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:20px;width:min(520px,92vw);max-height:88vh;overflow:auto}
+.modal h2{margin:0;font-size:15px;text-transform:none;color:var(--text);letter-spacing:0}
+.modal ol{margin:6px 0 0 18px;padding:0;font-size:12px;color:var(--muted);line-height:1.7}
+.modal a{color:var(--accent2)}
 </style>
 </head>
 <body>
@@ -119,6 +135,7 @@ footer{padding:18px 24px;color:var(--muted);font-size:11px;border-top:1px solid 
     </div>
   </div>
   <div class="actions">
+    <button class="ghost" id="syncPill" onclick="openSyncModal()" title="Shared team register — click for settings"><span class="dot local"></span> Connecting…</button>
     <button class="ghost" onclick="loadDemo()" title="Seed dashboard with six sample legacy wells">Load Demo</button>
     <button class="ghost" onclick="downloadCSVTemplate()" title="Download a CSV template prefilled with a sample legacy well — edit it, then re-upload via Import CSV">📄 CSV Template</button>
     <label class="btn primary" style="margin:0;cursor:pointer;background:linear-gradient(135deg,#1f7ad6,#3aa0ff);border:none" title="Bulk upload legacy wells from a CSV file">
@@ -296,6 +313,40 @@ footer{padding:18px 24px;color:var(--muted);font-size:11px;border-top:1px solid 
   </main>
 </div>
 
+<!-- Team sync settings modal -->
+<div class="modal-back" id="syncModal">
+  <div class="modal">
+    <div class="row spread" style="margin-bottom:8px">
+      <h2>Shared Team Register — Sync Settings</h2>
+      <button class="ghost" onclick="closeSyncModal()" style="padding:4px 10px">✕</button>
+    </div>
+    <p class="muted" style="margin:0 0 12px 0">
+      This dashboard stores the well register in a shared file (<code>wells.json</code>) in the team's GitHub repository.
+      Everyone who opens this page sees the same register, and every save is kept — with full change history — until someone deletes it.
+      <b>Viewing</b> needs nothing. <b>Saving</b> needs a GitHub access token (entered once; this browser remembers it).
+    </p>
+    <div class="form-grid" style="grid-template-columns:1fr">
+      <div><label>Your name (stamped on your edits so the team knows who changed what)</label><input id="s_name" placeholder="e.g. T. Chisti"/></div>
+      <div><label>GitHub access token</label><input id="s_token" type="password" placeholder="github_pat_…" autocomplete="off"/></div>
+    </div>
+    <div class="note" style="margin-top:10px">
+      <b>Getting a token (once, ~2 min):</b>
+      <ol>
+        <li>Open <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">github.com/settings/personal-access-tokens/new</a> (sign in to GitHub).</li>
+        <li>Name it anything (e.g. "well dashboard"); set a long expiration.</li>
+        <li>Repository access → <b>Only select repositories</b> → choose <b>CO2_Legacy_wellbore_dashboard</b>.</li>
+        <li>Permissions → Repository permissions → <b>Contents</b> → <b>Read and write</b>.</li>
+        <li>Generate, copy the token, and paste it above. A team token shared privately also works.</li>
+      </ol>
+    </div>
+    <div id="syncMsg"></div>
+    <div class="actions-row" style="margin-top:14px">
+      <button class="danger" onclick="disconnectSync()">Disconnect</button>
+      <button class="primary" onclick="connectSync()">Save &amp; Test Connection</button>
+    </div>
+  </div>
+</div>
+
 <footer>
   Built on Enbridge NET <i>Legacy Well Review Guideline</i> GD-40-0B42-524E v1.0.0 (Khan & Christi, 2025) ·
   cross-checked against EPA UIC Class VI 40 CFR §146.84, AER Directive 051/020, CSA Z741, ISO 27914, API RP 65-3 ·
@@ -340,7 +391,9 @@ let state = { wells: [], editingId: null, currentForm: defaultScores(), selected
 function defaultScores(){ const o={}; PARAMS.forEach(p=>o[p.key]=1); return o; }
 function uid(){ return 'W-'+Math.random().toString(36).slice(2,8).toUpperCase(); }
 
-function save(){ localStorage.setItem('co2_legacy_wells', JSON.stringify(state.wells)); }
+function persistLocal(){ localStorage.setItem('co2_legacy_wells', JSON.stringify(state.wells)); }
+/* save() = keep a local copy (offline cache) AND queue a push to the shared team register */
+function save(msg){ persistLocal(); markDirty(msg); schedulePush(); }
 function load(){
   try{ const x=JSON.parse(localStorage.getItem('co2_legacy_wells')); if(Array.isArray(x)) state.wells=x; }catch(e){}
 }
@@ -418,13 +471,15 @@ function readForm(){
     total: PARAMS.reduce((a,p)=>a+state.currentForm[p.key],0),
     createdAt: prev?.createdAt || new Date().toISOString(),
     updatedAt: new Date().toISOString(),
+    updatedBy: syncName() || prev?.updatedBy || '',
   };
 }
 
 function saveWell(){
   let w;
   try { w = readForm(); } catch(e){ return; }
-  if(state.editingId){
+  const isEdit = !!state.editingId;
+  if(isEdit){
     const i = state.wells.findIndex(x=>x.id===state.editingId);
     if(i>=0) state.wells[i] = w;
   } else {
@@ -437,7 +492,7 @@ function saveWell(){
   document.getElementById('formTitle').textContent='Add Legacy Well';
   document.getElementById('saveBtn').textContent='Save Well';
   resetForm(true);
-  save(); render();
+  save((isEdit?'Update well ':'Add well ')+w.licence); render();
 }
 
 function resetForm(keepScores){
@@ -475,9 +530,13 @@ function editWell(id){
 }
 
 function deleteWell(id){
-  if(!confirm('Delete this well?')) return;
+  const w = state.wells.find(x=>x.id===id);
+  const shared = syncToken() ? ' from the SHARED team register (for everyone)' : '';
+  if(!confirm(`Delete well ${w?w.licence:''}${shared}?`)) return;
   state.wells = state.wells.filter(x=>x.id!==id);
-  save(); render();
+  SYNC.pendingDeletes.add(id);
+  if(state.selected===id) state.selected=null;
+  save('Delete well '+(w?w.licence:id)); render();
 }
 
 /* ============ RENDER ============ */
@@ -507,10 +566,10 @@ function render(){
       const tr = document.createElement('tr');
       const age = w.scores.age===1?'<30y':w.scores.age===3?'30–50y':'>50y';
       tr.innerHTML = `
-        <td><span class="well-id">${w.licence}</span><br><small style="color:var(--muted)">${w.operator}</small></td>
-        <td>${w.type}</td>
-        <td>${w.status}</td>
-        <td>${w.klass}</td>
+        <td><span class="well-id">${escapeHtml(w.licence)}</span><br><small style="color:var(--muted)">${escapeHtml(w.operator)}</small></td>
+        <td>${escapeHtml(w.type)}</td>
+        <td>${escapeHtml(w.status)}</td>
+        <td>${escapeHtml(w.klass)}</td>
         <td>${age}</td>
         <td><span class="score-pill">${w.total}</span></td>
         <td><span class="tag ${t.cls}">${t.label}</span></td>
@@ -532,19 +591,23 @@ function render(){
     const t = tierFor(w.total);
     const pct = ((w.total-9)/(45-9))*100;
     return `<div onclick="openDetail('${w.id}')" style="cursor:pointer;padding:10px;border:1px solid var(--line);border-radius:10px;margin-bottom:8px;background:#0c1525">
-      <div class="row spread"><div><span class="well-id">${w.licence}</span> <span class="tag ${t.cls}">${t.label}</span></div><div style="font-weight:800">${w.total}/45</div></div>
-      <div class="muted" style="font-size:11px;margin:4px 0">${w.operator} · ${w.type} · ${w.status} · ${w.klass}</div>
+      <div class="row spread"><div><span class="well-id">${escapeHtml(w.licence)}</span> <span class="tag ${t.cls}">${t.label}</span></div><div style="font-weight:800">${w.total}/45</div></div>
+      <div class="muted" style="font-size:11px;margin:4px 0">${escapeHtml(w.operator)} · ${escapeHtml(w.type)} · ${escapeHtml(w.status)} · ${escapeHtml(w.klass)}</div>
       <div class="bar"><div style="width:${pct}%"></div></div>
     </div>`;
   }).join('');
 
   drawCharts(); drawMatrix(); renderRef();
-  if(state.selected) openDetail(state.selected);
+  // refresh the dossier only if the Detail tab is already visible — background
+  // sync refreshes must not yank the user away from the tab they're on
+  const detailTab = document.getElementById('tab-detail');
+  if(state.selected && detailTab && detailTab.style.display!=='none') openDetail(state.selected);
 }
 
 /* ============ CHARTS ============ */
 let distChart, driverChart;
 function drawCharts(){
+  if(typeof Chart==='undefined') return; // CDN unavailable — table/register still work
   const lo = state.wells.filter(w=>tierFor(w.total).cls==='low').length;
   const mo = state.wells.filter(w=>tierFor(w.total).cls==='mod').length;
   const hi = state.wells.filter(w=>tierFor(w.total).cls==='high').length;
@@ -641,8 +704,8 @@ function openDetail(id){
     <div class="detail-head">
       <div>
         <div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.5px">Legacy Well Dossier</div>
-        <h2 style="font-size:20px;color:var(--text);text-transform:none;margin:4px 0">${w.licence}</h2>
-        <div class="muted">${w.operator} · ${w.type} · ${w.traj} · ${w.status} · ${w.klass}</div>
+        <h2 style="font-size:20px;color:var(--text);text-transform:none;margin:4px 0">${escapeHtml(w.licence)}</h2>
+        <div class="muted">${escapeHtml(w.operator)} · ${escapeHtml(w.type)} · ${escapeHtml(w.traj)} · ${escapeHtml(w.status)} · ${escapeHtml(w.klass)}</div>
       </div>
       <div style="text-align:right">
         <div style="font-size:34px;font-weight:800">${w.total}<span style="color:var(--muted);font-size:16px">/45</span></div>
@@ -667,6 +730,7 @@ function openDetail(id){
           <tr><td>Spud / Completion Year</td><td>${w.year || '—'}</td></tr>
           <tr><td>Reviewer</td><td>${escapeHtml(w.reviewer)||'—'}</td></tr>
           <tr><td>Assessed</td><td>${(w.updatedAt||w.createdAt||'').slice(0,10)||'—'}</td></tr>
+          <tr><td>Last Updated By</td><td>${escapeHtml(w.updatedBy)||'—'}</td></tr>
         </tbody></table>
         ${w.notes?`<h2 style="margin-top:14px">Notes</h2><div class="rec-card" style="white-space:pre-wrap">${escapeHtml(w.notes)}</div>`:''}
         <h2 style="margin-top:14px">Recommended Action — § 8</h2>
@@ -727,8 +791,9 @@ function showTab(t,btn){
 
 /* ============ DEMO / IO ============ */
 function loadDemo(){
+  if(state.wells.length && !confirm('Load Demo replaces the current register with 6 sample wells'+(syncToken()?' — including the SHARED register everyone sees.':'.')+' Continue?')) return;
   const now = new Date().toISOString();
-  const mk = (o)=>({id:uid(), reviewer:'T. Khan', createdAt:now, updatedAt:now, ...o});
+  const mk = (o)=>({id:uid(), reviewer:'T. Khan', createdAt:now, updatedAt:now, updatedBy:syncName()||'', ...o});
   state.wells = [
     mk({licence:'100/04-20-046-25W4',operator:'Orphan Well Assoc.',lat:53.4123,lon:-113.5421,year:1958,type:'Oil Producer',traj:'Vertical',status:'Orphaned',klass:'Type 2',
      notes:'Worst-case orphan: no surface marker, no records, no licensee. Inside modeled AoR (< 1.6 km).',
@@ -749,7 +814,8 @@ function loadDemo(){
      notes:'Pre-NACE carbon steel tubulars; cement coverage absent above caprock; re-entry diagnostics scheduled.',
      scores:{plug:3,barriers:3,cement:5,prox:5,depthR:5,depthC:3,age:5,access:3,data:3},total:35}),
   ];
-  save(); render();
+  SYNC.replaceNext = true;
+  save('Load demo data'); render();
 }
 function exportJSON(){
   const blob = new Blob([JSON.stringify(state.wells,null,2)],{type:'application/json'});
@@ -759,7 +825,7 @@ function exportJSON(){
 function importJSON(e){
   const f=e.target.files[0]; if(!f) return;
   const r=new FileReader(); r.onload=()=>{
-    try{ const d=JSON.parse(r.result); if(Array.isArray(d)){state.wells=d;save();render();}}catch(err){alert('Invalid JSON');}
+    try{ const d=JSON.parse(r.result); if(Array.isArray(d)){state.wells=d;SYNC.replaceNext=true;save('Import JSON ('+d.length+' wells)');render();}}catch(err){alert('Invalid JSON');}
     e.target.value='';
   }; r.readAsText(f);
 }
@@ -983,6 +1049,7 @@ function importCSV(e){
             scores, total,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
+            updatedBy: syncName()||'',
           };
           imported.push(well);
         } catch(rowErr){
@@ -994,7 +1061,8 @@ function importCSV(e){
       } else {
         const append = confirm(`Parsed ${imported.length} well(s) from CSV.\n\nOK = append to existing ${state.wells.length} well(s)\nCancel = replace existing register with the CSV contents.${errors.length?'\n\nSkipped '+errors.length+' row(s):\n'+errors.slice(0,5).join('\n'):''}`);
         state.wells = append ? state.wells.concat(imported) : imported;
-        save(); render();
+        if(!append) SYNC.replaceNext = true;
+        save('Import CSV ('+imported.length+' wells)'); render();
       }
     } catch(err){
       alert('Failed to parse CSV: '+err.message);
@@ -1058,6 +1126,7 @@ function pdfHtmlToText(html){
 function hexToRgb(h){ const v=h.replace('#',''); return [parseInt(v.slice(0,2),16),parseInt(v.slice(2,4),16),parseInt(v.slice(4,6),16)]; }
 
 async function exportPDF(singleId){
+  if(!window.jspdf){ alert('PDF library failed to load (no internet access to cdnjs.cloudflare.com). Reload the page and try again.'); return; }
   if(!state.wells.length){ alert('No wells in the register yet. Add a well or click "Load Demo" first.'); return; }
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({unit:'pt',format:'letter'});
@@ -1250,11 +1319,218 @@ async function exportPDF(singleId){
   doc.save(fname);
 }
 
+/* ============ TEAM SYNC — GitHub-backed shared register ============
+   The register lives in wells.json in the team GitHub repo. Anyone with the
+   page link can VIEW it (public repo). SAVING requires a GitHub token with
+   Contents: Read & write on the repo (entered once via the Sync modal).
+   Concurrency: before each save the latest remote copy is fetched and merged
+   per-well (newest updatedAt wins; deletions made here are honored), then the
+   file is written with its blob SHA so GitHub rejects mid-air collisions
+   (409), which we retry after re-merging. */
+const SYNC = {
+  owner:'tchisti', repo:'CO2_Legacy_wellbore_dashboard', branch:'main', path:'wells.json',
+  sha:null, etag:null, mode:'local', dirty:false, pushing:false, queued:false,
+  replaceNext:false, pendingMsg:'', pendingDeletes:new Set(),
+  pushTimer:null, pollTimer:null, lastSync:null,
+};
+function syncToken(){ return localStorage.getItem('co2_sync_token')||''; }
+function syncName(){ return localStorage.getItem('co2_sync_name')||''; }
+function apiUrl(){ return `https://api.github.com/repos/${SYNC.owner}/${SYNC.repo}/contents/${SYNC.path}`; }
+function apiHeaders(){
+  const h = {'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'};
+  const t = syncToken(); if(t) h['Authorization'] = 'Bearer '+t;
+  return h;
+}
+function b64encode(str){
+  const bytes = new TextEncoder().encode(str);
+  let bin=''; for(let i=0;i<bytes.length;i++) bin+=String.fromCharCode(bytes[i]);
+  return btoa(bin);
+}
+function b64decode(b64){
+  const bin = atob(String(b64).replace(/\s/g,''));
+  const bytes = new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) bytes[i]=bin.charCodeAt(i);
+  return new TextDecoder().decode(bytes);
+}
+function setSyncStatus(mode, detail){
+  SYNC.mode = mode;
+  const pill = document.getElementById('syncPill'); if(!pill) return;
+  const cfg = {
+    live:   {cls:'live',    txt:'Live · shared register'},
+    syncing:{cls:'syncing', txt:'Saving…'},
+    view:   {cls:'view',    txt:'Shared · view only'},
+    local:  {cls:'local',   txt:'Local only'},
+    error:  {cls:'err',     txt:'Sync error'},
+  }[mode] || {cls:'local', txt:'Local only'};
+  pill.innerHTML = `<span class="dot ${cfg.cls}"></span> ${cfg.txt}`;
+  pill.title = detail || (mode==='local'
+    ? 'Changes stay in this browser only — click to connect the shared team register'
+    : `Shared register: ${SYNC.owner}/${SYNC.repo} — click for settings`);
+  if(detail && mode==='error'){
+    const msg = document.getElementById('syncMsg');
+    if(msg) msg.innerHTML = `<div class="warn" style="margin-top:10px">${escapeHtml(detail)}</div>`;
+  }
+}
+function mergeWells(local, remote){
+  const byId = new Map();
+  (remote||[]).forEach(w=>{ if(w && w.id && !SYNC.pendingDeletes.has(w.id)) byId.set(w.id, w); });
+  (local||[]).forEach(w=>{
+    if(!w || !w.id) return;
+    const r = byId.get(w.id);
+    if(!r || String(w.updatedAt||'') >= String(r.updatedAt||'')) byId.set(w.id, w);
+  });
+  return [...byId.values()];
+}
+async function fetchRemote(useEtag){
+  const headers = apiHeaders();
+  if(useEtag && SYNC.etag) headers['If-None-Match'] = SYNC.etag;
+  const res = await fetch(apiUrl()+'?ref='+encodeURIComponent(SYNC.branch), {headers, cache:'no-store'});
+  if(res.status===304) return {unchanged:true};
+  if(res.status===404) return {missing:true, sha:null, wells:null};
+  if(res.status===401) throw new Error('GitHub rejected the token (401). Open sync settings and re-enter it.');
+  if(res.status===403) throw new Error(syncToken()
+    ? 'GitHub denied access (403) — check the token has Contents: Read and write on this repo.'
+    : 'GitHub rate limit reached (403) — will retry automatically, or add a token in sync settings.');
+  if(!res.ok) throw new Error('GitHub read failed ('+res.status+')');
+  const etag = res.headers.get('ETag');
+  const j = await res.json();
+  let wells = null;
+  try{ const arr = JSON.parse(b64decode(j.content||'')); if(Array.isArray(arr)) wells = arr; }catch(e){}
+  return {sha:j.sha, wells, etag};
+}
+async function pullRemote(initial){
+  if(SYNC.pushing || SYNC.dirty) return; // never clobber unsaved local edits; push() merges instead
+  try{
+    const r = await fetchRemote(true);
+    if(r.unchanged){ if(SYNC.mode!=='error') setSyncStatus(syncToken()?'live':'view'); return; }
+    if(r.missing){
+      SYNC.sha=null; SYNC.etag=null;
+      setSyncStatus(syncToken()?'live':'view', 'Shared register is empty — the first saved well will create it.');
+      return;
+    }
+    SYNC.sha=r.sha; SYNC.etag=r.etag; SYNC.lastSync=Date.now();
+    if(r.wells){ state.wells = r.wells; persistLocal(); render(); }
+    setSyncStatus(syncToken()?'live':'view');
+  }catch(e){
+    setSyncStatus(syncToken()?'error':'local', e.message);
+  }
+}
+function markDirty(msg){
+  SYNC.dirty = true;
+  if(msg) SYNC.pendingMsg = SYNC.pendingMsg ? SYNC.pendingMsg+'; '+msg : msg;
+}
+function schedulePush(){
+  if(!syncToken()){
+    setSyncStatus('local','Saved in this browser only — open sync settings (top bar) to share with the team.');
+    return;
+  }
+  clearTimeout(SYNC.pushTimer);
+  SYNC.pushTimer = setTimeout(pushRemote, 1000);
+}
+async function pushRemote(){
+  if(!syncToken()){ setSyncStatus('local'); return; }
+  if(SYNC.pushing){ SYNC.queued = true; return; }
+  SYNC.pushing = true; setSyncStatus('syncing');
+  try{
+    let ok = false;
+    for(let attempt=0; attempt<3 && !ok; attempt++){
+      let head = {sha:null, wells:null};
+      try{ head = await fetchRemote(false); }
+      catch(e){ if(attempt===2) throw e; continue; }
+      if(head.wells && !SYNC.replaceNext){
+        state.wells = mergeWells(state.wells, head.wells);
+      }
+      const who = syncName();
+      const body = {
+        message: (SYNC.pendingMsg||'Update well register') + (who ? ' — '+who : ''),
+        content: b64encode(JSON.stringify(state.wells,null,2)+'\n'),
+        branch: SYNC.branch,
+      };
+      if(head.sha) body.sha = head.sha;
+      const res = await fetch(apiUrl(), {method:'PUT', headers:{...apiHeaders(),'Content-Type':'application/json'}, body:JSON.stringify(body)});
+      if(res.status===409) continue; // someone saved simultaneously — re-fetch, re-merge, retry
+      if(res.status===404) throw new Error('Repo not reachable with this token (404) — it must be granted access to '+SYNC.owner+'/'+SYNC.repo+'.');
+      if(res.status===401) throw new Error('GitHub rejected the token (401). Open sync settings and re-enter it.');
+      if(res.status===403) throw new Error('Token cannot write (403) — it needs Contents: Read and write on this repo.');
+      if(!res.ok) throw new Error('GitHub save failed ('+res.status+')');
+      const j = await res.json();
+      SYNC.sha = j.content && j.content.sha; SYNC.etag = null;
+      ok = true;
+    }
+    if(!ok) throw new Error('Save conflict — a teammate saved at the same moment. Your change is kept locally; it will retry on your next save.');
+    SYNC.dirty=false; SYNC.replaceNext=false; SYNC.pendingMsg='';
+    SYNC.pendingDeletes.clear(); SYNC.lastSync=Date.now();
+    persistLocal(); render();
+    setSyncStatus('live');
+  }catch(e){
+    setSyncStatus('error', e.message);
+  }finally{
+    SYNC.pushing = false;
+    if(SYNC.queued){ SYNC.queued=false; schedulePush(); }
+  }
+}
+/* ---- sync settings modal ---- */
+function openSyncModal(){
+  document.getElementById('s_name').value = syncName();
+  document.getElementById('s_token').value = syncToken();
+  document.getElementById('syncMsg').innerHTML = '';
+  document.getElementById('syncModal').classList.add('open');
+}
+function closeSyncModal(){ document.getElementById('syncModal').classList.remove('open'); }
+async function connectSync(){
+  const name = document.getElementById('s_name').value.trim();
+  const token = document.getElementById('s_token').value.trim();
+  localStorage.setItem('co2_sync_name', name);
+  if(token) localStorage.setItem('co2_sync_token', token); else localStorage.removeItem('co2_sync_token');
+  const msg = document.getElementById('syncMsg');
+  msg.innerHTML = '<div class="note" style="margin-top:10px">Testing connection…</div>';
+  try{
+    SYNC.etag = null;
+    const r = await fetchRemote(false);
+    if(r.wells){
+      state.wells = SYNC.dirty ? mergeWells(state.wells, r.wells) : r.wells;
+      SYNC.sha=r.sha; SYNC.etag=r.etag;
+      persistLocal(); render();
+    }
+    setSyncStatus(token?'live':'view');
+    msg.innerHTML = '<div class="note" style="margin-top:10px">✓ Connected. '
+      + (r.missing ? 'Shared register is empty — save a well to create it.' : 'Loaded '+(r.wells?r.wells.length:0)+' shared well(s).')
+      + (token ? ' You can save changes.' : ' View only — add a token to save changes.')+'</div>';
+    startPolling();
+    if(SYNC.dirty && token) schedulePush();
+  }catch(e){
+    setSyncStatus(token?'error':'local', e.message);
+    msg.innerHTML = '<div class="warn" style="margin-top:10px">'+escapeHtml(e.message)+'</div>';
+  }
+}
+function disconnectSync(){
+  localStorage.removeItem('co2_sync_token');
+  startPolling();
+  setSyncStatus('local','Token removed — changes now stay in this browser only.');
+  const msg = document.getElementById('syncMsg');
+  if(msg) msg.innerHTML = '<div class="note" style="margin-top:10px">Disconnected. The shared register is untouched; this browser is now local-only.</div>';
+}
+function startPolling(){
+  clearInterval(SYNC.pollTimer);
+  SYNC.pollTimer = setInterval(()=>pullRemote(false), syncToken()?45000:120000);
+}
+function initSync(){
+  setSyncStatus('local');
+  pullRemote(true);
+  startPolling();
+  window.addEventListener('focus', ()=>pullRemote(false));
+  window.addEventListener('beforeunload', (e)=>{
+    if(SYNC.dirty && syncToken()){ e.preventDefault(); e.returnValue=''; }
+  });
+  document.getElementById('syncModal').addEventListener('click',(e)=>{ if(e.target.id==='syncModal') closeSyncModal(); });
+}
+
 /* ============ INIT ============ */
-load();
+load();           // local cache first (instant paint, offline fallback)
 buildScoring();
 updateLiveTotal();
 render();
+initSync();       // then pull the shared team register and start auto-refresh
 </script>
 </body>
 </html>
