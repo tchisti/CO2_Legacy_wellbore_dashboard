@@ -1,1 +1,31 @@
-[]
+[
+  {
+    "id": "W-TVBQQ5",
+    "licence": "0276844",
+    "operator": "STRATEGIC OIL & GAS LTD.",
+    "lat": null,
+    "lon": null,
+    "year": 2008,
+    "type": "Oil Producer",
+    "traj": "Vertical",
+    "status": "Abandoned (P&A)",
+    "klass": "Type 1",
+    "reviewer": "tahir Chisti",
+    "notes": "Fort Saskatchewan, TD 1076 m",
+    "scores": {
+      "plug": 3,
+      "barriers": 1,
+      "cement": 5,
+      "prox": 5,
+      "depthR": 3,
+      "depthC": 1,
+      "age": 1,
+      "access": 1,
+      "data": 1
+    },
+    "total": 21,
+    "createdAt": "2026-07-21T19:57:03.032Z",
+    "updatedAt": "2026-07-21T19:57:03.033Z",
+    "updatedBy": "Tahir Chisti"
+  }
+]
