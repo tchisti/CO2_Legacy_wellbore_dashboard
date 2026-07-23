@@ -63,3 +63,15 @@ Anyone who needs to **save/edit/delete** wells (not just view):
   file's **History** on GitHub to see or restore any previous version of the register.
 - CSV/JSON import-export in the top bar still works and syncs like any other edit
   (importing with "replace" replaces the shared register for everyone — the page warns first).
+
+
+## 3D Legacy Well Reviewer (new)
+
+The **3D Well Reviewer** tab embeds a full interactive AOR / wellbore-risk application ([`3d-reviewer.html`](3d-reviewer.html), also usable stand-alone):
+
+- Orbitable 3D scene: DLS section/township fabric, per-injector 5 km AOR circles, formation slabs, wells colored by screening risk class
+- Two preloaded sites — a Wabamun demo set and **Nisku Enbridge POC AOR** (three proposed injectors, five real offset wells from the AccuMap wellbore review)
+- Transparent additive risk model with a built-in **Risk Model & Methodology** page (factors, thresholds, references incl. Watson & Bachu 2009, AER D065/D020, 40 CFR 146.84)
+- Add/edit/duplicate/import/export wells, scenario mode, undo/redo, per-site autosave
+
+**Bridge to the register:** the "Send register wells → 3D viewer" button pushes the shared register into the active 3D site. Wells with lat/lon are geolocated; wells without coordinates are parked on a flagged holding row; the register total (9–45, higher = worse) is translated to the reviewer's Integrity Score (100–0, higher = better).
