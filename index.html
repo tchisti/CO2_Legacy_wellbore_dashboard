@@ -227,6 +227,7 @@ footer{padding:18px 24px;color:var(--muted);font-size:11px;border-top:1px solid 
       <button data-tab="matrix" onclick="showTab('matrix',this)">5×5 Risk Matrix</button>
       <button data-tab="detail" onclick="showTab('detail',this)">Well Detail</button>
       <button data-tab="ref" onclick="showTab('ref',this)">Scoring Reference</button>
+      <button data-tab="viewer3d" onclick="showTab('viewer3d',this)">3D Well Reviewer</button>
     </div>
 
     <!-- Overview -->
@@ -308,6 +309,22 @@ footer{padding:18px 24px;color:var(--muted);font-size:11px;border-top:1px solid 
         </div>
         <div class="note" style="margin-top:14px"><b>Risk Ranking = Likelihood × Consequence</b> — per § 7.2. Total Risk Score = Σ(parameter scores). Range: 9 (best case) — 45 (worst case). Tiering tuned from Appendix D's 8/16/28/40 thresholds, normalized to a 9-parameter scale.</div>
         <div class="note"><b>Cement carbonation note (Fig. A-2):</b> CO₂ ingress converts cement hydrates → CaCO₃ → soluble bicarbonate; vertical degradation typically &lt;few metres over geological timescales — but the barrier credit collapses if cement was never placed above caprock. Score "Cement Coverage" conservatively when CBL/VDL is absent.</div>
+      </div>
+    </section>
+
+    <!-- 3D Legacy Well Reviewer -->
+    <section id="tab-viewer3d" style="display:none">
+      <div class="panel" style="padding:14px">
+        <div class="row spread" style="margin-bottom:10px;flex-wrap:wrap;gap:8px">
+          <h2 style="margin:0">3D Legacy Well Reviewer <span class="muted" style="text-transform:none;letter-spacing:0">&mdash; interactive AOR &amp; wellbore risk viewer (sites, 3D scene, screening model)</span></h2>
+          <div class="row" style="gap:8px">
+            <button class="btn" onclick="sendRegisterTo3D()">Send register wells &rarr; 3D viewer</button>
+            <a class="btn" href="3d-reviewer.html" target="_blank" rel="noopener">Open full screen &#8599;</a>
+          </div>
+        </div>
+        <iframe id="viewer3dFrame" src="3d-reviewer.html" loading="lazy" title="3D Legacy Well Reviewer"
+          style="width:100%;height:78vh;border:1px solid var(--line);border-radius:12px;background:#0d1117"></iframe>
+        <div class="note" style="margin-top:10px">The 3D reviewer keeps its own per-site datasets (autosaved in your browser). "Send register wells" pushes the current shared register into the active 3D site: wells with lat/lon inside the site frame are geolocated; wells without coordinates are parked on a flagged holding row. The register total (9&ndash;45, higher&nbsp;=&nbsp;worse) is translated to the reviewer's Integrity Score (100&ndash;0, higher&nbsp;=&nbsp;better). One click of Ctrl+Z inside the viewer reverts a send.</div>
       </div>
     </section>
   </main>
@@ -779,6 +796,31 @@ function renderRef(){
     <td><b>${p.name}</b><br><small style="color:var(--muted)">${p.desc}</small></td>
     <td>${p.levels[1]}</td><td>${p.levels[3]}</td><td>${p.levels[5]}</td>
   </tr>`).join('');
+}
+
+
+/* ============ 3D VIEWER BRIDGE ============ */
+function sendRegisterTo3D(){
+  if(!state.wells.length){ alert('The register is empty — nothing to send.'); return; }
+  const frame = document.getElementById('viewer3dFrame');
+  if(!frame || !frame.contentWindow){ alert('Open the 3D Well Reviewer tab first.'); return; }
+  const mapType = t => /disposal/i.test(t||'') ? 'Water Disposal' : /inject/i.test(t||'') ? 'Injector' : /gas/i.test(t||'') ? 'Gas' : /oil/i.test(t||'') ? 'Oil' : /observ/i.test(t||'') ? 'Observation' : /suspend/i.test(t||'') ? 'Suspended' : 'Abandoned';
+  const rows = state.wells.map(w => ({
+    uwi: w.licence || w.id,
+    wellName: ((w.operator||'WELL').split(' ')[0] + ' ' + (w.licence||w.id)).toUpperCase(),
+    operator: w.operator || '',
+    licenseNumber: w.licence || '',
+    status: w.status || '',
+    wellType: mapType(w.type),
+    orientation: w.traj === 'Deviated' ? 'Deviated' : w.traj === 'Horizontal' ? 'Horizontal' : 'Vertical',
+    drillingYear: w.year || null,
+    surfaceLat: w.lat, surfaceLon: w.lon,
+    reviewer: w.reviewer || '',
+    // Register total is 9 (best) .. 45 (worst); reviewer Integrity Score is 100 (best) .. 0.
+    integrityScore: (typeof w.total === 'number' && w.total >= 9) ? Math.max(0, Math.min(100, Math.round(100 - (w.total - 9) * (100/36)))) : null,
+    notes: ((w.notes||'') + ' [From Dashboard register' + (w.klass ? ': ' + w.klass : '') + (typeof w.total === 'number' ? ', score ' + w.total + '/45' : '') + ']').trim()
+  }));
+  frame.contentWindow.postMessage({ type: 'lwms:importWells', rows }, '*');
 }
 
 /* ============ TABS ============ */
