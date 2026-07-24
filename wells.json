@@ -356,7 +356,7 @@
     "year": 1958,
     "type": "Unknown",
     "traj": "Vertical",
-    "status": "Abandoned",
+    "status": "",
     "klass": "Type 4",
     "reviewer": "",
     "notes": "1958 Abandoned, abandoned 2001. 2 casing string(s), surface to 236.8 m. 18 formation tops on record, TD in Ireton @ 1925 m. 9 plug/treatment record(s). [Auto-compiled from South Seq. Eval. Area wellbore review; integrity score is rule-based screening judgment] [From 3D Reviewer: High 59/100 — subscores and Type derived; verify Classification, Access, Data]",
@@ -367,14 +367,14 @@
       "prox": 3,
       "depthR": 5,
       "depthC": 5,
-      "age": 5,
+      "age": 1,
       "access": 1,
       "data": 1
     },
-    "total": 27,
+    "total": 23,
     "createdAt": "2026-07-24T16:17:13.481Z",
-    "updatedAt": "2026-07-24T16:17:13.481Z",
-    "updatedBy": "Tahir Chisti (3D Reviewer)"
+    "updatedAt": "2026-07-24T16:54:34.613Z",
+    "updatedBy": "Tahir Chisti"
   },
   {
     "id": "W-DDB4VY",
