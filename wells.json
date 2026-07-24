@@ -843,31 +843,31 @@
   {
     "id": "W-3HRMMU",
     "licence": "100/09-13-052-01W5/00",
-    "operator": "Unknown",
+    "operator": "REGENT DRILLING LIMITED",
     "lat": 53.492092,
     "lon": -114.005026,
     "year": 1949,
     "type": "Oil Producer",
     "traj": "Vertical",
-    "status": "Abandoned Oil",
+    "status": "Abandoned (P&A)",
     "klass": "Type 3",
     "reviewer": "",
     "notes": "1949 Abandoned Oil, abandoned 1949. 1 casing string(s), surface to 183.8 m. 19 formation tops on record, TD in Ireton @ 1676 m. No plug records — verify abandonment. [Auto-compiled from South Seq. Eval. Area wellbore review; integrity score is rule-based screening judgment] [From 3D Reviewer: Very High 100/100 — subscores and Type derived; verify Classification, Access, Data]",
     "scores": {
       "plug": 5,
       "barriers": 3,
-      "cement": 5,
+      "cement": 3,
       "prox": 3,
       "depthR": 5,
       "depthC": 5,
       "age": 5,
       "access": 1,
-      "data": 5
+      "data": 3
     },
-    "total": 37,
+    "total": 33,
     "createdAt": "2026-07-24T16:17:13.481Z",
-    "updatedAt": "2026-07-24T16:17:13.481Z",
-    "updatedBy": "Tahir Chisti (3D Reviewer)"
+    "updatedAt": "2026-07-24T16:37:20.117Z",
+    "updatedBy": "Tahir Chisti"
   },
   {
     "id": "W-HJF12U",
