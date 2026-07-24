@@ -843,7 +843,7 @@ dialog.confirm { max-width: 420px; }
   var ORIENTATIONS = ["Vertical", "Deviated", "Horizontal"];
   var CEMENT_QUALITY = ["Excellent", "Good", "Fair", "Poor", "Unknown"];
   var PLUG_STATUS = ["Plugged & Verified", "Plugged", "Partially Plugged", "Unplugged", "Unknown"];
-  var RISK_OVERRIDES = ["Auto", "Low", "Medium", "High", "Critical"];
+  var RISK_OVERRIDES = ["Auto", "Low", "Medium", "High", "Very High"];
   var GROUPS = [
     { id: "identity", label: "Identity" },
     { id: "location", label: "Location" },
@@ -928,6 +928,7 @@ dialog.confirm { max-width: 420px; }
 
   // src/risk.js
   var RISK_ORDER = ["low", "medium", "high", "critical"];
+  var RISK_LABELS = { low: "Low", medium: "Medium", high: "High", critical: "Very High" };
   var CEMENT_PTS = { Excellent: 0, Good: 5, Fair: 15, Poor: 30, Unknown: 20 };
   var PLUG_PTS = { "Plugged & Verified": 0, "Plugged": 5, "Partially Plugged": 15, "Unplugged": 25, "Unknown": 25 };
   var isNum2 = (v) => typeof v === "number" && !Number.isNaN(v);
@@ -960,8 +961,9 @@ dialog.confirm { max-width: 420px; }
     const score = Math.max(0, Math.min(100, factors.reduce((s, f) => s + f.pts, 0)));
     let cls = classifyScore(score), overridden = false;
     const ov = String(w.leakageRiskOverride || "Auto").toLowerCase();
-    if (ov !== "auto" && RISK_ORDER.includes(ov)) {
-      cls = ov;
+    const ovKey = ov === "very high" ? "critical" : ov;
+    if (ovKey !== "auto" && RISK_ORDER.includes(ovKey)) {
+      cls = ovKey;
       overridden = true;
     }
     return { score, class: cls, factors, overridden };
@@ -1399,7 +1401,7 @@ dialog.confirm { max-width: 420px; }
   function renderKpis(root, k, site2, { includeScenario, onToggleScenario }) {
     root.replaceChildren(
       card("Total Wells", k.total),
-      card("Critical", k.counts.critical, site2.colors.critical),
+      card(RISK_LABELS.critical, k.counts.critical, site2.colors.critical),
       card("High", k.counts.high, site2.colors.high),
       card("Medium", k.counts.medium, site2.colors.medium),
       card("Low", k.counts.low, site2.colors.low),
@@ -1491,7 +1493,7 @@ dialog.confirm { max-width: 420px; }
         el("td", {}, fmt(w.wellName)),
         el("td", {}, fmt(w.operator)),
         el("td", {}, fmt(w.wellType)),
-        el("td", {}, el("span", { class: `badge ${w._risk.class}` }, `${w._risk.class} ${w._risk.score}`)),
+        el("td", {}, el("span", { class: `badge ${w._risk.class}` }, `${RISK_LABELS[w._risk.class] || w._risk.class} ${w._risk.score}`)),
         el("td", {}, fmt(w.integrityScore)),
         el("td", {}, w.reviewer ? "\u2713" : ""),
         el(
@@ -1532,7 +1534,7 @@ dialog.confirm { max-width: 420px; }
         el(
           "div",
           {},
-          el("span", { class: `badge big ${r.class}` }, `${r.class.toUpperCase()} \xB7 ${r.score}${r.overridden ? " (manual)" : ""}`),
+          el("span", { class: `badge big ${r.class}` }, `${(RISK_LABELS[r.class] || r.class).toUpperCase()} \xB7 ${r.score}${r.overridden ? " (manual)" : ""}`),
           well.isScenario ? el("span", { class: "chip", style: "margin-left:6px" }, "SCENARIO") : null
         )
       ),
@@ -1568,7 +1570,7 @@ dialog.confirm { max-width: 420px; }
     }
     function render2() {
       const openFacets = new Set([...root.querySelectorAll("details.facet[open]")].map((d) => d.querySelector("summary").textContent.split(" (")[0]));
-      function multi(label, values, selected, apply) {
+      function multi(label, values, selected, apply, fmtVal = (v) => v) {
         const d = el(
           "details",
           { class: "facet" },
@@ -1576,7 +1578,7 @@ dialog.confirm { max-width: 420px; }
           el("div", { class: "facet-list" }, ...values.map((v) => {
             const cb = el("input", { type: "checkbox", onchange: () => apply(cb.checked ? [...selected, v] : selected.filter((x) => x !== v)) });
             cb.checked = selected.includes(v);
-            return el("label", {}, cb, ` ${v}`);
+            return el("label", {}, cb, ` ${fmtVal(v)}`);
           }))
         );
         if (openFacets.has(label)) d.setAttribute("open", "");
@@ -1597,7 +1599,7 @@ dialog.confirm { max-width: 420px; }
         multi("Status", fx.statuses, f.statuses, (v) => set({ statuses: v })),
         multi("Type", fx.wellTypes, f.wellTypes, (v) => set({ wellTypes: v })),
         multi("Formation", fx.formations, f.formations, (v) => set({ formations: v })),
-        multi("Risk", [...RISK_ORDER].reverse(), f.riskClasses, (v) => set({ riskClasses: v })),
+        multi("Risk", [...RISK_ORDER].reverse(), f.riskClasses, (v) => set({ riskClasses: v }), (v) => RISK_LABELS[v] || v),
         num("Integ \u2265", f.integrityMin, (v) => set({ integrityMin: v ?? 0 }), { min: 0, max: 100 }),
         num("Integ \u2264", f.integrityMax, (v) => set({ integrityMax: v ?? 100 }), { min: 0, max: 100 }),
         num("Aband \u2265", f.yearMin, (v) => set({ yearMin: v })),
@@ -23396,7 +23398,7 @@ dialog.confirm { max-width: 420px; }
       const w = gather();
       for (const f of FIELDS) if (f.derived) inputs[f.key].value = w[f.key] ?? "";
       const r = computeRisk(w, site2);
-      riskChip.textContent = `${r.class.toUpperCase()} \xB7 ${r.score}${r.overridden ? " (manual)" : ""}`;
+      riskChip.textContent = `${(RISK_LABELS[r.class] || r.class).toUpperCase()} \xB7 ${r.score}${r.overridden ? " (manual)" : ""}`;
       riskChip.dataset.cls = r.class;
     }
     const sections = GROUPS.map((g, i) => el(
@@ -23449,11 +23451,11 @@ dialog.confirm { max-width: 420px; }
       return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
     };
     const header = [...EXPORT_KEYS.map((k) => HEADERS[k] || k), "riskScore", "riskClass"];
-    const rows = wells.map((w) => [...EXPORT_KEYS.map((k) => w[k]), w._risk?.score ?? "", w._risk?.class ?? ""].map(esc).join(","));
+    const rows = wells.map((w) => [...EXPORT_KEYS.map((k) => w[k]), w._risk?.score ?? "", RISK_LABELS[w._risk?.class] ?? ""].map(esc).join(","));
     return [header.map(esc).join(","), ...rows].join("\n");
   }
   function toJson(wells) {
-    const out = wells.map(({ _risk, ...w }) => ({ ...w, riskScore: _risk?.score, riskClass: _risk?.class }));
+    const out = wells.map(({ _risk, ...w }) => ({ ...w, riskScore: _risk?.score, riskClass: RISK_LABELS[_risk?.class] ?? _risk?.class }));
     return JSON.stringify({ schemaVersion: 1, exportedAt: (/* @__PURE__ */ new Date()).toISOString(), wells: out }, null, 2);
   }
   var normHeader = (h) => String(h || "").toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -23613,7 +23615,7 @@ dialog.confirm { max-width: 420px; }
     ["Inside AOR", "+5 if within the AOR boundary", "0 \u2013 5", "Wells inside the delineated Area of Review are within the predicted pressure/plume footprint (40 CFR 146.84)."]
   ];
   function renderMethodology(root, site2) {
-    const chip = (cls) => el("span", { class: `badge ${cls}`, style: "margin-right:6px" }, cls);
+    const chip = (cls) => el("span", { class: `badge ${cls}`, style: "margin-right:6px" }, RISK_LABELS[cls] || cls);
     const worstCase = deriveDistances({ ...blankWell(), x: site2.injectors[0].x + 300, y: site2.injectors[0].y, td: 1500, integrityScore: 25, cementQuality: "Unknown", pluggingStatus: "Unknown", drillingYear: 1949, caprockPenetrated: true, reservoirPenetrated: true }, site2);
     const worst = computeRisk(worstCase, site2);
     const modern = deriveDistances({ ...blankWell(), x: site2.injectors[0].x + 300, y: site2.injectors[0].y, td: 2300, integrityScore: 92, cementQuality: "Good", pluggingStatus: "Unplugged", drillingYear: 2025, caprockPenetrated: true, reservoirPenetrated: true, leakageRiskOverride: "Low" }, site2);
@@ -23663,8 +23665,8 @@ dialog.confirm { max-width: 420px; }
         el("tbody", {}, el(
           "tr",
           {},
-          el("td", {}, ...worst.factors.map((f) => el("div", {}, `${f.label}: +${f.pts}`)), el("div", { class: "method-total" }, `\u2192 score ${worst.score}, class ${worst.class.toUpperCase()}`)),
-          el("td", {}, ...modernR.factors.map((f) => el("div", {}, `${f.label}: +${f.pts}`)), el("div", { class: "method-total" }, `\u2192 score ${modernR.score}, class ${modernR.class.toUpperCase()}${modernR.overridden ? " (manual override)" : ""}`))
+          el("td", {}, ...worst.factors.map((f) => el("div", {}, `${f.label}: +${f.pts}`)), el("div", { class: "method-total" }, `\u2192 score ${worst.score}, class ${(RISK_LABELS[worst.class] || "").toUpperCase()}`)),
+          el("td", {}, ...modernR.factors.map((f) => el("div", {}, `${f.label}: +${f.pts}`)), el("div", { class: "method-total" }, `\u2192 score ${modernR.score}, class ${(RISK_LABELS[modernR.class] || "").toUpperCase()}${modernR.overridden ? " (manual override)" : ""}`))
         ))
       )),
       el("h2", {}, "6. Data provenance (this build)"),
@@ -23767,7 +23769,7 @@ dialog.confirm { max-width: 420px; }
       return;
     }
     tip.hidden = false;
-    tip.textContent = `${w.uwi} \xB7 ${w.operator || "\u2014"} \xB7 ${w._risk.class.toUpperCase()} (${w._risk.score})`;
+    tip.textContent = `${w.uwi} \xB7 ${w.operator || "\u2014"} \xB7 ${(RISK_LABELS[w._risk.class] || "").toUpperCase()} (${w._risk.score})`;
     tip.style.left = `${x + 14}px`;
     tip.style.top = `${y + 10}px`;
   }
@@ -23919,7 +23921,7 @@ dialog.confirm { max-width: 420px; }
         toast("No wells to push (scenario wells are excluded).", { error: true });
         return;
       }
-      const rows = wells.map(({ _risk, ...w }) => ({ ...w, riskScore: _risk?.score, riskClass: _risk?.class }));
+      const rows = wells.map(({ _risk, ...w }) => ({ ...w, riskScore: _risk?.score, riskClass: RISK_LABELS[_risk?.class] ?? _risk?.class }));
       window.parent.postMessage({ type: "lwms:exportWells", site: site.name, rows }, "*");
     });
     $("#toolbar").append(pushBtn);
