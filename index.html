@@ -15,16 +15,23 @@
   --text:#e7eefc; --muted:#9fb0cf; --accent:#3aa0ff; --accent2:#5fd0ff;
   --low:#1fbf75; --mod:#f0a93b; --high:#e85a4f; --crit:#a8324a;
   --shadow:0 8px 24px rgba(0,0,0,.35);
+  --field:#0c1525; --thead:#0e1729; --rowline:#1a2740;
 }
 :root[data-theme="light"]{
   --bg:#eef2f8; --panel:#ffffff; --panel2:#e9eef6; --line:#ccd6e6;
   --text:#1d2a3a; --muted:#5c6d85; --accent:#1867c0; --accent2:#0f5aa8;
   --shadow:0 8px 24px rgba(30,45,70,.12);
+  --field:#f3f6fa; --thead:#e8edf5; --rowline:#dde5ef;
 }
 html[data-theme="light"], html[data-theme="light"] body{background:linear-gradient(180deg,#e6ebf4 0%,#eef2f8 100%)}
 html[data-theme="light"] header.topbar{background:rgba(255,255,255,.92)}
 html[data-theme="light"] input, html[data-theme="light"] select, html[data-theme="light"] textarea{background:#fff}
-html[data-theme="light"] .seg button{background:#e9eef6}
+html[data-theme="light"] .tag.low{color:#127a4a}
+html[data-theme="light"] .tag.mod{color:#946313}
+html[data-theme="light"] .tag.high{color:#b3392e}
+html[data-theme="light"] .tag.crit{color:#8c2440}
+html[data-theme="light"] .seg button{background:var(--field)}
+html[data-theme="light"] .modal-back{background:rgba(40,55,80,.45)}
 html[data-theme="light"] button.danger{background:#fdecea;border-color:#e5b4ae;color:#b3261e}
 html[data-theme="light"] .warn{color:#a13b32}
 html[data-theme="light"] .note{color:#14568f}
@@ -69,9 +76,9 @@ button.ghost{background:transparent}
 .cell .count{position:absolute;top:3px;right:6px;background:rgba(0,0,0,.35);color:#fff;border-radius:10px;padding:1px 6px;font-size:10px}
 
 table.wells{width:100%;border-collapse:collapse;font-size:13px}
-table.wells th{background:#0e1729;color:var(--muted);text-align:left;padding:10px 8px;border-bottom:1px solid var(--line);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.4px;position:sticky;top:0}
-table.wells td{padding:10px 8px;border-bottom:1px solid #1a2740}
-table.wells tr:hover{background:#0e1729;cursor:pointer}
+table.wells th{background:var(--thead);color:var(--muted);text-align:left;padding:10px 8px;border-bottom:1px solid var(--line);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.4px;position:sticky;top:0}
+table.wells td{padding:10px 8px;border-bottom:1px solid var(--rowline)}
+table.wells tr:hover{background:var(--thead);cursor:pointer}
 .tag{display:inline-block;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.3px}
 .tag.low{background:rgba(31,191,117,.15);color:#5cf0a8;border:1px solid rgba(31,191,117,.4)}
 .tag.mod{background:rgba(240,169,59,.15);color:#ffd58a;border:1px solid rgba(240,169,59,.4)}
@@ -80,14 +87,14 @@ table.wells tr:hover{background:#0e1729;cursor:pointer}
 
 .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 label{font-size:12px;color:var(--muted);display:block;margin-bottom:4px}
-input,select,textarea{width:100%;background:#0c1525;border:1px solid var(--line);color:var(--text);padding:8px 10px;border-radius:7px;font-size:13px;outline:none;font-family:inherit}
+input,select,textarea{width:100%;background:var(--field);border:1px solid var(--line);color:var(--text);padding:8px 10px;border-radius:7px;font-size:13px;outline:none;font-family:inherit}
 input:focus,select:focus,textarea:focus{border-color:var(--accent)}
 .scoring{display:grid;gap:8px;margin-top:8px}
-.score-row{display:grid;grid-template-columns:1.5fr 2.2fr 60px;gap:8px;align-items:center;padding:8px;border:1px solid var(--line);border-radius:8px;background:#0c1525}
+.score-row{display:grid;grid-template-columns:1.5fr 2.2fr 60px;gap:8px;align-items:center;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--field)}
 .score-row .name{font-size:12px;font-weight:600}
 .score-row .name small{display:block;color:var(--muted);font-weight:400;font-size:10px;margin-top:2px}
 .seg{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px}
-.seg button{padding:6px 4px;font-size:11px;border-radius:6px;border:1px solid var(--line);background:#0c1525;color:var(--text)}
+.seg button{padding:6px 4px;font-size:11px;border-radius:6px;border:1px solid var(--line);background:var(--field);color:var(--text)}
 .seg button.active.low{background:#1fbf75;color:#0b1220;border-color:#1fbf75}
 .seg button.active.med{background:#f0a93b;color:#0b1220;border-color:#f0a93b}
 .seg button.active.high{background:#e85a4f;color:#fff;border-color:#e85a4f}
@@ -105,9 +112,9 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
 .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
 .row.spread{justify-content:space-between}
 .muted{color:var(--muted);font-size:12px}
-.rec-card{padding:12px;border-radius:10px;border:1px solid var(--line);background:#0c1525;margin-top:8px;font-size:13px;line-height:1.55}
+.rec-card{padding:12px;border-radius:10px;border:1px solid var(--line);background:var(--field);margin-top:8px;font-size:13px;line-height:1.55}
 .rec-card h4{margin:0 0 6px 0;font-size:13px;color:var(--accent2)}
-.bar{height:6px;background:#0c1525;border-radius:4px;overflow:hidden}
+.bar{height:6px;background:var(--field);border-radius:4px;overflow:hidden}
 .bar>div{height:100%;background:linear-gradient(90deg,#1fbf75,#f0a93b,#e85a4f)}
 .warn{background:rgba(232,90,79,.08);border:1px solid rgba(232,90,79,.4);padding:10px 12px;border-radius:8px;font-size:12px;color:#ffb6b0}
 .note{background:rgba(58,160,255,.08);border:1px solid rgba(58,160,255,.4);padding:10px 12px;border-radius:8px;font-size:12px;color:#bcdfff;margin-top:8px}
@@ -119,7 +126,7 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
 .search input{padding-left:30px}
 .search svg{position:absolute;left:8px;top:8px;color:var(--muted)}
 footer{padding:18px 24px;color:var(--muted);font-size:11px;border-top:1px solid var(--line);text-align:center}
-.score-pill{display:inline-block;padding:2px 8px;border-radius:6px;font-weight:800;font-size:12px;background:#0c1525;border:1px solid var(--line)}
+.score-pill{display:inline-block;padding:2px 8px;border-radius:6px;font-weight:800;font-size:12px;background:var(--field);border:1px solid var(--line)}
 
 /* team sync */
 #syncPill{font-size:12px}
@@ -425,7 +432,7 @@ footer{padding:18px 24px;color:var(--muted);font-size:11px;border-top:1px solid 
           </div>
         </div>
         <iframe id="viewer3dFrame" src="3d-reviewer.html" loading="lazy" title="3D Legacy Well Reviewer"
-          style="width:100%;height:78vh;border:1px solid var(--line);border-radius:12px;background:#0d1117"></iframe>
+          style="width:100%;height:78vh;border:1px solid var(--line);border-radius:12px;background:var(--panel2)"></iframe>
         <div class="note" style="margin-top:10px">The 3D reviewer keeps its own per-site datasets (autosaved in your browser). "Send register wells" pushes the current shared register into the active 3D site: wells with lat/lon inside the site frame are geolocated; wells without coordinates are parked on a flagged holding row. The register total (9&ndash;45, higher&nbsp;=&nbsp;worse) is translated to the reviewer's Integrity Score (100&ndash;0, higher&nbsp;=&nbsp;better). One click of Ctrl+Z inside the viewer reverts a send. The bridge is two-way: the viewer\u2019s toolbar gains a &ldquo;&#8679; Push to Register&rdquo; button when embedded here, which maps its wells back into the shared register (subscores derived from reviewer fields using the register\u2019s own 1/3/5 anchors &mdash; verify Classification, Access and Data after a push).</div>
       </div>
     </section>
@@ -730,7 +737,7 @@ function render(){
   else host.innerHTML = top.map(w=>{
     const t = tierFor(w.total);
     const pct = ((w.total-9)/(45-9))*100;
-    return `<div onclick="openDetail('${w.id}')" style="cursor:pointer;padding:10px;border:1px solid var(--line);border-radius:10px;margin-bottom:8px;background:#0c1525">
+    return `<div onclick="openDetail('${w.id}')" style="cursor:pointer;padding:10px;border:1px solid var(--line);border-radius:10px;margin-bottom:8px;background:var(--field)">
       <div class="row spread"><div><span class="well-id">${escapeHtml(w.licence)}</span> <span class="tag ${t.cls}">${t.label}</span></div><div style="font-weight:800">${w.total}/45</div></div>
       <div class="muted" style="font-size:11px;margin:4px 0">${escapeHtml(w.operator)} · ${escapeHtml(w.type)} · ${escapeHtml(w.status)} · ${escapeHtml(w.klass)}</div>
       <div class="bar"><div style="width:${pct}%"></div></div>
