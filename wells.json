@@ -96,7 +96,7 @@
     "type": "Strat Test",
     "traj": "Deviated",
     "status": "Abandoned (P&A)",
-    "klass": "Type 1",
+    "klass": "Type 9",
     "reviewer": "Tahir Chisti",
     "notes": "2004 deviated Viking gas well, Redwater field, abandoned 2017 to modern standards. TD in the Wabamun — does NOT penetrate the Calmar caprock or Nisku. Perfs squeezed on abandonment. [From 3D Reviewer: medium 25/100 — subscores derived; verify Classification, Access, Data]",
     "scores": {
@@ -112,7 +112,7 @@
     },
     "total": 11,
     "createdAt": "2026-07-24T12:15:02.272Z",
-    "updatedAt": "2026-07-24T13:02:14.965Z",
+    "updatedAt": "2026-07-24T16:01:23.221Z",
     "updatedBy": "Tahir Chisti"
   },
   {
