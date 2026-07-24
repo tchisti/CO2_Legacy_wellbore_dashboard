@@ -617,7 +617,7 @@
     "year": 1949,
     "type": "Unknown",
     "traj": "Vertical",
-    "status": "Abandoned",
+    "status": "Abandoned (P&A)",
     "klass": "Type 3",
     "reviewer": "",
     "notes": "1949 Abandoned, abandoned 1950. 1 casing string(s), surface to 185.3 m. 22 formation tops on record, TD in Beaverhill Lake @ 2130 m. No plug records — verify abandonment. [Auto-compiled from South Seq. Eval. Area wellbore review; integrity score is rule-based screening judgment] [From 3D Reviewer: Very High 100/100 — subscores and Type derived; verify Classification, Access, Data]",
@@ -630,12 +630,12 @@
       "depthC": 5,
       "age": 5,
       "access": 1,
-      "data": 5
+      "data": 3
     },
-    "total": 37,
+    "total": 35,
     "createdAt": "2026-07-24T16:17:13.481Z",
-    "updatedAt": "2026-07-24T16:17:13.481Z",
-    "updatedBy": "Tahir Chisti (3D Reviewer)"
+    "updatedAt": "2026-07-24T16:57:34.181Z",
+    "updatedBy": "Tahir Chisti"
   },
   {
     "id": "W-QPIUGW",
