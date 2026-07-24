@@ -1,34 +1,5 @@
 [
   {
-    "id": "W-7Q9O2A",
-    "reviewer": "T. Khan",
-    "createdAt": "2026-07-23T22:08:12.821Z",
-    "updatedAt": "2026-07-23T22:08:12.821Z",
-    "updatedBy": "Tahir Chisti",
-    "licence": "102/11-08-046-26W4",
-    "operator": "Cenovus Energy",
-    "lat": 53.4501,
-    "lon": -113.6011,
-    "year": 1998,
-    "type": "Gas Producer",
-    "traj": "Vertical",
-    "status": "Abandoned (P&A)",
-    "klass": "Type 7",
-    "notes": "Modern P&A, CBL verified to top of caprock, two cement plugs. Within plume buffer but barriers sound.",
-    "scores": {
-      "plug": 1,
-      "barriers": 1,
-      "cement": 1,
-      "prox": 3,
-      "depthR": 5,
-      "depthC": 1,
-      "age": 3,
-      "access": 1,
-      "data": 1
-    },
-    "total": 17
-  },
-  {
     "id": "W-OT40RC",
     "reviewer": "T. Khan",
     "createdAt": "2026-07-23T22:08:12.821Z",
