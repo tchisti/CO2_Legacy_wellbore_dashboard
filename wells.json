@@ -44,17 +44,17 @@
     "scores": {
       "plug": 1,
       "barriers": 1,
-      "cement": 3,
-      "prox": 5,
-      "depthR": 5,
-      "depthC": 5,
+      "cement": 1,
+      "prox": 3,
+      "depthR": 3,
+      "depthC": 3,
       "age": 1,
       "access": 1,
       "data": 1
     },
-    "total": 23,
+    "total": 15,
     "createdAt": "2026-07-24T12:15:02.272Z",
-    "updatedAt": "2026-07-24T15:58:36.887Z",
+    "updatedAt": "2026-07-24T15:59:04.383Z",
     "updatedBy": "Tahir Chisti"
   },
   {
