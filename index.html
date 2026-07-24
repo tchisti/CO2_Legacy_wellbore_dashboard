@@ -156,7 +156,7 @@ footer{padding:18px 24px;color:var(--muted);font-size:11px;border-top:1px solid 
   <div class="kpi total"><div class="label">Wells in Review</div><div class="val" id="kTotal">0</div><div class="sub">within AoR</div></div>
   <div class="kpi low"><div class="label">Low Risk</div><div class="val" id="kLow">0</div><div class="sub">Score 9 – 18</div></div>
   <div class="kpi mod"><div class="label">Moderate Risk</div><div class="val" id="kMod">0</div><div class="sub">Score 19 – 30</div></div>
-  <div class="kpi high"><div class="label">High / Critical</div><div class="val" id="kHigh">0</div><div class="sub">Score 31 – 45</div></div>
+  <div class="kpi high"><div class="label">High / Very High</div><div class="val" id="kHigh">0</div><div class="sub">Score 31 – 45</div></div>
 </div>
 
 <div class="layout">
@@ -270,7 +270,7 @@ footer{padding:18px 24px;color:var(--muted);font-size:11px;border-top:1px solid 
           <span><span class="sw" style="background:var(--low)"></span>Low (9–18)</span>
           <span><span class="sw" style="background:var(--mod)"></span>Moderate (19–30)</span>
           <span><span class="sw" style="background:var(--high)"></span>High (31–40)</span>
-          <span><span class="sw" style="background:var(--crit)"></span>Critical (41–45)</span>
+          <span><span class="sw" style="background:var(--crit)"></span>Very High (41–45)</span>
         </div>
       </div>
     </section>
@@ -285,7 +285,7 @@ footer{padding:18px 24px;color:var(--muted);font-size:11px;border-top:1px solid 
           <span><span class="sw" style="background:var(--low)"></span>Low</span>
           <span><span class="sw" style="background:var(--mod)"></span>Moderate</span>
           <span><span class="sw" style="background:var(--high)"></span>High</span>
-          <span><span class="sw" style="background:var(--crit)"></span>Critical</span>
+          <span><span class="sw" style="background:var(--crit)"></span>Very High</span>
         </div>
       </div>
     </section>
@@ -397,7 +397,7 @@ const TIERS = [
   {min:9, max:18, label:'Low',      cls:'low',  color:'#1fbf75'},
   {min:19,max:30, label:'Moderate', cls:'mod',  color:'#f0a93b'},
   {min:31,max:40, label:'High',     cls:'high', color:'#e85a4f'},
-  {min:41,max:45, label:'Critical', cls:'crit', color:'#a8324a'},
+  {min:41,max:45, label:'Very High', cls:'crit', color:'#a8324a'},
 ];
 
 function tierFor(s){ return TIERS.find(t=>s>=t.min && s<=t.max) || TIERS[0]; }
@@ -634,7 +634,7 @@ function drawCharts(){
   if(distChart) distChart.destroy();
   distChart = new Chart(ctx1,{
     type:'doughnut',
-    data:{labels:['Low','Moderate','High','Critical'],datasets:[{data:[lo,mo,hi,cr],backgroundColor:['#1fbf75','#f0a93b','#e85a4f','#a8324a'],borderWidth:0}]},
+    data:{labels:['Low','Moderate','High','Very High'],datasets:[{data:[lo,mo,hi,cr],backgroundColor:['#1fbf75','#f0a93b','#e85a4f','#a8324a'],borderWidth:0}]},
     options:{plugins:{legend:{position:'right',labels:{color:'#e7eefc',font:{size:12}}}},cutout:'62%'}
   });
 
@@ -769,7 +769,7 @@ function recommend(w){
   // critical drivers
   const drivers = PARAMS.filter(p=>s[p.key]===5).map(p=>p.name);
   if(T.cls==='crit' || T.cls==='high'){
-    let body = `<b>Tier ${T.label}</b> — re-entry diagnostics + mitigation candidate. Critical drivers: ${drivers.join(', ')||'none flagged'}.<br>`;
+    let body = `<b>Tier ${T.label}</b> — re-entry diagnostics + mitigation candidate. Key drivers: ${drivers.join(', ')||'none flagged'}.<br>`;
     const actions = [];
     if(s.plug===5 || s.barriers===5) actions.push('Pressure-test surface casing vent + annular buildup (§ 8.1); if leak confirmed → squeeze cement or full re-abandonment (§ 8.2).');
     if(s.cement===5) actions.push('Run CBL/VDL or ultrasonic imaging across caprock interval; top-up annular cement via perforate-and-squeeze if TOC is below caprock.');
@@ -1264,7 +1264,7 @@ async function exportPDF(singleId){
     const hi=wells.filter(w=>tierFor(w.total).cls==='high').length;
     const cr=wells.filter(w=>tierFor(w.total).cls==='crit').length;
     doc.text(`Total wells reviewed: ${wells.length}`, M, y); y+=14;
-    doc.text(`Low: ${lo}    Moderate: ${mo}    High: ${hi}    Critical: ${cr}`, M, y); y+=18;
+    doc.text(`Low: ${lo}    Moderate: ${mo}    High: ${hi}    Very High: ${cr}`, M, y); y+=18;
 
     doc.autoTable({
       startY: y, margin:{left:M,right:M},
