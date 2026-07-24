@@ -1046,7 +1046,7 @@
   {
     "id": "W-QUNF2S",
     "licence": "100/09-10-054-02W5/03",
-    "operator": "UnknownBLUE SKY RESOURCES LTD.",
+    "operator": "BLUE SKY RESOURCES LTD.",
     "lat": 53.653349,
     "lon": -114.201389,
     "year": 1978,
@@ -1069,7 +1069,7 @@
     },
     "total": 17,
     "createdAt": "2026-07-24T16:17:13.481Z",
-    "updatedAt": "2026-07-24T16:44:32.034Z",
+    "updatedAt": "2026-07-24T16:51:15.103Z",
     "updatedBy": "Tahir Chisti"
   }
 ]
