@@ -87,35 +87,6 @@
     "total": 9
   },
   {
-    "id": "W-UA7JV2",
-    "reviewer": "T. Khan",
-    "createdAt": "2026-07-23T22:08:12.821Z",
-    "updatedAt": "2026-07-23T22:08:12.821Z",
-    "updatedBy": "Tahir Chisti",
-    "licence": "09-27-046-25W4",
-    "operator": "Husky / Cenovus",
-    "lat": 53.4402,
-    "lon": -113.532,
-    "year": 1972,
-    "type": "Injection",
-    "traj": "Vertical",
-    "status": "Suspended",
-    "klass": "Type 5",
-    "notes": "Pre-NACE carbon steel tubulars; cement coverage absent above caprock; re-entry diagnostics scheduled.",
-    "scores": {
-      "plug": 3,
-      "barriers": 3,
-      "cement": 5,
-      "prox": 5,
-      "depthR": 5,
-      "depthC": 3,
-      "age": 5,
-      "access": 3,
-      "data": 3
-    },
-    "total": 35
-  },
-  {
     "id": "W-W8QB2S",
     "licence": "100/13-06-055-22W4/00",
     "operator": "Fred M. Manning Ltd.",
