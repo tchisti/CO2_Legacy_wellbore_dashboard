@@ -29,35 +29,6 @@
     "total": 17
   },
   {
-    "id": "W-L91PFZ",
-    "reviewer": "T. Khan",
-    "createdAt": "2026-07-23T22:08:12.821Z",
-    "updatedAt": "2026-07-23T22:08:12.821Z",
-    "updatedBy": "Tahir Chisti",
-    "licence": "07-22-045-25W4",
-    "operator": "CNRL",
-    "lat": 53.3811,
-    "lon": -113.52,
-    "year": 1985,
-    "type": "Disposal",
-    "traj": "Deviated",
-    "status": "Suspended",
-    "klass": "Type 4",
-    "notes": "Suspended disposal well; partial cement data; pressure test pending under MMV cycle.",
-    "scores": {
-      "plug": 3,
-      "barriers": 3,
-      "cement": 3,
-      "prox": 3,
-      "depthR": 5,
-      "depthC": 3,
-      "age": 3,
-      "access": 3,
-      "data": 3
-    },
-    "total": 29
-  },
-  {
     "id": "W-OT40RC",
     "reviewer": "T. Khan",
     "createdAt": "2026-07-23T22:08:12.821Z",
