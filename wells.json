@@ -145,35 +145,6 @@
     "updatedBy": "Tahir Chisti (3D Reviewer)"
   },
   {
-    "id": "W-IB7JGE",
-    "licence": "UNNAMED",
-    "operator": "Unknown",
-    "lat": null,
-    "lon": null,
-    "year": null,
-    "type": "Oil Producer",
-    "traj": "Vertical",
-    "status": "Active",
-    "klass": "Type 1",
-    "reviewer": "",
-    "notes": "",
-    "scores": {
-      "plug": 3,
-      "barriers": 1,
-      "cement": 1,
-      "prox": 3,
-      "depthR": 1,
-      "depthC": 1,
-      "age": 1,
-      "access": 1,
-      "data": 1
-    },
-    "total": 13,
-    "createdAt": "2026-07-24T13:01:44.257Z",
-    "updatedAt": "2026-07-24T13:01:44.257Z",
-    "updatedBy": "Tahir Chisti"
-  },
-  {
     "id": "W-8WSASM",
     "licence": "UNNAMED",
     "operator": "Unknown",
