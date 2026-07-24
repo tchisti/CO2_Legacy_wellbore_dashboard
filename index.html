@@ -324,13 +324,78 @@ footer{padding:18px 24px;color:var(--muted);font-size:11px;border-top:1px solid 
 
       <div class="panel" style="margin-top:16px">
         <h2>Legacy Well Classification — Type 1&ndash;9 (Table A-1 / Fig. A-4)</h2>
+        <div style="overflow-x:auto;margin-bottom:14px">
+        <svg viewBox="0 0 960 470" style="min-width:820px;width:100%;background:#10192e;border:1px solid var(--line);border-radius:10px" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Legacy well classification types, adapted after Arbad et al. 2024">
+          <defs>
+            <marker id="lk" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#ff6b5e"/></marker>
+          </defs>
+          <!-- stratigraphy -->
+          <rect x="0" y="28" width="960" height="412" fill="#232c42"/>
+          <rect x="0" y="70" width="960" height="26" fill="#3d85c8" opacity="0.9"/>
+          <rect x="0" y="230" width="960" height="30" fill="#c94f47"/>
+          <rect x="0" y="285" width="960" height="24" fill="#4f9257" opacity="0.85"/>
+          <rect x="0" y="330" width="960" height="56" fill="#d9c84a" opacity="0.8"/>
+          <ellipse cx="560" cy="358" rx="300" ry="20" fill="#3b6fd4" opacity="0.75"/>
+          <text x="8" y="87" fill="#dff0ff" font-size="12" font-weight="700">USDW / BGWP (protected groundwater)</text>
+          <text x="8" y="250" fill="#ffe3e0" font-size="12" font-weight="700">PRIMARY GEOLOGIC SEAL (caprock)</text>
+          <text x="8" y="301" fill="#e2f5e4" font-size="11">Production formation</text>
+          <text x="8" y="345" fill="#4a4420" font-size="12" font-weight="700">STORAGE RESERVOIR</text>
+          <text x="440" y="374" fill="#cfe0ff" font-size="11">CO&#8322; plume</text>
+          <text x="952" y="434" fill="#8fa0bd" font-size="10" text-anchor="end">Not to scale &middot; Type 1 (no records) cannot be illustrated</text>
+          <!-- depth arrow -->
+          <line x1="26" y1="105" x2="26" y2="420" stroke="#8fa0bd" stroke-width="1.5"/><path d="M22,420 L26,430 L30,420 z" fill="#8fa0bd"/>
+          <text x="18" y="280" fill="#8fa0bd" font-size="10" transform="rotate(-90 18 280)">Depth</text>
+          <!-- helper: casing=dark w/ light cement sheath; open hole=tan -->
+          <!-- Type 2: fully open hole to reservoir, leaks everywhere -->
+          <g><text x="90" y="18" fill="#e9eef7" font-size="13" font-weight="700" text-anchor="middle">Type 2</text>
+            <rect x="86" y="28" width="8" height="360" fill="#d9a066"/>
+            <path d="M96,370 C110,320 108,300 100,262" stroke="#ff6b5e" stroke-width="3" fill="none" marker-end="url(#lk)"/>
+            <path d="M100,225 C112,180 110,140 100,100" stroke="#ff6b5e" stroke-width="3" fill="none" marker-end="url(#lk)"/>
+            <path d="M100,66 C110,52 112,46 116,38" stroke="#ff6b5e" stroke-width="3" fill="none" marker-end="url(#lk)"/></g>
+          <!-- Type 3: surface casing thru USDW, open below -->
+          <g><text x="190" y="18" fill="#e9eef7" font-size="13" font-weight="700" text-anchor="middle">Type 3</text>
+            <rect x="180" y="28" width="20" height="84" fill="#cfd6e2"/><rect x="183" y="28" width="14" height="84" fill="#454e60" stroke="#9aa4b5"/>
+            <rect x="186" y="112" width="8" height="276" fill="#d9a066"/>
+            <path d="M196,370 C210,330 208,300 200,262" stroke="#ff6b5e" stroke-width="3" fill="none" marker-end="url(#lk)"/>
+            <path d="M200,225 C212,190 210,160 202,120" stroke="#ff6b5e" stroke-width="3" fill="none" marker-end="url(#lk)"/></g>
+          <!-- Type 4: cased+cemented thru seal, open at reservoir -->
+          <g><text x="290" y="18" fill="#e9eef7" font-size="13" font-weight="700" text-anchor="middle">Type 4</text>
+            <rect x="280" y="28" width="20" height="244" fill="#cfd6e2"/><rect x="283" y="28" width="14" height="244" fill="#454e60" stroke="#9aa4b5"/>
+            <rect x="286" y="272" width="8" height="116" fill="#d9a066"/>
+            <path d="M296,370 C312,352 314,330 306,308" stroke="#ff6b5e" stroke-width="3" fill="none" marker-end="url(#lk)"/></g>
+          <!-- Type 5: open hole ends in seal -->
+          <g><text x="390" y="18" fill="#e9eef7" font-size="13" font-weight="700" text-anchor="middle">Type 5</text>
+            <rect x="386" y="28" width="8" height="222" fill="#d9a066"/>
+            <path d="M396,240 C410,190 408,150 400,100" stroke="#ff6b5e" stroke-width="3" fill="none" marker-end="url(#lk)"/>
+            <path d="M400,66 C410,52 412,46 416,38" stroke="#ff6b5e" stroke-width="3" fill="none" marker-end="url(#lk)"/></g>
+          <!-- Type 6: surface casing, open ends in seal -->
+          <g><text x="478" y="18" fill="#e9eef7" font-size="13" font-weight="700" text-anchor="middle">Type 6</text>
+            <rect x="468" y="28" width="20" height="84" fill="#cfd6e2"/><rect x="471" y="28" width="14" height="84" fill="#454e60" stroke="#9aa4b5"/>
+            <rect x="474" y="112" width="8" height="138" fill="#d9a066"/>
+            <path d="M484,240 C496,205 494,170 486,125" stroke="#ff6b5e" stroke-width="3" fill="none" marker-end="url(#lk)"/></g>
+          <!-- Injector -->
+          <g><text x="588" y="18" fill="#9fd1ff" font-size="13" font-weight="800" text-anchor="middle">CO&#8322; Injector (Class VI)</text>
+            <rect x="576" y="28" width="24" height="360" fill="#cfd6e2"/><rect x="580" y="28" width="16" height="360" fill="#2f3b52" stroke="#7fb2e5" stroke-width="2"/>
+            <line x1="588" y1="30" x2="588" y2="386" stroke="#9fd1ff" stroke-width="2" stroke-dasharray="6 4"/></g>
+          <!-- Type 7: fully cased+cemented thru reservoir -->
+          <g><text x="690" y="18" fill="#e9eef7" font-size="13" font-weight="700" text-anchor="middle">Type 7</text>
+            <rect x="680" y="28" width="20" height="360" fill="#cfd6e2"/><rect x="683" y="28" width="14" height="360" fill="#454e60" stroke="#9aa4b5"/></g>
+          <!-- Type 8: cased+cemented, ends in seal -->
+          <g><text x="790" y="18" fill="#e9eef7" font-size="13" font-weight="700" text-anchor="middle">Type 8</text>
+            <rect x="780" y="28" width="20" height="222" fill="#cfd6e2"/><rect x="783" y="28" width="14" height="222" fill="#454e60" stroke="#9aa4b5"/></g>
+          <!-- Type 9: cased, ends above seal -->
+          <g><text x="880" y="18" fill="#e9eef7" font-size="13" font-weight="700" text-anchor="middle">Type 9</text>
+            <rect x="870" y="28" width="20" height="160" fill="#cfd6e2"/><rect x="873" y="28" width="14" height="160" fill="#454e60" stroke="#9aa4b5"/></g>
+        </svg>
+        </div>
+        <div class="muted" style="font-size:11px;margin:-6px 0 12px">Figure A-4 (adapted) &mdash; legacy well classification by penetration and protection. Original artwork redrawn for this dashboard; leak arrows mark unprotected pathways. Casing/cement shown dark/light; open hole shown tan.</div>
         <div style="overflow:auto">
         <table class="wells">
           <thead><tr><th style="white-space:nowrap">Type</th><th>Description</th><th>Protection Provided</th></tr></thead>
           <tbody id="klassBody"></tbody>
         </table>
         </div>
-        <div class="note" style="margin-top:14px"><b>Source:</b> Table A-1 &amp; Figure A-4, <i>CO2 Underground Storage Legacy Well Review Guideline</i>, GD-40-0B42-524E.1.0.0, Enbridge Inc., 2025-10-03. Wells within the AoR are categorized by <b>penetration</b> (seal / reservoir), <b>protection</b> (groundwater-USDWs, seal, reservoir) and <b>accessibility</b>, then entered into the risk matrix (Fig. A-10). "Protection" means verified barriers (casing/cement/plugs) across the named interval. Type 1 (no records) is the default for wells pushed from the 3D Reviewer until verified.</div>
+        <div class="note" style="margin-top:14px"><b>Sources:</b> Table A-1 &amp; Figure A-4, <i>CO2 Underground Storage Legacy Well Review Guideline</i>, GD-40-0B42-524E.1.0.0, Enbridge Inc., 2025-10-03; figure adapted after Arbad, N., Watson, M., Heinze, L. &amp; Emadi, H. (2024), <i>Qualitative risk assessment of legacy wells based on publicly available data for Class VI well permit applications &mdash; Illinois Basin case study</i>, International Journal of Greenhouse Gas Control 133:104106, <a href="https://doi.org/10.1016/j.ijggc.2024.104106" target="_blank" rel="noopener" style="color:var(--accent)">doi:10.1016/j.ijggc.2024.104106</a>. Wells within the AoR are categorized by <b>penetration</b> (seal / reservoir), <b>protection</b> (groundwater-USDWs, seal, reservoir) and <b>accessibility</b>, then entered into the risk matrix (Fig. A-10). "Protection" means verified barriers (casing/cement/plugs) across the named interval. Type 1 (no records) is the default for wells pushed from the 3D Reviewer until verified.</div>
       </div>
     </section>
 
