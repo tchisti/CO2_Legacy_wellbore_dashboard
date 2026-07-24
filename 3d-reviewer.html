@@ -23598,6 +23598,7 @@ dialog.confirm { max-width: 420px; }
     const objects = /* @__PURE__ */ new Map();
     const pickMeshes = [];
     let selectedId = null, dimmed = /* @__PURE__ */ new Set(), scenarioVisible = true;
+    let labelMode2 = "hover";
     const colorFor = (w) => new Color(site2.colors[w._risk?.class] || "#888888");
     function boreGeometry(w) {
       const tvd = typeof w.tvd === "number" ? w.tvd : w.td || 1e3;
@@ -23612,6 +23613,32 @@ dialog.confirm { max-width: 420px; }
         new Vector3(lat, -h, lat * 0.3)
       ];
       return new TubeGeometry(new CatmullRomCurve3(pts), 24, 2, 8);
+    }
+    function makeWellLabel(w) {
+      const c = document.createElement("canvas");
+      c.width = 640;
+      c.height = 128;
+      const g = c.getContext("2d");
+      const ink = theme2 === "light" ? "#1e2a38" : "#e8eef8";
+      const halo = theme2 === "light" ? "rgba(255,255,255,0.85)" : "rgba(10,15,24,0.75)";
+      g.fillStyle = halo;
+      g.beginPath();
+      g.roundRect(0, 8, 632, 112, 14);
+      g.fill();
+      g.fillStyle = site2.colors[w._risk?.class] || "#888888";
+      g.beginPath();
+      g.roundRect(14, 26, 26, 26, 5);
+      g.fill();
+      g.fillStyle = ink;
+      g.font = "700 40px system-ui, sans-serif";
+      g.fillText((w.wellName || "\u2014").slice(0, 26), 54, 58);
+      g.font = "400 32px ui-monospace, Menlo, monospace";
+      g.fillText((w.uwi || "").slice(0, 28), 54, 102);
+      const sp = new Sprite(new SpriteMaterial({ map: new CanvasTexture(c), transparent: true, depthTest: false }));
+      sp.scale.set(96, 19.2, 1);
+      sp.position.set(0, 26, 0);
+      sp.userData.wellId = w.id;
+      return sp;
     }
     function buildWell(w) {
       const group = new Group();
@@ -23628,10 +23655,12 @@ dialog.confirm { max-width: 420px; }
         edge.computeLineDistances();
         group.add(edge);
       }
+      const label = makeWellLabel(w);
+      group.add(label);
       const [px2, pz2] = toScene(w.x || 0, w.y || 0);
       group.position.set(px2, 0, pz2);
       bore.userData.wellId = head.userData.wellId = w.id;
-      return { group, bore, head, well: w };
+      return { group, bore, head, label, well: w };
     }
     function applyVisual(o) {
       const w = o.well;
@@ -23642,6 +23671,11 @@ dialog.confirm { max-width: 420px; }
         m.opacity = dimmed.has(w.id) ? 0.08 : baseOp;
         m.emissive.set(w.id === selectedId ? 3360606 : 0);
       }
+      o.label.visible = labelMode2 === "all" ? !dimmed.has(w.id) : labelMode2 === "selected" ? w.id === selectedId : false;
+    }
+    function setLabelMode(mode) {
+      labelMode2 = mode === "all" || mode === "selected" ? mode : "hover";
+      for (const o of objects.values()) applyVisual(o);
     }
     const tweens = [];
     const tween = (dur, fn, done) => tweens.push({ t0: performance.now(), dur, fn, done });
@@ -23652,6 +23686,7 @@ dialog.confirm { max-width: 420px; }
       objects.set(w.id, o);
       wellRoot.add(o.group);
       pickMeshes.push(o.bore, o.head);
+      if (o.label) pickMeshes.push(o.label);
       applyVisual(o);
       if (animate) {
         const gy = o.group.position.y;
@@ -23683,6 +23718,7 @@ dialog.confirm { max-width: 420px; }
         wellRoot.remove(o.group);
         o.group.traverse((n) => {
           n.geometry?.dispose();
+          n.material?.map?.dispose();
           n.material?.dispose();
         });
       };
@@ -23782,7 +23818,7 @@ dialog.confirm { max-width: 420px; }
       renderer.render(scene, camera);
     }
     requestAnimationFrame(frame);
-    return { supported: true, syncAll, upsert, remove, setSelected, setDimmed, setScenarioVisible, pulse, setFormations };
+    return { supported: true, syncAll, upsert, remove, setSelected, setDimmed, setScenarioVisible, pulse, setFormations, setLabelMode };
   }
 
   // src/fallback2d.js
@@ -24585,6 +24621,34 @@ dialog.confirm { max-width: 420px; }
   $("#search").addEventListener("input", (e) => store.setView({ search: e.target.value }));
   $("#btnUndo").addEventListener("click", () => store.undo());
   $("#btnRedo").addEventListener("click", () => store.redo());
+  var LABELS_KEY = "lwms:wellLabels";
+  var labelMode = "hover";
+  try {
+    const lm = localStorage.getItem(LABELS_KEY);
+    if (lm === "all" || lm === "selected") labelMode = lm;
+  } catch {
+  }
+  var labelWrap = document.createElement("label");
+  labelWrap.className = "switch";
+  labelWrap.title = "Floating well labels in the 3D view: only while hovering, pinned on the selected well, or on every well";
+  var labelSel = document.createElement("select");
+  for (const [v, t] of [["hover", "On hover"], ["selected", "Selected well"], ["all", "All wells"]]) {
+    const o = document.createElement("option");
+    o.value = v;
+    o.textContent = t;
+    labelSel.append(o);
+  }
+  labelSel.value = labelMode;
+  labelSel.addEventListener("change", () => {
+    labelMode = labelSel.value;
+    try {
+      localStorage.setItem(LABELS_KEY, labelMode);
+    } catch {
+    }
+    if (sceneApi.supported) sceneApi.setLabelMode(labelMode);
+  });
+  labelWrap.append(document.createTextNode("\u{1F3F7} Labels "), labelSel);
+  $("#toolbar").append(labelWrap);
   var fmBtn = document.createElement("button");
   fmBtn.id = "btnFormations";
   fmBtn.textContent = "\u26F0 Formations";
@@ -24618,6 +24682,7 @@ dialog.confirm { max-width: 420px; }
     if (await confirmDialog("Reset to the original 20-well demo dataset? Manually added wells will be removed (undoable)."))
       store.dispatch({ type: "wells/resetDemo" });
   });
+  if (sceneApi.supported && labelMode !== "hover") sceneApi.setLabelMode(labelMode);
   var saved = persistence.load();
   store.loadInitial(saved || seedWells);
   if (saved) toast(`Restored ${saved.length} wells from your last session`);
