@@ -130,6 +130,11 @@ dialog.confirm { max-width: 420px; }
 
 @media (max-width: 1100px) { #layout { grid-template-columns: 280px 1fr; } #right { display: none; } }
 
+.fm-table td { padding: 4px 6px; }
+.fm-table input[type="text"] { width: 100%; min-width: 140px; }
+.fm-table input[type="color"] { width: 40px; height: 28px; padding: 1px 2px; cursor: pointer; }
+.fm-table select { padding: 4px 6px; }
+
 </style>
 </head>
 <body>
@@ -627,6 +632,18 @@ dialog.confirm { max-width: 420px; }
     datums: { caprockTop_m: 1770, reservoirTop_m: 1850, reservoirBase_m: 1920 },
     grid: { spacing_m: 1609.344, majorEvery: 6, anchor: { x: 0, y: 0 } },
     // DLS fabric: 1-mile sections, township lines every 6
+    // Editable stratigraphic column (defaults; users can add/edit via the Formations dialog).
+    formations: [
+      { id: "fm-edmonton", name: "Edmonton Grp", top_m: 200, base_m: 450, color: "#8f9a7a", role: "" },
+      { id: "fm-bellyriver", name: "Belly River", top_m: 450, base_m: 750, color: "#b09a6e", role: "" },
+      { id: "fm-leapark", name: "Lea Park", top_m: 750, base_m: 950, color: "#6f7f99", role: "" },
+      { id: "fm-colorado", name: "Colorado Grp", top_m: 950, base_m: 1350, color: "#5d6858", role: "" },
+      { id: "fm-mannville", name: "Mannville Grp", top_m: 1350, base_m: 1600, color: "#8a6f4d", role: "" },
+      { id: "fm-wabamun", name: "Wabamun", top_m: 1600, base_m: 1770, color: "#7f93a8", role: "" },
+      { id: "fm-calmar", name: "Calmar (seal)", top_m: 1770, base_m: 1850, color: "#4a4f57", role: "caprock" },
+      { id: "fm-nisku", name: "Nisku (reservoir)", top_m: 1850, base_m: 1920, color: "#3f9b57", role: "reservoir" },
+      { id: "fm-ireton", name: "Ireton", top_m: 1920, base_m: 2100, color: "#66766a", role: "" }
+    ],
     colors: { critical: "#d32f2f", high: "#f57c00", medium: "#fbc02d", low: "#388e3c" }
   };
 
@@ -649,6 +666,19 @@ dialog.confirm { max-width: 420px; }
     // DLS fabric anchored to real survey lines: x=2556 m is the R23|R22W4 range line,
     // y=8476 m is the T55|T56 township line (derived from the 8-19-055-22W4 anchor well).
     grid: { spacing_m: 1609.344, majorEvery: 6, anchor: { x: 2556, y: 8476 } },
+    // Stratigraphic column with tops averaged from the wellbore review's formation-top
+    // records (editable via the Formations dialog; per-site edits persist in this browser).
+    formations: [
+      { id: "fm-leapark", name: "Lea Park", top_m: 290, base_m: 450, color: "#6f7f99", role: "" },
+      { id: "fm-colorado", name: "Colorado Grp", top_m: 450, base_m: 746, color: "#5d6858", role: "" },
+      { id: "fm-viking", name: "Viking", top_m: 746, base_m: 790, color: "#c2a878", role: "" },
+      { id: "fm-mannville", name: "Mannville Grp", top_m: 790, base_m: 1030, color: "#8a6f4d", role: "" },
+      { id: "fm-wabamun", name: "Wabamun", top_m: 1030, base_m: 1050, color: "#7f93a8", role: "" },
+      { id: "fm-calmar", name: "Calmar (seal)", top_m: 1050, base_m: 1080, color: "#4a4f57", role: "caprock" },
+      { id: "fm-nisku", name: "Nisku (reservoir)", top_m: 1080, base_m: 1160, color: "#3f9b57", role: "reservoir" },
+      { id: "fm-ireton", name: "Ireton", top_m: 1160, base_m: 1330, color: "#66766a", role: "" },
+      { id: "fm-cookinglake", name: "Cooking Lake", top_m: 1330, base_m: 1450, color: "#9aa7b5", role: "" }
+    ],
     colors: { critical: "#d32f2f", high: "#f57c00", medium: "#fbc02d", low: "#388e3c" }
   };
   var base = {
@@ -19474,6 +19504,405 @@ dialog.confirm { max-width: 420px; }
       return data;
     }
   };
+  var InterleavedBuffer = class {
+    constructor(array, stride) {
+      this.isInterleavedBuffer = true;
+      this.array = array;
+      this.stride = stride;
+      this.count = array !== void 0 ? array.length / stride : 0;
+      this.usage = StaticDrawUsage;
+      this._updateRange = { offset: 0, count: -1 };
+      this.updateRanges = [];
+      this.version = 0;
+      this.uuid = generateUUID();
+    }
+    onUploadCallback() {
+    }
+    set needsUpdate(value) {
+      if (value === true) this.version++;
+    }
+    get updateRange() {
+      console.warn("THREE.InterleavedBuffer: updateRange() is deprecated and will be removed in r169. Use addUpdateRange() instead.");
+      return this._updateRange;
+    }
+    setUsage(value) {
+      this.usage = value;
+      return this;
+    }
+    addUpdateRange(start, count) {
+      this.updateRanges.push({ start, count });
+    }
+    clearUpdateRanges() {
+      this.updateRanges.length = 0;
+    }
+    copy(source) {
+      this.array = new source.array.constructor(source.array);
+      this.count = source.count;
+      this.stride = source.stride;
+      this.usage = source.usage;
+      return this;
+    }
+    copyAt(index1, attribute, index2) {
+      index1 *= this.stride;
+      index2 *= attribute.stride;
+      for (let i = 0, l = this.stride; i < l; i++) {
+        this.array[index1 + i] = attribute.array[index2 + i];
+      }
+      return this;
+    }
+    set(value, offset = 0) {
+      this.array.set(value, offset);
+      return this;
+    }
+    clone(data) {
+      if (data.arrayBuffers === void 0) {
+        data.arrayBuffers = {};
+      }
+      if (this.array.buffer._uuid === void 0) {
+        this.array.buffer._uuid = generateUUID();
+      }
+      if (data.arrayBuffers[this.array.buffer._uuid] === void 0) {
+        data.arrayBuffers[this.array.buffer._uuid] = this.array.slice(0).buffer;
+      }
+      const array = new this.array.constructor(data.arrayBuffers[this.array.buffer._uuid]);
+      const ib = new this.constructor(array, this.stride);
+      ib.setUsage(this.usage);
+      return ib;
+    }
+    onUpload(callback) {
+      this.onUploadCallback = callback;
+      return this;
+    }
+    toJSON(data) {
+      if (data.arrayBuffers === void 0) {
+        data.arrayBuffers = {};
+      }
+      if (this.array.buffer._uuid === void 0) {
+        this.array.buffer._uuid = generateUUID();
+      }
+      if (data.arrayBuffers[this.array.buffer._uuid] === void 0) {
+        data.arrayBuffers[this.array.buffer._uuid] = Array.from(new Uint32Array(this.array.buffer));
+      }
+      return {
+        uuid: this.uuid,
+        buffer: this.array.buffer._uuid,
+        type: this.array.constructor.name,
+        stride: this.stride
+      };
+    }
+  };
+  var _vector$6 = /* @__PURE__ */ new Vector3();
+  var InterleavedBufferAttribute = class _InterleavedBufferAttribute {
+    constructor(interleavedBuffer, itemSize, offset, normalized = false) {
+      this.isInterleavedBufferAttribute = true;
+      this.name = "";
+      this.data = interleavedBuffer;
+      this.itemSize = itemSize;
+      this.offset = offset;
+      this.normalized = normalized;
+    }
+    get count() {
+      return this.data.count;
+    }
+    get array() {
+      return this.data.array;
+    }
+    set needsUpdate(value) {
+      this.data.needsUpdate = value;
+    }
+    applyMatrix4(m) {
+      for (let i = 0, l = this.data.count; i < l; i++) {
+        _vector$6.fromBufferAttribute(this, i);
+        _vector$6.applyMatrix4(m);
+        this.setXYZ(i, _vector$6.x, _vector$6.y, _vector$6.z);
+      }
+      return this;
+    }
+    applyNormalMatrix(m) {
+      for (let i = 0, l = this.count; i < l; i++) {
+        _vector$6.fromBufferAttribute(this, i);
+        _vector$6.applyNormalMatrix(m);
+        this.setXYZ(i, _vector$6.x, _vector$6.y, _vector$6.z);
+      }
+      return this;
+    }
+    transformDirection(m) {
+      for (let i = 0, l = this.count; i < l; i++) {
+        _vector$6.fromBufferAttribute(this, i);
+        _vector$6.transformDirection(m);
+        this.setXYZ(i, _vector$6.x, _vector$6.y, _vector$6.z);
+      }
+      return this;
+    }
+    setX(index, x) {
+      if (this.normalized) x = normalize(x, this.array);
+      this.data.array[index * this.data.stride + this.offset] = x;
+      return this;
+    }
+    setY(index, y) {
+      if (this.normalized) y = normalize(y, this.array);
+      this.data.array[index * this.data.stride + this.offset + 1] = y;
+      return this;
+    }
+    setZ(index, z) {
+      if (this.normalized) z = normalize(z, this.array);
+      this.data.array[index * this.data.stride + this.offset + 2] = z;
+      return this;
+    }
+    setW(index, w) {
+      if (this.normalized) w = normalize(w, this.array);
+      this.data.array[index * this.data.stride + this.offset + 3] = w;
+      return this;
+    }
+    getX(index) {
+      let x = this.data.array[index * this.data.stride + this.offset];
+      if (this.normalized) x = denormalize(x, this.array);
+      return x;
+    }
+    getY(index) {
+      let y = this.data.array[index * this.data.stride + this.offset + 1];
+      if (this.normalized) y = denormalize(y, this.array);
+      return y;
+    }
+    getZ(index) {
+      let z = this.data.array[index * this.data.stride + this.offset + 2];
+      if (this.normalized) z = denormalize(z, this.array);
+      return z;
+    }
+    getW(index) {
+      let w = this.data.array[index * this.data.stride + this.offset + 3];
+      if (this.normalized) w = denormalize(w, this.array);
+      return w;
+    }
+    setXY(index, x, y) {
+      index = index * this.data.stride + this.offset;
+      if (this.normalized) {
+        x = normalize(x, this.array);
+        y = normalize(y, this.array);
+      }
+      this.data.array[index + 0] = x;
+      this.data.array[index + 1] = y;
+      return this;
+    }
+    setXYZ(index, x, y, z) {
+      index = index * this.data.stride + this.offset;
+      if (this.normalized) {
+        x = normalize(x, this.array);
+        y = normalize(y, this.array);
+        z = normalize(z, this.array);
+      }
+      this.data.array[index + 0] = x;
+      this.data.array[index + 1] = y;
+      this.data.array[index + 2] = z;
+      return this;
+    }
+    setXYZW(index, x, y, z, w) {
+      index = index * this.data.stride + this.offset;
+      if (this.normalized) {
+        x = normalize(x, this.array);
+        y = normalize(y, this.array);
+        z = normalize(z, this.array);
+        w = normalize(w, this.array);
+      }
+      this.data.array[index + 0] = x;
+      this.data.array[index + 1] = y;
+      this.data.array[index + 2] = z;
+      this.data.array[index + 3] = w;
+      return this;
+    }
+    clone(data) {
+      if (data === void 0) {
+        console.log("THREE.InterleavedBufferAttribute.clone(): Cloning an interleaved buffer attribute will de-interleave buffer data.");
+        const array = [];
+        for (let i = 0; i < this.count; i++) {
+          const index = i * this.data.stride + this.offset;
+          for (let j = 0; j < this.itemSize; j++) {
+            array.push(this.data.array[index + j]);
+          }
+        }
+        return new BufferAttribute(new this.array.constructor(array), this.itemSize, this.normalized);
+      } else {
+        if (data.interleavedBuffers === void 0) {
+          data.interleavedBuffers = {};
+        }
+        if (data.interleavedBuffers[this.data.uuid] === void 0) {
+          data.interleavedBuffers[this.data.uuid] = this.data.clone(data);
+        }
+        return new _InterleavedBufferAttribute(data.interleavedBuffers[this.data.uuid], this.itemSize, this.offset, this.normalized);
+      }
+    }
+    toJSON(data) {
+      if (data === void 0) {
+        console.log("THREE.InterleavedBufferAttribute.toJSON(): Serializing an interleaved buffer attribute will de-interleave buffer data.");
+        const array = [];
+        for (let i = 0; i < this.count; i++) {
+          const index = i * this.data.stride + this.offset;
+          for (let j = 0; j < this.itemSize; j++) {
+            array.push(this.data.array[index + j]);
+          }
+        }
+        return {
+          itemSize: this.itemSize,
+          type: this.array.constructor.name,
+          array,
+          normalized: this.normalized
+        };
+      } else {
+        if (data.interleavedBuffers === void 0) {
+          data.interleavedBuffers = {};
+        }
+        if (data.interleavedBuffers[this.data.uuid] === void 0) {
+          data.interleavedBuffers[this.data.uuid] = this.data.toJSON(data);
+        }
+        return {
+          isInterleavedBufferAttribute: true,
+          itemSize: this.itemSize,
+          data: this.data.uuid,
+          offset: this.offset,
+          normalized: this.normalized
+        };
+      }
+    }
+  };
+  var SpriteMaterial = class extends Material {
+    constructor(parameters) {
+      super();
+      this.isSpriteMaterial = true;
+      this.type = "SpriteMaterial";
+      this.color = new Color(16777215);
+      this.map = null;
+      this.alphaMap = null;
+      this.rotation = 0;
+      this.sizeAttenuation = true;
+      this.transparent = true;
+      this.fog = true;
+      this.setValues(parameters);
+    }
+    copy(source) {
+      super.copy(source);
+      this.color.copy(source.color);
+      this.map = source.map;
+      this.alphaMap = source.alphaMap;
+      this.rotation = source.rotation;
+      this.sizeAttenuation = source.sizeAttenuation;
+      this.fog = source.fog;
+      return this;
+    }
+  };
+  var _geometry;
+  var _intersectPoint = /* @__PURE__ */ new Vector3();
+  var _worldScale = /* @__PURE__ */ new Vector3();
+  var _mvPosition = /* @__PURE__ */ new Vector3();
+  var _alignedPosition = /* @__PURE__ */ new Vector2();
+  var _rotatedPosition = /* @__PURE__ */ new Vector2();
+  var _viewWorldMatrix = /* @__PURE__ */ new Matrix4();
+  var _vA = /* @__PURE__ */ new Vector3();
+  var _vB = /* @__PURE__ */ new Vector3();
+  var _vC = /* @__PURE__ */ new Vector3();
+  var _uvA = /* @__PURE__ */ new Vector2();
+  var _uvB = /* @__PURE__ */ new Vector2();
+  var _uvC = /* @__PURE__ */ new Vector2();
+  var Sprite = class extends Object3D {
+    constructor(material = new SpriteMaterial()) {
+      super();
+      this.isSprite = true;
+      this.type = "Sprite";
+      if (_geometry === void 0) {
+        _geometry = new BufferGeometry();
+        const float32Array = new Float32Array([
+          -0.5,
+          -0.5,
+          0,
+          0,
+          0,
+          0.5,
+          -0.5,
+          0,
+          1,
+          0,
+          0.5,
+          0.5,
+          0,
+          1,
+          1,
+          -0.5,
+          0.5,
+          0,
+          0,
+          1
+        ]);
+        const interleavedBuffer = new InterleavedBuffer(float32Array, 5);
+        _geometry.setIndex([0, 1, 2, 0, 2, 3]);
+        _geometry.setAttribute("position", new InterleavedBufferAttribute(interleavedBuffer, 3, 0, false));
+        _geometry.setAttribute("uv", new InterleavedBufferAttribute(interleavedBuffer, 2, 3, false));
+      }
+      this.geometry = _geometry;
+      this.material = material;
+      this.center = new Vector2(0.5, 0.5);
+    }
+    raycast(raycaster, intersects) {
+      if (raycaster.camera === null) {
+        console.error('THREE.Sprite: "Raycaster.camera" needs to be set in order to raycast against sprites.');
+      }
+      _worldScale.setFromMatrixScale(this.matrixWorld);
+      _viewWorldMatrix.copy(raycaster.camera.matrixWorld);
+      this.modelViewMatrix.multiplyMatrices(raycaster.camera.matrixWorldInverse, this.matrixWorld);
+      _mvPosition.setFromMatrixPosition(this.modelViewMatrix);
+      if (raycaster.camera.isPerspectiveCamera && this.material.sizeAttenuation === false) {
+        _worldScale.multiplyScalar(-_mvPosition.z);
+      }
+      const rotation = this.material.rotation;
+      let sin, cos;
+      if (rotation !== 0) {
+        cos = Math.cos(rotation);
+        sin = Math.sin(rotation);
+      }
+      const center = this.center;
+      transformVertex(_vA.set(-0.5, -0.5, 0), _mvPosition, center, _worldScale, sin, cos);
+      transformVertex(_vB.set(0.5, -0.5, 0), _mvPosition, center, _worldScale, sin, cos);
+      transformVertex(_vC.set(0.5, 0.5, 0), _mvPosition, center, _worldScale, sin, cos);
+      _uvA.set(0, 0);
+      _uvB.set(1, 0);
+      _uvC.set(1, 1);
+      let intersect = raycaster.ray.intersectTriangle(_vA, _vB, _vC, false, _intersectPoint);
+      if (intersect === null) {
+        transformVertex(_vB.set(-0.5, 0.5, 0), _mvPosition, center, _worldScale, sin, cos);
+        _uvB.set(0, 1);
+        intersect = raycaster.ray.intersectTriangle(_vA, _vC, _vB, false, _intersectPoint);
+        if (intersect === null) {
+          return;
+        }
+      }
+      const distance = raycaster.ray.origin.distanceTo(_intersectPoint);
+      if (distance < raycaster.near || distance > raycaster.far) return;
+      intersects.push({
+        distance,
+        point: _intersectPoint.clone(),
+        uv: Triangle.getInterpolation(_intersectPoint, _vA, _vB, _vC, _uvA, _uvB, _uvC, new Vector2()),
+        face: null,
+        object: this
+      });
+    }
+    copy(source, recursive) {
+      super.copy(source, recursive);
+      if (source.center !== void 0) this.center.copy(source.center);
+      this.material = source.material;
+      return this;
+    }
+  };
+  function transformVertex(vertexPosition, mvPosition, center, scale, sin, cos) {
+    _alignedPosition.subVectors(vertexPosition, center).addScalar(0.5).multiply(scale);
+    if (sin !== void 0) {
+      _rotatedPosition.x = cos * _alignedPosition.x - sin * _alignedPosition.y;
+      _rotatedPosition.y = sin * _alignedPosition.x + cos * _alignedPosition.y;
+    } else {
+      _rotatedPosition.copy(_alignedPosition);
+    }
+    vertexPosition.copy(mvPosition);
+    vertexPosition.x += _rotatedPosition.x;
+    vertexPosition.y += _rotatedPosition.y;
+    vertexPosition.applyMatrix4(_viewWorldMatrix);
+  }
   var LineBasicMaterial = class extends Material {
     constructor(parameters) {
       super();
@@ -19647,6 +20076,13 @@ dialog.confirm { max-width: 420px; }
         console.warn("THREE.LineSegments.computeLineDistances(): Computation only possible with non-indexed BufferGeometry.");
       }
       return this;
+    }
+  };
+  var CanvasTexture = class extends Texture {
+    constructor(canvas, mapping, wrapS, wrapT, magFilter, minFilter, format, type, anisotropy) {
+      super(canvas, mapping, wrapS, wrapT, magFilter, minFilter, format, type, anisotropy);
+      this.isCanvasTexture = true;
+      this.needsUpdate = true;
     }
   };
   var Curve = class {
@@ -23012,7 +23448,7 @@ dialog.confirm { max-width: 420px; }
   // src/scene3d.js
   var S = 0.1;
   var easeOut = (t) => 1 - Math.pow(1 - t, 3);
-  function createScene({ canvas, site: site2, onSelect, onEdit, onHover, theme: theme2 = "dark" }) {
+  function createScene({ canvas, site: site2, onSelect, onEdit, onHover, theme: theme2 = "dark", formations = [] }) {
     let renderer;
     try {
       renderer = new WebGLRenderer({ canvas, antialias: true });
@@ -23087,17 +23523,50 @@ dialog.confirm { max-width: 420px; }
         scene.add(ring, fill);
       }
     }
-    const slab = (top, base2, color, opacity) => {
-      const h = (base2 - top) * S;
-      const m = new Mesh(
-        new BoxGeometry(D, h, D),
-        new MeshLambertMaterial({ color, transparent: true, opacity, depthWrite: false })
-      );
-      m.position.y = -(top * S + h / 2);
-      scene.add(m);
-    };
-    slab(site2.datums.caprockTop_m, site2.datums.reservoirTop_m, 6056896, 0.1);
-    slab(site2.datums.reservoirTop_m, site2.datums.reservoirBase_m, 2533018, 0.12);
+    const formGroup = new Group();
+    scene.add(formGroup);
+    function makeLabel(text, swatch) {
+      const c = document.createElement("canvas");
+      c.width = 512;
+      c.height = 80;
+      const g = c.getContext("2d");
+      g.font = "600 34px system-ui, sans-serif";
+      g.fillStyle = swatch;
+      g.fillRect(6, 22, 36, 36);
+      g.strokeStyle = theme2 === "light" ? "#1e2a38" : "#dbe4f0";
+      g.strokeRect(6, 22, 36, 36);
+      g.fillStyle = theme2 === "light" ? "#1e2a38" : "#dbe4f0";
+      g.fillText(text.slice(0, 24), 54, 52);
+      const tex = new CanvasTexture(c);
+      const sp = new Sprite(new SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
+      sp.scale.set(96, 15, 1);
+      return sp;
+    }
+    function setFormations(list2) {
+      for (const child of [...formGroup.children]) {
+        formGroup.remove(child);
+        child.traverse((n) => {
+          n.geometry?.dispose();
+          n.material?.map?.dispose();
+          n.material?.dispose();
+        });
+      }
+      const valid = (list2 || []).filter((f) => typeof f.top_m === "number" && typeof f.base_m === "number" && f.base_m > f.top_m);
+      valid.forEach((f, i) => {
+        const h = (f.base_m - f.top_m) * S;
+        const isKey = f.role === "caprock" || f.role === "reservoir";
+        const m = new Mesh(
+          new BoxGeometry(D, h, D),
+          new MeshLambertMaterial({ color: new Color(f.color || "#888888"), transparent: true, opacity: isKey ? 0.2 : 0.09, depthWrite: false })
+        );
+        m.position.y = -(f.top_m * S + h / 2);
+        formGroup.add(m);
+        const label = makeLabel(f.name || "?", f.color || "#888888");
+        label.position.set(focusX - 120 + i % 3 * 120, -(f.top_m + f.base_m) / 2 * S, cz + 12);
+        formGroup.add(label);
+      });
+    }
+    setFormations(formations);
     for (const inj of site2.injectors) {
       const [ix, iz] = toScene(inj.x, inj.y);
       const depth = site2.datums.reservoirTop_m * S;
@@ -23308,7 +23777,7 @@ dialog.confirm { max-width: 420px; }
       renderer.render(scene, camera);
     }
     requestAnimationFrame(frame);
-    return { supported: true, syncAll, upsert, remove, setSelected, setDimmed, setScenarioVisible, pulse };
+    return { supported: true, syncAll, upsert, remove, setSelected, setDimmed, setScenarioVisible, pulse, setFormations };
   }
 
   // src/fallback2d.js
@@ -23704,6 +24173,122 @@ dialog.confirm { max-width: 420px; }
     ));
   }
 
+  // src/formations.js
+  var KEY = (siteId) => `lwms:formations:${siteId}`;
+  function loadFormations(storage, siteId, site2) {
+    try {
+      const raw = storage.getItem(KEY(siteId));
+      if (raw) {
+        const env = JSON.parse(raw);
+        if (env && env.schemaVersion === 1 && Array.isArray(env.formations) && env.formations.length) return env.formations;
+      }
+    } catch {
+    }
+    return structuredClone(site2.formations || []);
+  }
+  function saveFormations(storage, siteId, formations) {
+    try {
+      storage.setItem(KEY(siteId), JSON.stringify({ schemaVersion: 1, formations }));
+    } catch {
+    }
+  }
+  var ROLES = [["", "\u2014"], ["caprock", "Caprock / seal"], ["reservoir", "Storage reservoir"]];
+  var nextId = 1;
+  function openFormationsDialog({ site: site2, formations, onSave }) {
+    const working = structuredClone(formations);
+    const tbody = el("tbody", {});
+    const errBox = el("div", { class: "field-err", style: "margin-top:6px" });
+    function row(f) {
+      const name = el("input", { type: "text", value: f.name || "", placeholder: "Formation name" });
+      const top = el("input", { type: "number", value: f.top_m ?? "", step: "any", style: "width:84px" });
+      const base2 = el("input", { type: "number", value: f.base_m ?? "", step: "any", style: "width:84px" });
+      const color = el("input", { type: "color", value: /^#[0-9a-fA-F]{6}$/.test(f.color || "") ? f.color : "#888888", title: "Slab color" });
+      const role = el("select", {}, ...ROLES.map(([v, l]) => el("option", { value: v, selected: (f.role || "") === v }, l)));
+      const del = el("button", { class: "danger", title: "Remove formation", onclick: (ev) => {
+        ev.preventDefault();
+        tr.remove();
+      } }, "\u2715");
+      const tr = el(
+        "tr",
+        {},
+        el("td", {}, name),
+        el("td", {}, top),
+        el("td", {}, base2),
+        el("td", {}, color),
+        el("td", {}, role),
+        el("td", {}, del)
+      );
+      tr._get = () => ({
+        id: f.id || `fm-user-${nextId++}`,
+        name: name.value.trim(),
+        top_m: top.value === "" ? null : Number(top.value),
+        base_m: base2.value === "" ? null : Number(base2.value),
+        color: color.value,
+        role: role.value
+      });
+      return tr;
+    }
+    const fill = (list2) => tbody.replaceChildren(...list2.map(row));
+    fill(working);
+    function save(ev) {
+      ev.preventDefault();
+      const list2 = [...tbody.children].map((tr) => tr._get());
+      const bad = list2.find((f) => !f.name || typeof f.top_m !== "number" || typeof f.base_m !== "number" || Number.isNaN(f.top_m) || Number.isNaN(f.base_m) || f.base_m <= f.top_m);
+      if (bad) {
+        errBox.textContent = `Check "${bad.name || "(unnamed)"}" \u2014 name required and base depth must be greater than top depth.`;
+        return;
+      }
+      if (!list2.length) {
+        errBox.textContent = "At least one formation is required (or Reset to defaults).";
+        return;
+      }
+      list2.sort((a, b) => a.top_m - b.top_m);
+      dlg.remove();
+      onSave(list2);
+    }
+    const dlg = el(
+      "dialog",
+      { class: "well-modal", oncancel: () => dlg.remove() },
+      el("h2", {}, `Formations \u2014 ${site2.name}`),
+      el(
+        "p",
+        { class: "muted", style: "margin:0 0 8px" },
+        "Stratigraphic column shown in the 3D viewer (depths in metres TVD). Tag one formation as Caprock / seal and one as Storage reservoir. Saved for this site in this browser."
+      ),
+      el(
+        "form",
+        {},
+        el(
+          "div",
+          { class: "method-table-wrap", style: "max-height:52vh;overflow-y:auto" },
+          el(
+            "table",
+            { class: "method-table fm-table" },
+            el("thead", {}, el("tr", {}, ...["Formation", "Top (m)", "Base (m)", "Color", "Role", ""].map((h) => el("th", {}, h)))),
+            tbody
+          )
+        ),
+        errBox,
+        el(
+          "div",
+          { class: "modal-actions" },
+          el("button", { type: "button", onclick: (ev) => {
+            ev.preventDefault();
+            tbody.append(row({ color: "#888888" }));
+          } }, "+ Add formation"),
+          el("button", { type: "button", onclick: (ev) => {
+            ev.preventDefault();
+            fill(structuredClone(site2.formations || []));
+          } }, "Reset to defaults"),
+          el("button", { type: "button", onclick: () => dlg.remove() }, "Cancel"),
+          el("button", { class: "primary", onclick: save }, "Save")
+        )
+      )
+    );
+    document.body.append(dlg);
+    dlg.showModal();
+  }
+
   // src/main.js
   var SITES = [
     { id: "nisku-demo", label: "Wabamun Demo", site: DEFAULT_SITE, seed: (s) => generateSeedWells(s), storageKey: "lwms:v1" },
@@ -23794,10 +24379,12 @@ dialog.confirm { max-width: 420px; }
     tip.style.left = `${x + 14}px`;
     tip.style.top = `${y + 10}px`;
   }
+  var formationsCurrent = loadFormations(localStorage, activeEntry.id, site);
   var sceneApi = createScene({
     canvas: $("#scene"),
     site,
     theme,
+    formations: formationsCurrent,
     onSelect: (id) => store.setView({ selection: id }),
     onEdit: (id) => handlers.onEdit(id),
     onHover: showTooltip
@@ -23992,6 +24579,23 @@ dialog.confirm { max-width: 420px; }
   $("#search").addEventListener("input", (e) => store.setView({ search: e.target.value }));
   $("#btnUndo").addEventListener("click", () => store.undo());
   $("#btnRedo").addEventListener("click", () => store.redo());
+  var fmBtn = document.createElement("button");
+  fmBtn.id = "btnFormations";
+  fmBtn.textContent = "\u26F0 Formations";
+  fmBtn.title = "Edit the stratigraphic column shown in the 3D viewer";
+  fmBtn.addEventListener("click", () => {
+    openFormationsDialog({
+      site,
+      formations: formationsCurrent,
+      onSave: (list2) => {
+        formationsCurrent = list2;
+        saveFormations(localStorage, activeEntry.id, list2);
+        if (sceneApi.supported) sceneApi.setFormations(list2);
+        toast(`Formations updated (${list2.length} in column).`);
+      }
+    });
+  });
+  $("#toolbar").append(fmBtn);
   var themeBtn = document.createElement("button");
   themeBtn.id = "btnTheme";
   themeBtn.textContent = theme === "light" ? "\u{1F319} Dark" : "\u2600\uFE0F Light";
