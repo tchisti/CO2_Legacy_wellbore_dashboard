@@ -324,7 +324,7 @@ footer{padding:18px 24px;color:var(--muted);font-size:11px;border-top:1px solid 
         </div>
         <iframe id="viewer3dFrame" src="3d-reviewer.html" loading="lazy" title="3D Legacy Well Reviewer"
           style="width:100%;height:78vh;border:1px solid var(--line);border-radius:12px;background:#0d1117"></iframe>
-        <div class="note" style="margin-top:10px">The 3D reviewer keeps its own per-site datasets (autosaved in your browser). "Send register wells" pushes the current shared register into the active 3D site: wells with lat/lon inside the site frame are geolocated; wells without coordinates are parked on a flagged holding row. The register total (9&ndash;45, higher&nbsp;=&nbsp;worse) is translated to the reviewer's Integrity Score (100&ndash;0, higher&nbsp;=&nbsp;better). One click of Ctrl+Z inside the viewer reverts a send.</div>
+        <div class="note" style="margin-top:10px">The 3D reviewer keeps its own per-site datasets (autosaved in your browser). "Send register wells" pushes the current shared register into the active 3D site: wells with lat/lon inside the site frame are geolocated; wells without coordinates are parked on a flagged holding row. The register total (9&ndash;45, higher&nbsp;=&nbsp;worse) is translated to the reviewer's Integrity Score (100&ndash;0, higher&nbsp;=&nbsp;better). One click of Ctrl+Z inside the viewer reverts a send. The bridge is two-way: the viewer\u2019s toolbar gains a &ldquo;&#8679; Push to Register&rdquo; button when embedded here, which maps its wells back into the shared register (subscores derived from reviewer fields using the register\u2019s own 1/3/5 anchors &mdash; verify Classification, Access and Data after a push).</div>
       </div>
     </section>
   </main>
@@ -822,6 +822,64 @@ function sendRegisterTo3D(){
   }));
   frame.contentWindow.postMessage({ type: 'lwms:importWells', rows }, '*');
 }
+
+/* Receive wells pushed back from the 3D Reviewer ("Push to Register" inside the iframe).
+   Subscores are derived from reviewer fields using the register's own 1/3/5 anchors;
+   Classification (Type 1-9), Access and Data need human verification after import. */
+function mapFrom3D(r, prev){
+  const now = new Date().toISOString();
+  const yr = new Date().getFullYear();
+  const plugMap = {'Plugged & Verified':1,'Plugged':3,'Partially Plugged':4};
+  const scores = {
+    plug: plugMap[r.pluggingStatus] ?? 5,
+    barriers: (r.casingStrings>=2) ? 1 : (r.casingStrings===1 ? 3 : 5),
+    cement: r.cementQuality==='Excellent' ? 1 : (r.cementQuality==='Good'||r.cementQuality==='Fair') ? 3 : 5,
+    prox: (typeof r.distToInjector==='number') ? (r.distToInjector<1600 ? 5 : (r.distToInjector<=3200 ? 3 : 1)) : 3,
+    depthR: r.reservoirPenetrated ? 5 : (r.caprockPenetrated ? 3 : 1),
+    depthC: r.reservoirPenetrated ? 5 : (r.caprockPenetrated ? 3 : 1),
+    age: (typeof r.drillingYear==='number') ? ((yr-r.drillingYear)>50 ? 5 : ((yr-r.drillingYear)>=30 ? 3 : 1)) : 3,
+    access: /orphan/i.test(r.status||'') ? 5 : (/suspend|unknown/i.test(r.status||'') ? 3 : 1),
+    data: (r.cementQuality==='Unknown' && r.pluggingStatus==='Unknown') ? 5 : ((r.cementQuality==='Unknown'||r.pluggingStatus==='Unknown') ? 3 : 1),
+  };
+  const typeMap = t => t==='Oil' ? 'Oil Producer' : t==='Gas' ? 'Gas Producer' : t==='Injector' ? 'Injection' : t==='Water Disposal' ? 'Disposal' : t==='Observation' ? 'Observation' : 'Unknown';
+  return {
+    id: prev?.id || uid(),
+    licence: String(r.uwi||r.licenseNumber||'UNNAMED'),
+    operator: r.operator || 'Unknown',
+    lat: (typeof r.surfaceLat==='number') ? r.surfaceLat : null,
+    lon: (typeof r.surfaceLon==='number') ? r.surfaceLon : null,
+    year: (typeof r.drillingYear==='number') ? r.drillingYear : null,
+    type: typeMap(r.wellType),
+    traj: r.orientation==='Deviated' ? 'Deviated' : r.orientation==='Horizontal' ? 'Horizontal' : 'Vertical',
+    status: r.status || 'Unknown',
+    klass: prev?.klass || 'Type 1',
+    reviewer: r.reviewer || '',
+    notes: ((r.notes||'') + ' [From 3D Reviewer' + (r.riskClass ? (': ' + r.riskClass + ' ' + r.riskScore + '/100') : '') + ' — subscores derived; verify Classification, Access, Data]').trim(),
+    scores, total: Object.values(scores).reduce((a,b)=>a+b,0),
+    createdAt: prev?.createdAt || now, updatedAt: now,
+    updatedBy: (syncName() ? syncName() + ' ' : '') + '(3D Reviewer)',
+  };
+}
+window.addEventListener('message', ev => {
+  if (ev.origin !== 'null' && ev.origin !== location.origin) return;
+  const msg = ev.data;
+  if (!msg || msg.type !== 'lwms:exportWells' || !Array.isArray(msg.rows)) return;
+  const frame = document.getElementById('viewer3dFrame');
+  const reply = r => frame && frame.contentWindow && frame.contentWindow.postMessage({ type:'lwms:exportResult', ...r }, '*');
+  const mapped = msg.rows.map(r => {
+    const licence = String(r.uwi||r.licenseNumber||'').trim();
+    const prev = licence ? state.wells.find(x => x.licence === licence) : null;
+    return { prev, rec: mapFrom3D(r, prev) };
+  });
+  const added = mapped.filter(m => !m.prev).length, updated = mapped.length - added;
+  if (!confirm('Receive ' + mapped.length + ' well(s) from the 3D Reviewer' + (msg.site ? ' (' + msg.site + ')' : '') + ' into the shared register? ' + added + ' new, ' + updated + ' existing will be updated. Subscores are derived — verify Classification/Access/Data after import.')) { reply({cancelled:true}); return; }
+  for (const m of mapped) {
+    if (m.prev) { const i = state.wells.findIndex(x => x.id === m.prev.id); state.wells[i] = m.rec; }
+    else state.wells.push(m.rec);
+  }
+  save('3D Reviewer push: ' + added + ' added, ' + updated + ' updated'); render();
+  reply({ added, updated, synced: !!syncToken() });
+});
 
 /* ============ TABS ============ */
 function showTab(t,btn){
