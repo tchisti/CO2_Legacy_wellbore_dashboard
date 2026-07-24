@@ -553,13 +553,13 @@
   {
     "id": "W-19EJU0",
     "licence": "100/09-16-051-01W5/00",
-    "operator": "Unknown",
+    "operator": "Imperial Oil Resources Limited",
     "lat": 53.404828,
     "lon": -114.07879,
     "year": 1954,
     "type": "Gas Producer",
     "traj": "Vertical",
-    "status": "Abandoned Gas",
+    "status": "Abandoned (P&A)",
     "klass": "Type 3",
     "reviewer": "",
     "notes": "1954 Abandoned Gas, abandoned 1996. 2 casing string(s), surface to 187.5 m. 22 formation tops on record, TD in Beaverhill Lake @ 2084 m. 12 plug/treatment record(s). [Auto-compiled from South Seq. Eval. Area wellbore review; integrity score is rule-based screening judgment] [From 3D Reviewer: High 69/100 — subscores and Type derived; verify Classification, Access, Data]",
@@ -576,8 +576,8 @@
     },
     "total": 27,
     "createdAt": "2026-07-24T16:17:13.481Z",
-    "updatedAt": "2026-07-24T16:17:13.481Z",
-    "updatedBy": "Tahir Chisti (3D Reviewer)"
+    "updatedAt": "2026-07-24T16:38:57.363Z",
+    "updatedBy": "Tahir Chisti"
   },
   {
     "id": "W-XPXXGZ",
