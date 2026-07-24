@@ -147,31 +147,31 @@
   {
     "id": "W-KH1IPQ",
     "licence": "102/08-13-049-04W5/00",
-    "operator": "BONTERRA ENERGY CORP.",
+    "operator": "Unknown",
     "lat": 53.225795,
     "lon": -114.441141,
     "year": 1991,
     "type": "Oil Producer",
     "traj": "Vertical",
-    "status": "Abandoned (P&A)",
+    "status": "Oil Abandoned Zone",
     "klass": "Type 7",
     "reviewer": "",
     "notes": "1991 Oil Abandoned Zone, abandoned 2022. 2 casing string(s), surface to 305 m. 17 formation tops on record, TD in Banff @ 1691 m. 10 plug/treatment record(s). [Auto-compiled from South Seq. Eval. Area wellbore review; integrity score is rule-based screening judgment] [From 3D Reviewer: Low 23/100 — subscores and Type derived; verify Classification, Access, Data]",
     "scores": {
       "plug": 3,
       "barriers": 1,
-      "cement": 1,
+      "cement": 3,
       "prox": 3,
-      "depthR": 3,
-      "depthC": 3,
-      "age": 1,
+      "depthR": 1,
+      "depthC": 1,
+      "age": 3,
       "access": 1,
       "data": 1
     },
     "total": 17,
     "createdAt": "2026-07-24T16:17:13.480Z",
-    "updatedAt": "2026-07-24T16:51:00.674Z",
-    "updatedBy": "Tahir Chisti"
+    "updatedAt": "2026-07-24T17:12:37.480Z",
+    "updatedBy": "Tahir Chisti (3D Reviewer)"
   },
   {
     "id": "W-ISFSC3",
@@ -199,7 +199,7 @@
     },
     "total": 17,
     "createdAt": "2026-07-24T16:17:13.481Z",
-    "updatedAt": "2026-07-24T16:17:13.481Z",
+    "updatedAt": "2026-07-24T17:12:37.480Z",
     "updatedBy": "Tahir Chisti (3D Reviewer)"
   },
   {
@@ -228,19 +228,19 @@
     },
     "total": 23,
     "createdAt": "2026-07-24T16:17:13.481Z",
-    "updatedAt": "2026-07-24T16:17:13.481Z",
+    "updatedAt": "2026-07-24T17:12:37.480Z",
     "updatedBy": "Tahir Chisti (3D Reviewer)"
   },
   {
     "id": "W-IRKTDE",
     "licence": "100/01-04-049-05W5/00",
-    "operator": "MAVERICK STRATEGIC GROWTH FUND (INDIA) L",
+    "operator": "Unknown",
     "lat": 53.195233,
     "lon": -114.664227,
     "year": 2000,
     "type": "Gas Producer",
     "traj": "Vertical",
-    "status": "Abandoned (P&A)",
+    "status": "Abandoned, Re-Entered Gas",
     "klass": "Type 7",
     "reviewer": "",
     "notes": "2000 Abandoned, Re-Entered Gas, abandoned 2015. 2 casing string(s), surface to 327 m. 17 formation tops on record, TD in Banff @ 1819 m. 3 plug/treatment record(s). [Auto-compiled from South Seq. Eval. Area wellbore review; integrity score is rule-based screening judgment] [From 3D Reviewer: Low 15/100 — subscores and Type derived; verify Classification, Access, Data]",
@@ -257,8 +257,8 @@
     },
     "total": 15,
     "createdAt": "2026-07-24T16:17:13.481Z",
-    "updatedAt": "2026-07-24T16:35:28.733Z",
-    "updatedBy": "Tahir Chisti"
+    "updatedAt": "2026-07-24T17:12:37.480Z",
+    "updatedBy": "Tahir Chisti (3D Reviewer)"
   },
   {
     "id": "W-M3JVK8",
@@ -286,7 +286,7 @@
     },
     "total": 19,
     "createdAt": "2026-07-24T16:17:13.481Z",
-    "updatedAt": "2026-07-24T16:17:13.481Z",
+    "updatedAt": "2026-07-24T17:12:37.480Z",
     "updatedBy": "Tahir Chisti (3D Reviewer)"
   },
   {
@@ -315,7 +315,7 @@
     },
     "total": 23,
     "createdAt": "2026-07-24T16:17:13.481Z",
-    "updatedAt": "2026-07-24T16:17:13.481Z",
+    "updatedAt": "2026-07-24T17:12:37.480Z",
     "updatedBy": "Tahir Chisti (3D Reviewer)"
   },
   {
@@ -327,7 +327,7 @@
     "year": 1960,
     "type": "Unknown",
     "traj": "Vertical",
-    "status": "Abandoned (P&A)",
+    "status": "Abandoned",
     "klass": "Type 3",
     "reviewer": "",
     "notes": "1960 Abandoned, abandoned 1960. 1 casing string(s), surface to 223.7 m. 21 formation tops on record, TD in Beaverhill Lake @ 2206 m. No plug records — verify abandonment. [Auto-compiled from South Seq. Eval. Area wellbore review; integrity score is rule-based screening judgment] [From 3D Reviewer: Very High 100/100 — subscores and Type derived; verify Classification, Access, Data]",
@@ -340,12 +340,12 @@
       "depthC": 5,
       "age": 5,
       "access": 1,
-      "data": 3
+      "data": 5
     },
-    "total": 35,
+    "total": 37,
     "createdAt": "2026-07-24T16:17:13.481Z",
-    "updatedAt": "2026-07-24T16:24:10.362Z",
-    "updatedBy": "Tahir Chisti"
+    "updatedAt": "2026-07-24T17:12:37.480Z",
+    "updatedBy": "Tahir Chisti (3D Reviewer)"
   },
   {
     "id": "W-70HJY0",
@@ -356,7 +356,7 @@
     "year": 1958,
     "type": "Unknown",
     "traj": "Vertical",
-    "status": "Abandoned (P&A)",
+    "status": "Abandoned",
     "klass": "Type 4",
     "reviewer": "",
     "notes": "1958 Abandoned, abandoned 2001. 2 casing string(s), surface to 236.8 m. 18 formation tops on record, TD in Ireton @ 1925 m. 9 plug/treatment record(s). [Auto-compiled from South Seq. Eval. Area wellbore review; integrity score is rule-based screening judgment] [From 3D Reviewer: High 59/100 — subscores and Type derived; verify Classification, Access, Data]",
@@ -367,14 +367,14 @@
       "prox": 3,
       "depthR": 5,
       "depthC": 5,
-      "age": 1,
+      "age": 5,
       "access": 1,
       "data": 1
     },
-    "total": 23,
+    "total": 27,
     "createdAt": "2026-07-24T16:17:13.481Z",
-    "updatedAt": "2026-07-24T16:56:03.317Z",
-    "updatedBy": "Tahir Chisti"
+    "updatedAt": "2026-07-24T17:12:37.480Z",
+    "updatedBy": "Tahir Chisti (3D Reviewer)"
   },
   {
     "id": "W-DDB4VY",
@@ -402,37 +402,37 @@
     },
     "total": 31,
     "createdAt": "2026-07-24T16:17:13.481Z",
-    "updatedAt": "2026-07-24T16:17:13.481Z",
+    "updatedAt": "2026-07-24T17:12:37.480Z",
     "updatedBy": "Tahir Chisti (3D Reviewer)"
   },
   {
     "id": "W-J1JV0W",
     "licence": "100/10-21-050-02W5/00",
-    "operator": "HYDRO VAULT ENERGY LTD.",
+    "operator": "Unknown",
     "lat": 53.333361,
     "lon": -114.229031,
     "year": 1997,
     "type": "Gas Producer",
     "traj": "Vertical",
-    "status": "Abandoned (P&A)",
+    "status": "Abandoned Gas",
     "klass": "Type 4",
     "reviewer": "",
     "notes": "1997 Abandoned Gas, abandoned 2009. 2 casing string(s), surface to 401 m. 6 formation tops on record, TD in Ireton @ 1881 m. 19 plug/treatment record(s). [Auto-compiled from South Seq. Eval. Area wellbore review; integrity score is rule-based screening judgment] [From 3D Reviewer: Medium 43/100 — subscores and Type derived; verify Classification, Access, Data]",
     "scores": {
-      "plug": 1,
+      "plug": 3,
       "barriers": 1,
-      "cement": 1,
-      "prox": 1,
+      "cement": 3,
+      "prox": 3,
       "depthR": 5,
       "depthC": 5,
       "age": 1,
       "access": 1,
       "data": 1
     },
-    "total": 17,
+    "total": 23,
     "createdAt": "2026-07-24T16:17:13.481Z",
-    "updatedAt": "2026-07-24T16:45:43.658Z",
-    "updatedBy": "Tahir Chisti"
+    "updatedAt": "2026-07-24T17:12:37.480Z",
+    "updatedBy": "Tahir Chisti (3D Reviewer)"
   },
   {
     "id": "W-DI9O90",
@@ -443,7 +443,7 @@
     "year": 2023,
     "type": "Disposal",
     "traj": "Deviated",
-    "status": "",
+    "status": "Potential Water Disposal",
     "klass": "Type 7",
     "reviewer": "Tahir Chisti",
     "notes": "2023 Potential Water Disposal. 5 casing string(s), surface to 450 m. 0 formation tops on record. 2 plug/treatment record(s). [Auto-compiled from South Seq. Eval. Area wellbore review; integrity score is rule-based screening judgment] [From 3D Reviewer: Medium 27/100 — subscores and Type derived; verify Classification, Access, Data]",
@@ -451,17 +451,17 @@
       "plug": 1,
       "barriers": 1,
       "cement": 1,
-      "prox": 1,
+      "prox": 3,
       "depthR": 5,
       "depthC": 5,
       "age": 1,
       "access": 1,
       "data": 1
     },
-    "total": 17,
+    "total": 19,
     "createdAt": "2026-07-24T16:17:13.481Z",
-    "updatedAt": "2026-07-24T16:31:29.191Z",
-    "updatedBy": "Tahir Chisti"
+    "updatedAt": "2026-07-24T17:12:37.480Z",
+    "updatedBy": "Tahir Chisti (3D Reviewer)"
   },
   {
     "id": "W-67L0SH",
@@ -489,37 +489,37 @@
     },
     "total": 27,
     "createdAt": "2026-07-24T16:17:13.481Z",
-    "updatedAt": "2026-07-24T16:17:13.481Z",
+    "updatedAt": "2026-07-24T17:12:37.480Z",
     "updatedBy": "Tahir Chisti (3D Reviewer)"
   },
   {
     "id": "W-3MJRZR",
     "licence": "100/15-33-050-05W5/00",
-    "operator": "SINOPEC CANADA ENERGY LTD.",
+    "operator": "Unknown",
     "lat": 53.36401,
     "lon": -114.671699,
     "year": 2009,
     "type": "Oil Producer",
     "traj": "Deviated",
-    "status": "Abandoned (P&A)",
+    "status": "Abandoned Oil",
     "klass": "Type 4",
     "reviewer": "",
     "notes": "2009 Abandoned Oil, abandoned 2017. 3 casing string(s), surface to 337 m. 24 formation tops on record, TD in Ireton @ 2055 m. 5 plug/treatment record(s). [Auto-compiled from South Seq. Eval. Area wellbore review; integrity score is rule-based screening judgment] [From 3D Reviewer: Medium 35/100 — subscores and Type derived; verify Classification, Access, Data]",
     "scores": {
-      "plug": 1,
+      "plug": 3,
       "barriers": 1,
-      "cement": 1,
-      "prox": 1,
+      "cement": 3,
+      "prox": 3,
       "depthR": 5,
       "depthC": 5,
       "age": 1,
       "access": 1,
       "data": 1
     },
-    "total": 17,
+    "total": 23,
     "createdAt": "2026-07-24T16:17:13.481Z",
-    "updatedAt": "2026-07-24T16:47:58.512Z",
-    "updatedBy": "Tahir Chisti"
+    "updatedAt": "2026-07-24T17:12:37.480Z",
+    "updatedBy": "Tahir Chisti (3D Reviewer)"
   },
   {
     "id": "W-SZGF3H",
@@ -547,19 +547,19 @@
     },
     "total": 37,
     "createdAt": "2026-07-24T16:17:13.481Z",
-    "updatedAt": "2026-07-24T16:17:13.481Z",
+    "updatedAt": "2026-07-24T17:12:37.480Z",
     "updatedBy": "Tahir Chisti (3D Reviewer)"
   },
   {
     "id": "W-19EJU0",
     "licence": "100/09-16-051-01W5/00",
-    "operator": "Imperial Oil Resources Limited",
+    "operator": "Unknown",
     "lat": 53.404828,
     "lon": -114.07879,
     "year": 1954,
     "type": "Gas Producer",
     "traj": "Vertical",
-    "status": "Abandoned (P&A)",
+    "status": "Abandoned Gas",
     "klass": "Type 3",
     "reviewer": "",
     "notes": "1954 Abandoned Gas, abandoned 1996. 2 casing string(s), surface to 187.5 m. 22 formation tops on record, TD in Beaverhill Lake @ 2084 m. 12 plug/treatment record(s). [Auto-compiled from South Seq. Eval. Area wellbore review; integrity score is rule-based screening judgment] [From 3D Reviewer: High 69/100 — subscores and Type derived; verify Classification, Access, Data]",
@@ -576,8 +576,8 @@
     },
     "total": 27,
     "createdAt": "2026-07-24T16:17:13.481Z",
-    "updatedAt": "2026-07-24T16:38:57.363Z",
-    "updatedBy": "Tahir Chisti"
+    "updatedAt": "2026-07-24T17:12:37.480Z",
+    "updatedBy": "Tahir Chisti (3D Reviewer)"
   },
   {
     "id": "W-XPXXGZ",
@@ -588,7 +588,7 @@
     "year": 1948,
     "type": "Unknown",
     "traj": "Vertical",
-    "status": "Abandoned (P&A)",
+    "status": "Abandoned",
     "klass": "Type 3",
     "reviewer": "",
     "notes": "1948 Abandoned. 1 casing string(s), surface to 111.9 m. 14 formation tops on record, TD in Cooking Lake @ 2039 m. No plug records — verify abandonment. [Auto-compiled from South Seq. Eval. Area wellbore review; integrity score is rule-based screening judgment] [From 3D Reviewer: Very High 100/100 — subscores and Type derived; verify Classification, Access, Data]",
@@ -601,12 +601,12 @@
       "depthC": 5,
       "age": 5,
       "access": 1,
-      "data": 3
+      "data": 5
     },
-    "total": 35,
+    "total": 37,
     "createdAt": "2026-07-24T16:17:13.481Z",
-    "updatedAt": "2026-07-24T16:58:36.324Z",
-    "updatedBy": "Tahir Chisti"
+    "updatedAt": "2026-07-24T17:12:37.480Z",
+    "updatedBy": "Tahir Chisti (3D Reviewer)"
   },
   {
     "id": "W-79I2V4",
@@ -617,7 +617,7 @@
     "year": 1949,
     "type": "Unknown",
     "traj": "Vertical",
-    "status": "Abandoned (P&A)",
+    "status": "Abandoned",
     "klass": "Type 3",
     "reviewer": "",
     "notes": "1949 Abandoned, abandoned 1950. 1 casing string(s), surface to 185.3 m. 22 formation tops on record, TD in Beaverhill Lake @ 2130 m. No plug records — verify abandonment. [Auto-compiled from South Seq. Eval. Area wellbore review; integrity score is rule-based screening judgment] [From 3D Reviewer: Very High 100/100 — subscores and Type derived; verify Classification, Access, Data]",
@@ -630,12 +630,12 @@
       "depthC": 5,
       "age": 5,
       "access": 1,
-      "data": 3
+      "data": 5
     },
-    "total": 35,
+    "total": 37,
     "createdAt": "2026-07-24T16:17:13.481Z",
-    "updatedAt": "2026-07-24T16:57:34.181Z",
-    "updatedBy": "Tahir Chisti"
+    "updatedAt": "2026-07-24T17:12:37.480Z",
+    "updatedBy": "Tahir Chisti (3D Reviewer)"
   },
   {
     "id": "W-QPIUGW",
@@ -663,7 +663,7 @@
     },
     "total": 37,
     "createdAt": "2026-07-24T16:17:13.481Z",
-    "updatedAt": "2026-07-24T16:17:13.481Z",
+    "updatedAt": "2026-07-24T17:12:37.480Z",
     "updatedBy": "Tahir Chisti (3D Reviewer)"
   },
   {
@@ -692,7 +692,7 @@
     },
     "total": 23,
     "createdAt": "2026-07-24T16:17:13.481Z",
-    "updatedAt": "2026-07-24T16:17:13.481Z",
+    "updatedAt": "2026-07-24T17:12:37.480Z",
     "updatedBy": "Tahir Chisti (3D Reviewer)"
   },
   {
@@ -721,7 +721,7 @@
     },
     "total": 35,
     "createdAt": "2026-07-24T16:17:13.481Z",
-    "updatedAt": "2026-07-24T16:17:13.481Z",
+    "updatedAt": "2026-07-24T17:12:37.480Z",
     "updatedBy": "Tahir Chisti (3D Reviewer)"
   },
   {
@@ -750,7 +750,7 @@
     },
     "total": 35,
     "createdAt": "2026-07-24T16:17:13.481Z",
-    "updatedAt": "2026-07-24T16:17:13.481Z",
+    "updatedAt": "2026-07-24T17:12:37.481Z",
     "updatedBy": "Tahir Chisti (3D Reviewer)"
   },
   {
@@ -779,7 +779,7 @@
     },
     "total": 27,
     "createdAt": "2026-07-24T16:17:13.481Z",
-    "updatedAt": "2026-07-24T16:17:13.481Z",
+    "updatedAt": "2026-07-24T17:12:37.481Z",
     "updatedBy": "Tahir Chisti (3D Reviewer)"
   },
   {
@@ -808,7 +808,7 @@
     },
     "total": 35,
     "createdAt": "2026-07-24T16:17:13.481Z",
-    "updatedAt": "2026-07-24T16:17:13.481Z",
+    "updatedAt": "2026-07-24T17:12:37.481Z",
     "updatedBy": "Tahir Chisti (3D Reviewer)"
   },
   {
@@ -837,37 +837,37 @@
     },
     "total": 35,
     "createdAt": "2026-07-24T16:17:13.481Z",
-    "updatedAt": "2026-07-24T16:17:13.481Z",
+    "updatedAt": "2026-07-24T17:12:37.481Z",
     "updatedBy": "Tahir Chisti (3D Reviewer)"
   },
   {
     "id": "W-3HRMMU",
     "licence": "100/09-13-052-01W5/00",
-    "operator": "REGENT DRILLING LIMITED",
+    "operator": "Unknown",
     "lat": 53.492092,
     "lon": -114.005026,
     "year": 1949,
     "type": "Oil Producer",
     "traj": "Vertical",
-    "status": "Abandoned (P&A)",
+    "status": "Abandoned Oil",
     "klass": "Type 3",
     "reviewer": "",
     "notes": "1949 Abandoned Oil, abandoned 1949. 1 casing string(s), surface to 183.8 m. 19 formation tops on record, TD in Ireton @ 1676 m. No plug records — verify abandonment. [Auto-compiled from South Seq. Eval. Area wellbore review; integrity score is rule-based screening judgment] [From 3D Reviewer: Very High 100/100 — subscores and Type derived; verify Classification, Access, Data]",
     "scores": {
       "plug": 5,
       "barriers": 3,
-      "cement": 3,
+      "cement": 5,
       "prox": 3,
       "depthR": 5,
       "depthC": 5,
       "age": 5,
       "access": 1,
-      "data": 3
+      "data": 5
     },
-    "total": 33,
+    "total": 37,
     "createdAt": "2026-07-24T16:17:13.481Z",
-    "updatedAt": "2026-07-24T16:37:20.117Z",
-    "updatedBy": "Tahir Chisti"
+    "updatedAt": "2026-07-24T17:12:37.481Z",
+    "updatedBy": "Tahir Chisti (3D Reviewer)"
   },
   {
     "id": "W-HJF12U",
@@ -895,7 +895,7 @@
     },
     "total": 37,
     "createdAt": "2026-07-24T16:17:13.481Z",
-    "updatedAt": "2026-07-24T16:17:13.481Z",
+    "updatedAt": "2026-07-24T17:12:37.481Z",
     "updatedBy": "Tahir Chisti (3D Reviewer)"
   },
   {
@@ -924,7 +924,7 @@
     },
     "total": 31,
     "createdAt": "2026-07-24T16:17:13.481Z",
-    "updatedAt": "2026-07-24T16:17:13.481Z",
+    "updatedAt": "2026-07-24T17:12:37.481Z",
     "updatedBy": "Tahir Chisti (3D Reviewer)"
   },
   {
@@ -953,7 +953,7 @@
     },
     "total": 37,
     "createdAt": "2026-07-24T16:17:13.481Z",
-    "updatedAt": "2026-07-24T16:17:13.481Z",
+    "updatedAt": "2026-07-24T17:12:37.481Z",
     "updatedBy": "Tahir Chisti (3D Reviewer)"
   },
   {
@@ -982,26 +982,26 @@
     },
     "total": 25,
     "createdAt": "2026-07-24T16:17:13.481Z",
-    "updatedAt": "2026-07-24T16:17:13.481Z",
+    "updatedAt": "2026-07-24T17:12:37.481Z",
     "updatedBy": "Tahir Chisti (3D Reviewer)"
   },
   {
     "id": "W-UII62Q",
     "licence": "100/09-10-054-02W5/00",
-    "operator": "BLUE SKY RESOURCES LTD.",
+    "operator": "Unknown",
     "lat": 53.653349,
     "lon": -114.201389,
     "year": 1978,
     "type": "Gas Producer",
     "traj": "Vertical",
-    "status": "Abandoned (P&A)",
+    "status": "Abandoned Gas Zone",
     "klass": "Type 4",
     "reviewer": "",
     "notes": "1978 Abandoned Gas Zone, abandoned 2017. 2 casing string(s), surface to 459.1 m. 18 formation tops on record, TD in Ireton @ 1737 m. 9 plug/treatment record(s). [Auto-compiled from South Seq. Eval. Area wellbore review; integrity score is rule-based screening judgment] [From 3D Reviewer: High 51/100 — subscores and Type derived; verify Classification, Access, Data]",
     "scores": {
-      "plug": 1,
+      "plug": 3,
       "barriers": 1,
-      "cement": 1,
+      "cement": 3,
       "prox": 3,
       "depthR": 5,
       "depthC": 5,
@@ -1009,67 +1009,67 @@
       "access": 1,
       "data": 1
     },
-    "total": 21,
+    "total": 25,
     "createdAt": "2026-07-24T16:17:13.481Z",
-    "updatedAt": "2026-07-24T16:40:36.275Z",
-    "updatedBy": "Tahir Chisti"
+    "updatedAt": "2026-07-24T17:12:37.481Z",
+    "updatedBy": "Tahir Chisti (3D Reviewer)"
   },
   {
     "id": "W-UPDZNP",
     "licence": "100/09-10-054-02W5/02",
-    "operator": "BLUE SKY RESOURCES LTD.",
+    "operator": "Unknown",
     "lat": 53.653349,
     "lon": -114.201389,
     "year": 1978,
     "type": "Gas Producer",
     "traj": "Vertical",
-    "status": "Abandoned (P&A)",
+    "status": "Abandoned Gas Zone",
     "klass": "Type 4",
     "reviewer": "",
     "notes": "1978 Abandoned Gas Zone, abandoned 2017. 2 casing string(s), surface to 459.1 m. 18 formation tops on record, TD in Ireton @ 1737 m. 10 plug/treatment record(s). [Auto-compiled from South Seq. Eval. Area wellbore review; integrity score is rule-based screening judgment] [From 3D Reviewer: High 51/100 — subscores and Type derived; verify Classification, Access, Data]",
     "scores": {
-      "plug": 1,
+      "plug": 3,
       "barriers": 1,
-      "cement": 1,
-      "prox": 1,
+      "cement": 3,
+      "prox": 3,
       "depthR": 5,
       "depthC": 5,
-      "age": 1,
+      "age": 3,
       "access": 1,
       "data": 1
     },
-    "total": 17,
+    "total": 25,
     "createdAt": "2026-07-24T16:17:13.481Z",
-    "updatedAt": "2026-07-24T16:42:38.955Z",
-    "updatedBy": "Tahir Chisti"
+    "updatedAt": "2026-07-24T17:12:37.481Z",
+    "updatedBy": "Tahir Chisti (3D Reviewer)"
   },
   {
     "id": "W-QUNF2S",
     "licence": "100/09-10-054-02W5/03",
-    "operator": "BLUE SKY RESOURCES LTD.",
+    "operator": "Unknown",
     "lat": 53.653349,
     "lon": -114.201389,
     "year": 1978,
     "type": "Gas Producer",
     "traj": "Vertical",
-    "status": "Abandoned (P&A)",
+    "status": "Abandoned Gas",
     "klass": "Type 4",
     "reviewer": "",
     "notes": "1978 Abandoned Gas, abandoned 2017. 2 casing string(s), surface to 459.1 m. 18 formation tops on record, TD in Ireton @ 1737 m. 10 plug/treatment record(s). [Auto-compiled from South Seq. Eval. Area wellbore review; integrity score is rule-based screening judgment] [From 3D Reviewer: High 51/100 — subscores and Type derived; verify Classification, Access, Data]",
     "scores": {
-      "plug": 1,
+      "plug": 3,
       "barriers": 1,
-      "cement": 1,
-      "prox": 1,
+      "cement": 3,
+      "prox": 3,
       "depthR": 5,
       "depthC": 5,
-      "age": 1,
+      "age": 3,
       "access": 1,
       "data": 1
     },
-    "total": 17,
+    "total": 25,
     "createdAt": "2026-07-24T16:17:13.481Z",
-    "updatedAt": "2026-07-24T16:51:15.103Z",
-    "updatedBy": "Tahir Chisti"
+    "updatedAt": "2026-07-24T17:12:37.481Z",
+    "updatedBy": "Tahir Chisti (3D Reviewer)"
   }
 ]
