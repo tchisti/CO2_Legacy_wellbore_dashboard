@@ -1,34 +1,5 @@
 [
   {
-    "id": "W-OT40RC",
-    "reviewer": "T. Khan",
-    "createdAt": "2026-07-23T22:08:12.821Z",
-    "updatedAt": "2026-07-23T22:08:12.821Z",
-    "updatedBy": "Tahir Chisti",
-    "licence": "06-15-046-25W4",
-    "operator": "Imperial Oil",
-    "lat": 53.425,
-    "lon": -113.5108,
-    "year": 2010,
-    "type": "Strat Test",
-    "traj": "Vertical",
-    "status": "Abandoned (P&A)",
-    "klass": "Type 9",
-    "notes": "Strat test with full log suite, modern materials, far above caprock — background population.",
-    "scores": {
-      "plug": 1,
-      "barriers": 1,
-      "cement": 1,
-      "prox": 1,
-      "depthR": 1,
-      "depthC": 1,
-      "age": 1,
-      "access": 1,
-      "data": 1
-    },
-    "total": 9
-  },
-  {
     "id": "W-W8QB2S",
     "licence": "100/13-06-055-22W4/00",
     "operator": "Fred M. Manning Ltd.",
