@@ -1071,5 +1071,34 @@
     "createdAt": "2026-07-24T16:17:13.481Z",
     "updatedAt": "2026-07-24T16:44:32.034Z",
     "updatedBy": "Tahir Chisti"
+  },
+  {
+    "id": "W-UCLVFM",
+    "licence": "UNNAMED",
+    "operator": "Unknown",
+    "lat": null,
+    "lon": null,
+    "year": null,
+    "type": "Oil Producer",
+    "traj": "Vertical",
+    "status": "Active",
+    "klass": "Type 1",
+    "reviewer": "",
+    "notes": "",
+    "scores": {
+      "plug": 1,
+      "barriers": 1,
+      "cement": 1,
+      "prox": 1,
+      "depthR": 5,
+      "depthC": 5,
+      "age": 1,
+      "access": 1,
+      "data": 1
+    },
+    "total": 17,
+    "createdAt": "2026-07-24T16:45:46.626Z",
+    "updatedAt": "2026-07-24T16:45:46.626Z",
+    "updatedBy": "Tahir Chisti"
   }
 ]
