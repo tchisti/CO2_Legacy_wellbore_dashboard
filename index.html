@@ -790,19 +790,21 @@ function drawCharts(){
 }
 
 /* ============ MATRIX (L x C) ============ */
-function drawMatrix(){
-  // Likelihood bin (1-5) from L-group params avg → bucket
-  function bucket(avg){
-    if(avg<=1.5) return 1; if(avg<=2.5) return 2; if(avg<=3.5) return 3; if(avg<=4.5) return 4; return 5;
-  }
+function matrixGrid(list){
+  // Likelihood/Consequence bins (1-5) from group-averaged params
+  const bucket = avg => avg<=1.5?1:avg<=2.5?2:avg<=3.5?3:avg<=4.5?4:5;
   const grid = Array.from({length:5},()=>Array(5).fill(0));
-  state.wells.forEach(w=>{
-    const Lp = PARAMS.filter(p=>p.group==='L');
-    const Cp = PARAMS.filter(p=>p.group==='C');
+  const Lp = PARAMS.filter(p=>p.group==='L');
+  const Cp = PARAMS.filter(p=>p.group==='C');
+  for(const w of list){
     const L = bucket(Lp.reduce((a,p)=>a+w.scores[p.key],0)/Lp.length);
     const C = bucket(Cp.reduce((a,p)=>a+w.scores[p.key],0)/Cp.length);
     grid[5-L][C-1]++;
-  });
+  }
+  return grid;
+}
+function drawMatrix(){
+  const grid = matrixGrid(state.wells);
   const host = document.getElementById('matrix'); host.innerHTML='';
   // header row
   host.appendChild(makeCell('',true));
@@ -1434,8 +1436,85 @@ async function exportPDF(singleId){
     const hi=wells.filter(w=>tierFor(w.total).cls==='high').length;
     const cr=wells.filter(w=>tierFor(w.total).cls==='crit').length;
     doc.text(`Total wells reviewed: ${wells.length}`, M, y); y+=14;
-    doc.text(`Low: ${lo}    Moderate: ${mo}    High: ${hi}    Very High: ${cr}`, M, y); y+=18;
+    doc.text(`Low: ${lo}    Moderate: ${mo}    High: ${hi}    Very High: ${cr}`, M, y); y+=22;
 
+    // ---- Overview charts (re-colored for paper, then restored to screen theme) ----
+    const paper = { text:'#1d2a3a', muted:'#5c6d85', grid:'#d5deea' };
+    const chartImg = (chart, mutate, restore) => {
+      if(!chart || !chart.canvas || chart.canvas.width < 20) return null;
+      try {
+        mutate(); chart.update('none');
+        // composite onto white at capped resolution -> small JPEG, no dark/transparent bg
+        const src = chart.canvas, scale = Math.min(1, 1000 / src.width);
+        const c = document.createElement('canvas');
+        c.width = Math.round(src.width * scale); c.height = Math.round(src.height * scale);
+        const g = c.getContext('2d');
+        g.fillStyle = '#ffffff'; g.fillRect(0, 0, c.width, c.height);
+        g.drawImage(src, 0, 0, c.width, c.height);
+        const img = c.toDataURL('image/jpeg', 0.9);
+        restore(); chart.update('none');
+        return img;
+      }
+      catch(e){ try{ restore(); chart.update('none'); }catch(_){} return null; }
+    };
+    const distImg = chartImg(distChart,
+      ()=>{ distChart.options.plugins.legend.labels.color = paper.text; },
+      ()=>{ distChart.options.plugins.legend.labels.color = CHART_COLORS().text; });
+    const drvImg = chartImg(driverChart,
+      ()=>{ const o=driverChart.options.scales; o.x.grid.color=paper.grid; o.x.ticks.color=paper.muted; o.y.ticks.color=paper.text; },
+      ()=>{ const o=driverChart.options.scales; o.x.grid.color=CHART_COLORS().grid; o.x.ticks.color=CHART_COLORS().muted; o.y.ticks.color=CHART_COLORS().text; });
+    ensure(210);
+    doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(0,0,0);
+    doc.text('Overview - Risk Distribution & Score Drivers', M, y); y+=12;
+    let rowH = 0;
+    if(distImg){ const w1=200, h1=Math.min(170, w1*distChart.height/Math.max(1,distChart.width)); doc.addImage(distImg,'JPEG',M,y,w1,h1); rowH=Math.max(rowH,h1); }
+    if(drvImg){ const w2=CONTENT_W-220, h2=Math.min(170, w2*driverChart.height/Math.max(1,driverChart.width)); doc.addImage(drvImg,'JPEG',M+220,y,w2,h2); rowH=Math.max(rowH,h2); }
+    if(!distImg && !drvImg){ doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.text('Charts unavailable (Overview not yet rendered in this session).', M, y+12); rowH=22; }
+    y += rowH + 24;
+
+    // ---- 5x5 risk matrix, drawn as vector graphics ----
+    ensure(330);
+    doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(0,0,0);
+    doc.text('5x5 Risk Matrix (Likelihood x Consequence)', M, y); y+=16;
+    const mgrid = matrixGrid(wells);
+    const cellW = 46, gap = 4, headH = 18;
+    const gx = M + 52, gy = y + headH;
+    doc.setFontSize(9); doc.setFont('helvetica','bold'); doc.setTextColor(92,109,133);
+    doc.text('Consequence', gx + (5*cellW+4*gap)/2, y + 6, {align:'center'});
+    doc.text('Likelihood', M + 14, gy + (5*cellW+4*gap)/2 + 24, {angle:90});
+    for(let c=0;c<5;c++) doc.text('C'+(c+1), gx + c*(cellW+gap) + cellW/2, gy - 4, {align:'center'});
+    const colFor = sc => sc<=4?[31,191,117]:sc<=9?[240,169,59]:sc<=16?[232,90,79]:[168,50,74];
+    for(let r=0;r<5;r++){
+      const L = 5-r;
+      doc.setTextColor(92,109,133); doc.setFont('helvetica','bold'); doc.setFontSize(9);
+      doc.text('L'+L, gx - 16, gy + r*(cellW+gap) + cellW/2 + 3, {align:'center'});
+      for(let c=0;c<5;c++){
+        const sc = L*(c+1);
+        const rgb = colFor(sc);
+        const x0 = gx + c*(cellW+gap), y0 = gy + r*(cellW+gap);
+        doc.setFillColor(rgb[0],rgb[1],rgb[2]);
+        doc.roundedRect(x0, y0, cellW, cellW, 4, 4, 'F');
+        if(sc>16) doc.setTextColor(255,255,255); else doc.setTextColor(11,18,32);
+        doc.setFontSize(11);
+        doc.text(String(sc), x0 + cellW/2, y0 + cellW/2 + 4, {align:'center'});
+        const n = mgrid[r][c];
+        if(n){
+          doc.setFillColor(20,26,40);
+          doc.circle(x0 + cellW - 10, y0 + 10, 7.5, 'F');
+          doc.setTextColor(255,255,255); doc.setFontSize(7.5);
+          doc.text(String(n), x0 + cellW - 10, y0 + 12.5, {align:'center'});
+        }
+      }
+    }
+    y = gy + 5*cellW + 4*gap + 16;
+    doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(92,109,133);
+    doc.text('Cell value = Likelihood x Consequence. Low <=4 · Moderate 5-9 · High 10-16 · Very High >=20. Dark badges show well count per cell.', M, y);
+    y += 24;
+    doc.setTextColor(0,0,0);
+
+    ensure(200);
+    doc.setFont('helvetica','bold'); doc.setFontSize(14);
+    doc.text('Well Register', M, y); y+=8;
     doc.autoTable({
       startY: y, margin:{left:M,right:M},
       head:[['Well ID','Operator','Type','Status','Class','Score','Tier']],
