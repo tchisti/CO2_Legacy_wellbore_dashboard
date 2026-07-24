@@ -234,14 +234,14 @@
   {
     "id": "W-IRKTDE",
     "licence": "100/01-04-049-05W5/00",
-    "operator": "Unknown",
+    "operator": "MAVERICK STRATEGIC GROWTH FUND (INDIA) L",
     "lat": 53.195233,
     "lon": -114.664227,
     "year": 2000,
     "type": "Gas Producer",
     "traj": "Vertical",
-    "status": "Abandoned, Re-Entered Gas",
-    "klass": "Type 9",
+    "status": "Abandoned (P&A)",
+    "klass": "Type 7",
     "reviewer": "",
     "notes": "2000 Abandoned, Re-Entered Gas, abandoned 2015. 2 casing string(s), surface to 327 m. 17 formation tops on record, TD in Banff @ 1819 m. 3 plug/treatment record(s). [Auto-compiled from South Seq. Eval. Area wellbore review; integrity score is rule-based screening judgment] [From 3D Reviewer: Low 15/100 — subscores and Type derived; verify Classification, Access, Data]",
     "scores": {
@@ -257,8 +257,8 @@
     },
     "total": 15,
     "createdAt": "2026-07-24T16:17:13.481Z",
-    "updatedAt": "2026-07-24T16:17:13.481Z",
-    "updatedBy": "Tahir Chisti (3D Reviewer)"
+    "updatedAt": "2026-07-24T16:35:28.733Z",
+    "updatedBy": "Tahir Chisti"
   },
   {
     "id": "W-M3JVK8",
