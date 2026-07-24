@@ -143,34 +143,5 @@
     "createdAt": "2026-07-24T12:15:02.272Z",
     "updatedAt": "2026-07-24T16:03:31.365Z",
     "updatedBy": "Tahir Chisti"
-  },
-  {
-    "id": "W-82IOVZ",
-    "licence": "UNNAMED",
-    "operator": "Unknown",
-    "lat": null,
-    "lon": null,
-    "year": null,
-    "type": "Oil Producer",
-    "traj": "Vertical",
-    "status": "Active",
-    "klass": "Type 1",
-    "reviewer": "",
-    "notes": "",
-    "scores": {
-      "plug": 5,
-      "barriers": 3,
-      "cement": 3,
-      "prox": 1,
-      "depthR": 5,
-      "depthC": 5,
-      "age": 5,
-      "access": 1,
-      "data": 5
-    },
-    "total": 33,
-    "createdAt": "2026-07-24T16:04:26.540Z",
-    "updatedAt": "2026-07-24T16:04:26.540Z",
-    "updatedBy": "Tahir Chisti"
   }
 ]
