@@ -8,6 +8,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.0/jspdf.plugin.autotable.min.js"></script>
+<script>try{if(localStorage.getItem('lwms:theme')==='light')document.documentElement.dataset.theme='light'}catch(e){}</script>
 <style>
 :root{
   --bg:#0b1220; --panel:#111a2c; --panel2:#172238; --line:#22304d;
@@ -15,6 +16,19 @@
   --low:#1fbf75; --mod:#f0a93b; --high:#e85a4f; --crit:#a8324a;
   --shadow:0 8px 24px rgba(0,0,0,.35);
 }
+:root[data-theme="light"]{
+  --bg:#eef2f8; --panel:#ffffff; --panel2:#e9eef6; --line:#ccd6e6;
+  --text:#1d2a3a; --muted:#5c6d85; --accent:#1867c0; --accent2:#0f5aa8;
+  --shadow:0 8px 24px rgba(30,45,70,.12);
+}
+html[data-theme="light"], html[data-theme="light"] body{background:linear-gradient(180deg,#e6ebf4 0%,#eef2f8 100%)}
+html[data-theme="light"] header.topbar{background:rgba(255,255,255,.92)}
+html[data-theme="light"] input, html[data-theme="light"] select, html[data-theme="light"] textarea{background:#fff}
+html[data-theme="light"] .seg button{background:#e9eef6}
+html[data-theme="light"] button.danger{background:#fdecea;border-color:#e5b4ae;color:#b3261e}
+html[data-theme="light"] .warn{color:#a13b32}
+html[data-theme="light"] .note{color:#14568f}
+html[data-theme="light"] .note a{color:var(--accent) !important}
 *{box-sizing:border-box}
 html,body{margin:0;background:linear-gradient(180deg,#070b16 0%,#0b1220 100%);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;font-size:14px}
 header.topbar{position:sticky;top:0;z-index:50;background:rgba(11,18,32,.92);backdrop-filter:blur(10px);border-bottom:1px solid var(--line);padding:14px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px}
@@ -135,6 +149,7 @@ footer{padding:18px 24px;color:var(--muted);font-size:11px;border-top:1px solid 
     </div>
   </div>
   <div class="actions">
+    <button class="ghost" id="themeBtn" onclick="toggleTheme()" title="Switch color theme">☀️ Light</button>
     <button class="ghost" id="syncPill" onclick="openSyncModal()" title="Shared team register — click for settings"><span class="dot local"></span> Connecting…</button>
     <button class="ghost" onclick="loadDemo()" title="Seed dashboard with six sample legacy wells">Load Demo</button>
     <button class="ghost" onclick="downloadCSVTemplate()" title="Download a CSV template prefilled with a sample legacy well — edit it, then re-upload via Import CSV">📄 CSV Template</button>
@@ -743,7 +758,7 @@ function drawCharts(){
   distChart = new Chart(ctx1,{
     type:'doughnut',
     data:{labels:['Low','Moderate','High','Very High'],datasets:[{data:[lo,mo,hi,cr],backgroundColor:['#1fbf75','#f0a93b','#e85a4f','#a8324a'],borderWidth:0}]},
-    options:{plugins:{legend:{position:'right',labels:{color:'#e7eefc',font:{size:12}}}},cutout:'62%'}
+    options:{plugins:{legend:{position:'right',labels:{color:CHART_COLORS().text,font:{size:12}}}},cutout:'62%'}
   });
 
   const avgs = PARAMS.map(p=>{
@@ -760,8 +775,8 @@ function drawCharts(){
       indexAxis:'y',
       plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>'Avg score: '+c.parsed.x.toFixed(2)}}},
       scales:{
-        x:{min:0,max:5,grid:{color:'#1a2740'},ticks:{color:'#9fb0cf'}},
-        y:{grid:{display:false},ticks:{color:'#e7eefc',font:{size:11}}}
+        x:{min:0,max:5,grid:{color:CHART_COLORS().grid},ticks:{color:CHART_COLORS().muted}},
+        y:{grid:{display:false},ticks:{color:CHART_COLORS().text,font:{size:11}}}
       }
     }
   });
@@ -912,6 +927,17 @@ function renderRef(){
   </tr>`).join('');
 }
 
+
+const CHART_COLORS = () => document.documentElement.dataset.theme==='light'
+  ? { text:'#1d2a3a', muted:'#5c6d85', grid:'#d5deea' }
+  : { text:'#e7eefc', muted:'#9fb0cf', grid:'#1a2740' };
+
+/* ============ THEME ============ */
+function toggleTheme(){
+  try{ localStorage.setItem('lwms:theme', document.documentElement.dataset.theme==='light' ? 'dark' : 'light'); }catch(e){}
+  location.reload();  // rebuilds charts and reloads the embedded 3D reviewer with the same preference
+}
+(function(){ const b=document.getElementById('themeBtn'); if(b && document.documentElement.dataset.theme==='light') b.textContent='🌙 Dark'; })();
 
 /* ============ 3D VIEWER BRIDGE ============ */
 function sendRegisterTo3D(){
