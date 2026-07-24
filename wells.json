@@ -58,35 +58,6 @@
     "total": 29
   },
   {
-    "id": "W-2QF80P",
-    "reviewer": "T. Khan",
-    "createdAt": "2026-07-23T22:08:12.821Z",
-    "updatedAt": "2026-07-23T22:08:12.821Z",
-    "updatedBy": "Tahir Chisti",
-    "licence": "14-31-047-25W4",
-    "operator": "Unknown",
-    "lat": 53.4921,
-    "lon": -113.4805,
-    "year": null,
-    "type": "Unknown",
-    "traj": "Unknown",
-    "status": "Unknown",
-    "klass": "Type 1",
-    "notes": "Undocumented well discovered via legacy aerial survey; default to analog assumptions until logged.",
-    "scores": {
-      "plug": 5,
-      "barriers": 5,
-      "cement": 5,
-      "prox": 3,
-      "depthR": 3,
-      "depthC": 3,
-      "age": 5,
-      "access": 5,
-      "data": 5
-    },
-    "total": 39
-  },
-  {
     "id": "W-OT40RC",
     "reviewer": "T. Khan",
     "createdAt": "2026-07-23T22:08:12.821Z",
