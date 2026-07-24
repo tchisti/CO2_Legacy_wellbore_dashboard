@@ -443,7 +443,7 @@
     "year": 2023,
     "type": "Disposal",
     "traj": "Deviated",
-    "status": "Potential Water Disposal",
+    "status": "",
     "klass": "Type 7",
     "reviewer": "Tahir Chisti",
     "notes": "2023 Potential Water Disposal. 5 casing string(s), surface to 450 m. 0 formation tops on record. 2 plug/treatment record(s). [Auto-compiled from South Seq. Eval. Area wellbore review; integrity score is rule-based screening judgment] [From 3D Reviewer: Medium 27/100 — subscores and Type derived; verify Classification, Access, Data]",
@@ -451,17 +451,17 @@
       "plug": 1,
       "barriers": 1,
       "cement": 1,
-      "prox": 3,
+      "prox": 1,
       "depthR": 5,
       "depthC": 5,
       "age": 1,
       "access": 1,
       "data": 1
     },
-    "total": 19,
+    "total": 17,
     "createdAt": "2026-07-24T16:17:13.481Z",
-    "updatedAt": "2026-07-24T16:17:13.481Z",
-    "updatedBy": "Tahir Chisti (3D Reviewer)"
+    "updatedAt": "2026-07-24T16:31:29.191Z",
+    "updatedBy": "Tahir Chisti"
   },
   {
     "id": "W-67L0SH",
