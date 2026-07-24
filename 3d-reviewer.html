@@ -23869,6 +23869,10 @@ dialog.confirm { max-width: 420px; }
   window.addEventListener("message", (ev) => {
     if (ev.origin !== "null" && ev.origin !== location.origin) return;
     const msg = ev.data;
+    if (msg && msg.type === "lwms:exportResult") {
+      toast(msg.cancelled ? "Register push cancelled in the dashboard." : `Dashboard register updated: ${msg.added} added, ${msg.updated} updated${msg.synced ? " \u2014 syncing to GitHub" : ""}.`);
+      return;
+    }
     if (!msg || msg.type !== "lwms:importWells" || !Array.isArray(msg.rows)) return;
     const mLat = 111320, mLon = 111320 * Math.cos(site.origin.lat * Math.PI / 180);
     let parked = 0;
@@ -23904,6 +23908,22 @@ dialog.confirm { max-width: 420px; }
     store.dispatch({ type: "wells/import", wells, mode: "updateByUwi" });
     toast(`Loaded ${wells.length} well${wells.length === 1 ? "" : "s"} from the Dashboard register${parked ? ` (${parked} parked \u2014 no usable location)` : ""}. Ctrl+Z reverts.`);
   });
+  if (window.parent !== window) {
+    const pushBtn = document.createElement("button");
+    pushBtn.id = "btnPushRegister";
+    pushBtn.textContent = "\u21E7 Push to Register";
+    pushBtn.title = "Send this site's wells (scenario wells excluded) to the dashboard's shared register";
+    pushBtn.addEventListener("click", () => {
+      const wells = store.state.wells.filter((w) => !w.isScenario);
+      if (!wells.length) {
+        toast("No wells to push (scenario wells are excluded).", { error: true });
+        return;
+      }
+      const rows = wells.map(({ _risk, ...w }) => ({ ...w, riskScore: _risk?.score, riskClass: _risk?.class }));
+      window.parent.postMessage({ type: "lwms:exportWells", site: site.name, rows }, "*");
+    });
+    $("#toolbar").append(pushBtn);
+  }
   function sceneSync(ev, wells, vis) {
     if (!sceneApi.supported) {
       drawPlan($("#planCanvas"), wells.filter((w) => store.view.scenarioVisible || !w.isScenario), site);
