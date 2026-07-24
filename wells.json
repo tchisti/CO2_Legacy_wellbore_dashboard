@@ -38,7 +38,7 @@
     "type": "Disposal",
     "traj": "Vertical",
     "status": "",
-    "klass": "Type 1",
+    "klass": "Type 7",
     "reviewer": "T. Chisti",
     "notes": "Enbridge disposal well, spud 2025-11-16, Fort Saskatchewan field. Modern four-string design with CRS bottom liner — engineered for injection service. Risk override LOW: active engineered wellbore, not a legacy abandonment. [From 3D Reviewer: low 67/100 — subscores derived; verify Classification, Access, Data]",
     "scores": {
@@ -54,7 +54,7 @@
     },
     "total": 15,
     "createdAt": "2026-07-24T12:15:02.272Z",
-    "updatedAt": "2026-07-24T16:00:08.190Z",
+    "updatedAt": "2026-07-24T16:02:22.149Z",
     "updatedBy": "Tahir Chisti"
   },
   {
