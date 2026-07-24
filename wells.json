@@ -1,34 +1,5 @@
 [
   {
-    "id": "W-U386ML",
-    "reviewer": "T. Khan",
-    "createdAt": "2026-07-23T22:08:12.821Z",
-    "updatedAt": "2026-07-23T22:08:12.821Z",
-    "updatedBy": "Tahir Chisti",
-    "licence": "100/04-20-046-25W4",
-    "operator": "Orphan Well Assoc.",
-    "lat": 53.4123,
-    "lon": -113.5421,
-    "year": 1958,
-    "type": "Oil Producer",
-    "traj": "Vertical",
-    "status": "Orphaned",
-    "klass": "Type 2",
-    "notes": "Worst-case orphan: no surface marker, no records, no licensee. Inside modeled AoR (< 1.6 km).",
-    "scores": {
-      "plug": 5,
-      "barriers": 5,
-      "cement": 5,
-      "prox": 5,
-      "depthR": 5,
-      "depthC": 5,
-      "age": 5,
-      "access": 5,
-      "data": 5
-    },
-    "total": 45
-  },
-  {
     "id": "W-7Q9O2A",
     "reviewer": "T. Khan",
     "createdAt": "2026-07-23T22:08:12.821Z",
