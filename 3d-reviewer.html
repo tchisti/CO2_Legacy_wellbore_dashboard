@@ -135,6 +135,12 @@ dialog.confirm { max-width: 420px; }
 .fm-table input[type="color"] { width: 40px; height: 28px; padding: 1px 2px; cursor: pointer; }
 .fm-table select { padding: 4px 6px; }
 
+.scene-nav { position: absolute; left: 14px; bottom: 14px; z-index: 15; display: flex; gap: 5px; align-items: center; background: var(--bg2); border: 1px solid var(--line); border-radius: 10px; padding: 6px 10px; box-shadow: 0 3px 12px rgba(0,0,0,.25); }
+.scene-nav button { padding: 3px 9px; font-size: 14px; line-height: 1.2; }
+.scene-nav button.on { border-color: var(--amber); color: var(--amber); }
+.scene-nav input[type="range"] { width: 88px; }
+.scene-nav-sep { width: 1px; height: 18px; background: var(--line); margin: 0 3px; }
+
 </style>
 </head>
 <body>
@@ -885,6 +891,8 @@ dialog.confirm { max-width: 420px; }
     name: "Wabamun South Lease Area",
     origin: { lat: 53.17, lon: -114.75 },
     domainSize_m: 6e4,
+    defaultVexag: 8,
+    // lease-scale: 1.9 km of section over 60 km reads flat at true scale
     injectors: [],
     aor: { mode: "none", center: { x: 3e4, y: 3e4 }, radius_m: 0 },
     datums: { caprockTop_m: 1773, reservoirTop_m: 1810, reservoirBase_m: 1865 },
@@ -23514,7 +23522,7 @@ dialog.confirm { max-width: 420px; }
   // src/scene3d.js
   var S = 0.1;
   var easeOut = (t) => 1 - Math.pow(1 - t, 3);
-  function createScene({ canvas, site: site2, onSelect, onEdit, onHover, theme: theme2 = "dark", formations = [] }) {
+  function createScene({ canvas, site: site2, onSelect, onEdit, onHover, theme: theme2 = "dark", formations = [], vexag: vexag2 = 1 }) {
     let renderer;
     try {
       renderer = new WebGLRenderer({ canvas, antialias: true });
@@ -23543,6 +23551,11 @@ dialog.confirm { max-width: 420px; }
     controls.target.set(focusX, -70, focusZ);
     controls.enableDamping = true;
     controls.maxPolarAngle = Math.PI * 0.495;
+    controls.minDistance = 30;
+    controls.maxDistance = camDist * 5;
+    const homePos = camera.position.clone(), homeTarget = controls.target.clone();
+    const labelScale = Math.min(480, Math.max(96, camDist * 0.085));
+    let zScale = Math.max(1, +vexag2 || 1);
     scene.add(new HemisphereLight(12571903, 2105384, 0.95));
     const sun = new DirectionalLight(16777215, 0.8);
     sun.position.set(400, 700, 300);
@@ -23612,7 +23625,7 @@ dialog.confirm { max-width: 420px; }
       g.fillText(text.slice(0, 24), 54, 52);
       const tex = new CanvasTexture(c);
       const sp = new Sprite(new SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
-      sp.scale.set(96, 15, 1);
+      sp.scale.set(labelScale, labelScale * 0.156, 1);
       return sp;
     }
     function setFormations(list2) {
@@ -23625,34 +23638,48 @@ dialog.confirm { max-width: 420px; }
         });
       }
       const valid = (list2 || []).filter((f) => typeof f.top_m === "number" && typeof f.base_m === "number" && f.base_m > f.top_m);
+      lastFormations = list2;
       valid.forEach((f, i) => {
-        const h = (f.base_m - f.top_m) * S;
+        const h = (f.base_m - f.top_m) * S * zScale;
         const isKey = f.role === "caprock" || f.role === "reservoir";
         const m = new Mesh(
           new BoxGeometry(D, h, D),
           new MeshLambertMaterial({ color: new Color(f.color || "#888888"), transparent: true, opacity: isKey ? 0.2 : 0.09, depthWrite: false })
         );
-        m.position.y = -(f.top_m * S + h / 2);
+        m.position.y = -(f.top_m * S * zScale + h / 2);
         formGroup.add(m);
         const label = makeLabel(f.name || "?", f.color || "#888888");
-        label.position.set(focusX - 120 + i % 3 * 120, -(f.top_m + f.base_m) / 2 * S, cz + 12);
+        label.position.set(focusX + (i % 3 - 1) * labelScale * 1.25, -(f.top_m + f.base_m) / 2 * S * zScale, cz + 12);
         formGroup.add(label);
       });
     }
+    let lastFormations = formations;
     setFormations(formations);
-    for (const inj of site2.injectors) {
-      const [ix, iz] = toScene(inj.x, inj.y);
-      const depth = site2.datums.reservoirTop_m * S;
-      const mat = new MeshLambertMaterial({ color: 4367861 });
-      const bore = new Mesh(new CylinderGeometry(2.4, 2.4, depth, 10), mat);
-      bore.position.y = -depth / 2;
-      const head = new Mesh(new ConeGeometry(8, 22, 4), mat);
-      head.position.y = 11;
-      const g = new Group();
-      g.add(bore, head);
-      g.position.set(ix, 0, iz);
-      scene.add(g);
+    const injGroup = new Group();
+    scene.add(injGroup);
+    function buildInjectors() {
+      for (const child of [...injGroup.children]) {
+        injGroup.remove(child);
+        child.traverse((n) => {
+          n.geometry?.dispose();
+          n.material?.dispose();
+        });
+      }
+      for (const inj of site2.injectors) {
+        const [ix, iz] = toScene(inj.x, inj.y);
+        const depth = site2.datums.reservoirTop_m * S * zScale;
+        const mat = new MeshLambertMaterial({ color: 4367861 });
+        const bore = new Mesh(new CylinderGeometry(2.4, 2.4, depth, 10), mat);
+        bore.position.y = -depth / 2;
+        const head = new Mesh(new ConeGeometry(8, 22, 4), mat);
+        head.position.y = 11;
+        const g = new Group();
+        g.add(bore, head);
+        g.position.set(ix, 0, iz);
+        injGroup.add(g);
+      }
     }
+    buildInjectors();
     const selRing = new Mesh(
       new RingGeometry(9, 12, 32),
       new MeshBasicMaterial({ color: PAL.selRing, transparent: true, opacity: 0.9, side: DoubleSide })
@@ -23670,7 +23697,7 @@ dialog.confirm { max-width: 420px; }
     const colorFor = (w) => new Color(site2.colors[w._risk?.class] || "#888888");
     function boreGeometry(w) {
       const tvd = typeof w.tvd === "number" ? w.tvd : w.td || 1e3;
-      const h = tvd * S;
+      const h = tvd * S * zScale;
       if (!w.orientation || w.orientation === "Vertical")
         return new CylinderGeometry(2, 2, h, 8).translate(0, -h / 2, 0);
       const lat = Math.max(((w.md || tvd) - tvd) * (w.orientation === "Horizontal" ? 1 : 0.5), 250) * S;
@@ -23703,8 +23730,8 @@ dialog.confirm { max-width: 420px; }
       g.font = "400 32px ui-monospace, Menlo, monospace";
       g.fillText((w.uwi || "").slice(0, 28), 54, 102);
       const sp = new Sprite(new SpriteMaterial({ map: new CanvasTexture(c), transparent: true, depthTest: false }));
-      sp.scale.set(96, 19.2, 1);
-      sp.position.set(0, 26, 0);
+      sp.scale.set(labelScale, labelScale * 0.2, 1);
+      sp.position.set(0, labelScale * 0.27, 0);
       sp.userData.wellId = w.id;
       return sp;
     }
@@ -23886,7 +23913,34 @@ dialog.confirm { max-width: 420px; }
       renderer.render(scene, camera);
     }
     requestAnimationFrame(frame);
-    return { supported: true, syncAll, upsert, remove, setSelected, setDimmed, setScenarioVisible, pulse, setFormations, setLabelMode };
+    function resetView() {
+      camera.position.copy(homePos);
+      controls.target.copy(homeTarget);
+      controls.update();
+    }
+    function viewTop() {
+      camera.position.set(homeTarget.x, camDist * 1.25, homeTarget.z + 0.01);
+      controls.target.set(homeTarget.x, 0, homeTarget.z);
+      controls.update();
+    }
+    function zoomBy(f) {
+      camera.position.sub(controls.target).multiplyScalar(f).add(controls.target);
+      controls.update();
+    }
+    function setAutoRotate(on) {
+      controls.autoRotate = !!on;
+      controls.autoRotateSpeed = 1.5;
+    }
+    function setVerticalScale(k) {
+      zScale = Math.max(1, Math.min(20, +k || 1));
+      buildInjectors();
+      setFormations(lastFormations);
+      const wells = [...objects.values()].map((o) => o.well);
+      const keep = selectedId;
+      syncAll(wells);
+      setSelected(keep);
+    }
+    return { supported: true, syncAll, upsert, remove, setSelected, setDimmed, setScenarioVisible, pulse, setFormations, setLabelMode, resetView, viewTop, zoomBy, setAutoRotate, setVerticalScale };
   }
 
   // src/fallback2d.js
@@ -24492,15 +24546,56 @@ dialog.confirm { max-width: 420px; }
     tip.style.top = `${y + 10}px`;
   }
   var formationsCurrent = loadFormations(localStorage, activeEntry.id, site);
+  var VEXAG_KEY = `lwms:vexag:${activeEntry.id}`;
+  var vexag = site.defaultVexag || 1;
+  try {
+    const v = +localStorage.getItem(VEXAG_KEY);
+    if (v >= 1 && v <= 20) vexag = v;
+  } catch {
+  }
   var sceneApi = createScene({
     canvas: $("#scene"),
     site,
     theme,
     formations: formationsCurrent,
+    vexag,
     onSelect: (id) => store.setView({ selection: id }),
     onEdit: (id) => handlers.onEdit(id),
     onHover: showTooltip
   });
+  if (sceneApi.supported) {
+    const veVal = el("span", { class: "mono" }, `${vexag}\xD7`);
+    const veSlider = el("input", { type: "range", min: "1", max: "15", step: "1", title: "Vertical exaggeration (depth stretch)" });
+    veSlider.value = String(vexag);
+    veSlider.addEventListener("input", () => {
+      vexag = +veSlider.value;
+      veVal.textContent = `${vexag}\xD7`;
+      sceneApi.setVerticalScale(vexag);
+      try {
+        localStorage.setItem(VEXAG_KEY, String(vexag));
+      } catch {
+      }
+    });
+    let spinning = false;
+    const spinBtn = el("button", { title: "Auto-rotate (turntable)", onclick: () => {
+      spinning = !spinning;
+      sceneApi.setAutoRotate(spinning);
+      spinBtn.classList.toggle("on", spinning);
+    } }, "\u27F3");
+    $("#center").append(el(
+      "div",
+      { class: "scene-nav" },
+      el("button", { title: "Reset view (zoom to fit)", onclick: () => sceneApi.resetView() }, "\u2302"),
+      el("button", { title: "Top / plan view", onclick: () => sceneApi.viewTop() }, "\u22A4"),
+      el("button", { title: "Zoom in", onclick: () => sceneApi.zoomBy(0.7) }, "\uFF0B"),
+      el("button", { title: "Zoom out", onclick: () => sceneApi.zoomBy(1.45) }, "\uFF0D"),
+      spinBtn,
+      el("span", { class: "scene-nav-sep" }),
+      el("span", { class: "muted", title: "Vertical exaggeration" }, "VE"),
+      veSlider,
+      veVal
+    ));
+  }
   if (!sceneApi.supported) {
     $("#scene").hidden = true;
     $("#fallback2d").hidden = false;
