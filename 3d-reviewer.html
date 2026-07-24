@@ -651,21 +651,21 @@ dialog.confirm { max-width: 420px; }
   var TS = 17532e8;
   var ENBRIDGE_SITE = {
     name: "Nisku Enbridge POC AOR",
-    origin: { lat: 53.72, lon: -113.3 },
-    domainSize_m: 14e3,
+    origin: { lat: 53.71, lon: -113.36 },
+    domainSize_m: 15e3,
     injectors: [
-      { id: "INJ-PINE", name: "Pine (proposed)", x: 3359, y: 7681, rate_MtYr: 1 },
-      { id: "INJ-OAK", name: "Oak (proposed)", x: 3359, y: 6067, rate_MtYr: 1 },
-      { id: "INJ-CEDAR", name: "Cedar (proposed)", x: 1752, y: 4453, rate_MtYr: 1 }
+      { id: "INJ-PINE", name: "Pine (proposed)", x: 7313, y: 8794, rate_MtYr: 1 },
+      { id: "INJ-OAK", name: "Oak (proposed)", x: 7313, y: 7180, rate_MtYr: 1 },
+      { id: "INJ-CEDAR", name: "Cedar (proposed)", x: 5706, y: 5566, rate_MtYr: 1 }
     ],
     // Per the map: an individual 5 km circle around EACH proposed injector.
-    aor: { mode: "perInjector", center: { x: 3359, y: 6067 }, radius_m: 5e3 },
+    aor: { mode: "perInjector", center: { x: 7313, y: 7180 }, radius_m: 5e3 },
     // Nisku structure from the xlsx formation tops in this area (Calmar caprock ~1016-1117 m,
     // Nisku ~1029-1132 m, Ireton below).
     datums: { caprockTop_m: 1050, reservoirTop_m: 1080, reservoirBase_m: 1160 },
-    // DLS fabric anchored to real survey lines: x=2556 m is the R23|R22W4 range line,
-    // y=8476 m is the T55|T56 township line (derived from the 8-19-055-22W4 anchor well).
-    grid: { spacing_m: 1609.344, majorEvery: 6, anchor: { x: 2556, y: 8476 } },
+    // DLS fabric anchored to real survey lines: x=6510 m is the R23|R22W4 range line,
+    // y=9589 m is the T55|T56 township line (derived from the 8-19-055-22W4 anchor well).
+    grid: { spacing_m: 1609.344, majorEvery: 6, anchor: { x: 6510, y: 9589 } },
     // Stratigraphic column with tops averaged from the wellbore review's formation-top
     // records (editable via the Formations dialog; per-site edits persist in this browser).
     formations: [
@@ -704,8 +704,8 @@ dialog.confirm { max-width: 420px; }
       status: "Abandoned",
       surfaceLat: 53.728872,
       surfaceLon: -113.269667,
-      x: 1998,
-      y: 988,
+      x: 5952,
+      y: 2101,
       groundElev: 662,
       kbElev: 662,
       td: 1447.2,
@@ -740,8 +740,8 @@ dialog.confirm { max-width: 420px; }
       status: "Potential Water Disposal",
       surfaceLat: 53.763685,
       surfaceLon: -113.249104,
-      x: 3353,
-      y: 4863,
+      x: 7307,
+      y: 5976,
       groundElev: 654.7,
       kbElev: 660.3,
       td: 2337,
@@ -779,8 +779,8 @@ dialog.confirm { max-width: 420px; }
       status: "Abandoned",
       surfaceLat: 53.764946,
       surfaceLon: -113.207628,
-      x: 6085,
-      y: 5003,
+      x: 10039,
+      y: 6117,
       groundElev: 640.1,
       kbElev: 644,
       td: 1463.3,
@@ -815,8 +815,8 @@ dialog.confirm { max-width: 420px; }
       status: "Abandoned",
       surfaceLat: 53.814949,
       surfaceLon: -113.243559,
-      x: 3718,
-      y: 10570,
+      x: 7672,
+      y: 11683,
       groundElev: 650.8,
       kbElev: 655.5,
       td: 1160.5,
@@ -852,8 +852,8 @@ dialog.confirm { max-width: 420px; }
       status: "Abandoned",
       surfaceLat: 53.834594,
       surfaceLon: -113.239156,
-      x: 4008,
-      y: 12757,
+      x: 7962,
+      y: 13870,
       groundElev: 659.9,
       kbElev: 663.5,
       td: 1115.6,
@@ -23463,9 +23463,14 @@ dialog.confirm { max-width: 420px; }
     const D = site2.domainSize_m * S;
     const cx = D / 2, cz = D / 2;
     const toScene = (x, y) => [x * S - cx, y * S - cz];
-    const [focusX, focusZ] = toScene(site2.aor.center.x, site2.aor.center.y);
+    const ringCenters = site2.aor.mode === "perInjector" ? site2.injectors : [site2.aor.center];
+    const rr = site2.aor.radius_m;
+    const bbMinX = Math.min(...ringCenters.map((c) => c.x - rr)), bbMaxX = Math.max(...ringCenters.map((c) => c.x + rr));
+    const bbMinY = Math.min(...ringCenters.map((c) => c.y - rr)), bbMaxY = Math.max(...ringCenters.map((c) => c.y + rr));
+    const [focusX, focusZ] = toScene((bbMinX + bbMaxX) / 2, (bbMinY + bbMaxY) / 2);
+    const camDist = Math.max(820, Math.max(bbMaxX - bbMinX, bbMaxY - bbMinY) * S * 1.05);
     const camera = new PerspectiveCamera(55, 2, 1, 2e4);
-    camera.position.set(focusX, 620, focusZ + 820);
+    camera.position.set(focusX, camDist * 0.75, focusZ + camDist);
     const controls = new OrbitControls(camera, canvas);
     controls.target.set(focusX, -70, focusZ);
     controls.enableDamping = true;
@@ -24292,7 +24297,8 @@ dialog.confirm { max-width: 420px; }
   // src/main.js
   var SITES = [
     { id: "nisku-demo", label: "Wabamun Demo", site: DEFAULT_SITE, seed: (s) => generateSeedWells(s), storageKey: "lwms:v1" },
-    { id: "enbridge-poc", label: "Nisku Enbridge POC AOR", site: ENBRIDGE_SITE, seed: () => ENBRIDGE_WELLS, storageKey: "lwms:v1:enbridge-poc" }
+    { id: "enbridge-poc", label: "Nisku Enbridge POC AOR", site: ENBRIDGE_SITE, seed: () => ENBRIDGE_WELLS, storageKey: "lwms:v1:enbridge-poc-f2" }
+    // -f2: coordinate frame v2 (15 km domain); old-frame saves orphaned intentionally,
   ];
   var ACTIVE_SITE_KEY = "lwms:activeSite";
   var activeSiteId = null;
