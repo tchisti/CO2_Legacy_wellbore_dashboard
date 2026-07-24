@@ -67,7 +67,7 @@
     "type": "Strat Test",
     "traj": "Vertical",
     "status": "Abandoned (P&A)",
-    "klass": "Type 1",
+    "klass": "Type 3",
     "reviewer": "Tahir Chisti",
     "notes": "1953 D&A, Fort Saskatchewan field. Surface casing only to 186.2 m. Tops: Wabamun 1022, Calmar 1053, Nisku 1065, Ireton 1117, Beaverhill Lake 1450 m. Abandonment predates modern cementing standards. [From 3D Reviewer: critical 100/100 — subscores derived; verify Classification, Access, Data]",
     "scores": {
@@ -83,7 +83,7 @@
     },
     "total": 37,
     "createdAt": "2026-07-24T12:15:02.272Z",
-    "updatedAt": "2026-07-24T12:25:13.098Z",
+    "updatedAt": "2026-07-24T13:09:16.194Z",
     "updatedBy": "Tahir Chisti"
   },
   {
