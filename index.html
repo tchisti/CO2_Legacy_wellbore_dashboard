@@ -191,7 +191,18 @@ footer{padding:18px 24px;color:var(--muted);font-size:11px;border-top:1px solid 
           <select id="f_status"><option>Active</option><option>Suspended</option><option>Abandoned (P&A)</option><option>Orphaned</option><option>Unknown</option></select>
         </div>
         <div><label>Classification (Type 1–9)</label>
-          <select id="f_class"><option>Type 1</option><option>Type 2</option><option>Type 3</option><option>Type 4</option><option>Type 5</option><option>Type 6</option><option>Type 7</option><option>Type 8</option><option>Type 9</option></select>
+          <select id="f_class" onchange="updateClassHint()">
+            <option value="Type 1">Type 1 — No records / undocumented</option>
+            <option value="Type 2">Type 2 — Thru seal + reservoir · nothing protected</option>
+            <option value="Type 3">Type 3 — Thru seal + reservoir · groundwater only</option>
+            <option value="Type 4">Type 4 — Thru seal + reservoir · groundwater + seal</option>
+            <option value="Type 5">Type 5 — Thru seal only · nothing protected</option>
+            <option value="Type 6">Type 6 — Thru seal only · groundwater protected</option>
+            <option value="Type 7">Type 7 — Thru seal + reservoir · fully protected</option>
+            <option value="Type 8">Type 8 — Thru seal only · groundwater + seal</option>
+            <option value="Type 9">Type 9 — Above seal & reservoir · lowest risk</option>
+          </select>
+          <div class="muted" id="classHint" style="font-size:11px;margin-top:4px;line-height:1.4"></div>
         </div>
         <div><label>Spud / Completion Year (optional)</label><input id="f_year" type="number" min="1900" max="2100" placeholder="e.g. 1972"/></div>
         <div><label>Reviewer (optional)</label><input id="f_reviewer" placeholder="e.g. T. Khan"/></div>
@@ -310,6 +321,17 @@ footer{padding:18px 24px;color:var(--muted);font-size:11px;border-top:1px solid 
         <div class="note" style="margin-top:14px"><b>Risk Ranking = Likelihood × Consequence</b> — per § 7.2. Total Risk Score = Σ(parameter scores). Range: 9 (best case) — 45 (worst case). Tiering tuned from Appendix D's 8/16/28/40 thresholds, normalized to a 9-parameter scale.</div>
         <div class="note"><b>Cement carbonation note (Fig. A-2):</b> CO₂ ingress converts cement hydrates → CaCO₃ → soluble bicarbonate; vertical degradation typically &lt;few metres over geological timescales — but the barrier credit collapses if cement was never placed above caprock. Score "Cement Coverage" conservatively when CBL/VDL is absent.</div>
       </div>
+
+      <div class="panel" style="margin-top:16px">
+        <h2>Legacy Well Classification — Type 1&ndash;9 (Table A-1 / Fig. A-4)</h2>
+        <div style="overflow:auto">
+        <table class="wells">
+          <thead><tr><th style="white-space:nowrap">Type</th><th>Description</th><th>Protection Provided</th></tr></thead>
+          <tbody id="klassBody"></tbody>
+        </table>
+        </div>
+        <div class="note" style="margin-top:14px"><b>Source:</b> Table A-1 &amp; Figure A-4, <i>CO2 Underground Storage Legacy Well Review Guideline</i>, GD-40-0B42-524E.1.0.0, Enbridge Inc., 2025-10-03. Wells within the AoR are categorized by <b>penetration</b> (seal / reservoir), <b>protection</b> (groundwater-USDWs, seal, reservoir) and <b>accessibility</b>, then entered into the risk matrix (Fig. A-10). "Protection" means verified barriers (casing/cement/plugs) across the named interval. Type 1 (no records) is the default for wells pushed from the 3D Reviewer until verified.</div>
+      </div>
     </section>
 
     <!-- 3D Legacy Well Reviewer -->
@@ -372,6 +394,27 @@ footer{padding:18px 24px;color:var(--muted);font-size:11px;border-top:1px solid 
 
 <script>
 /* ============ SCORING MODEL — Appendix D + § 7.2 ============ */
+
+/* Legacy well classifications — Table A-1 / Figure A-4, Enbridge "CO2 Underground
+   Storage Legacy Well Review Guideline" GD-40-0B42-524E.1.0.0 (2025-10-03). */
+const KLASS_DEFS = {
+  'Type 1': {short:'No records — undocumented construction', desc:'No documentation available, minimal or no records; only drilling is known. Construction details are absent, so schematics cannot be produced.', prot:'Unknown'},
+  'Type 2': {short:'Thru seal + reservoir — nothing protected', desc:'Penetrates both the primary geologic seal and storage reservoir.', prot:'No protection for groundwater/USDWs, primary geologic seal, or storage reservoir.'},
+  'Type 3': {short:'Thru seal + reservoir — groundwater only', desc:'Penetrates both the primary geologic seal and storage reservoir.', prot:'Protection for groundwater/USDWs only; no protection for primary geologic seal or storage reservoir.'},
+  'Type 4': {short:'Thru seal + reservoir — groundwater + seal', desc:'Penetrates both the primary geologic seal and storage reservoir.', prot:'Protection for groundwater/USDWs and primary geologic seal; storage reservoir not protected.'},
+  'Type 5': {short:'Thru seal only — nothing protected', desc:'Penetrates only the primary geologic seal.', prot:'No protection for groundwater/USDWs or primary geologic seal.'},
+  'Type 6': {short:'Thru seal only — groundwater protected', desc:'Penetrates only the primary geologic seal.', prot:'Protection for groundwater/USDWs; primary geologic seal not protected.'},
+  'Type 7': {short:'Thru seal + reservoir — fully protected', desc:'Penetrates both the primary geologic seal and storage reservoir.', prot:'Protection for groundwater/USDWs, primary geologic seal, and storage reservoir.'},
+  'Type 8': {short:'Thru seal only — groundwater + seal', desc:'Penetrates only the primary geologic seal.', prot:'Protection for groundwater/USDWs and primary geologic seal.'},
+  'Type 9': {short:'Above seal & reservoir — lowest risk', desc:'Does not penetrate either the primary geologic seal or storage reservoir.', prot:'Dependent on confining-zone integrity; if the confining zone is intact, represents the lowest level of risk.'},
+};
+function updateClassHint(){
+  const v = document.getElementById('f_class').value;
+  const d = KLASS_DEFS[v];
+  const h = document.getElementById('classHint');
+  if(h) h.innerHTML = d ? `<b>${v}:</b> ${escapeHtml(d.desc)} <i>Protection: ${escapeHtml(d.prot)}</i>` : '';
+}
+
 const PARAMS = [
   {key:'plug',   name:'Plug Quality',          group:'L', desc:'Verified modern plugs vs. missing/unverifiable',
     levels:{1:'Verified, modern, ≥2 barriers',3:'Unknown / old but present',5:'Missing or unverifiable'}},
@@ -520,7 +563,7 @@ function resetForm(keepScores){
   document.getElementById('f_type').selectedIndex=0;
   document.getElementById('f_traj').selectedIndex=0;
   document.getElementById('f_status').selectedIndex=0;
-  document.getElementById('f_class').selectedIndex=0;
+  document.getElementById('f_class').selectedIndex=0; updateClassHint();
   if(!keepScores){ state.currentForm = defaultScores(); }
   updateAllSegs(); updateLiveTotal();
 }
@@ -540,7 +583,7 @@ function editWell(id){
   document.getElementById('f_type').value=w.type;
   document.getElementById('f_traj').value=w.traj;
   document.getElementById('f_status').value=w.status;
-  document.getElementById('f_class').value=w.klass;
+  document.getElementById('f_class').value=w.klass; updateClassHint();
   state.currentForm = {...w.scores};
   updateAllSegs(); updateLiveTotal();
   window.scrollTo({top:0,behavior:'smooth'});
@@ -796,6 +839,12 @@ function renderRef(){
     <td><b>${p.name}</b><br><small style="color:var(--muted)">${p.desc}</small></td>
     <td>${p.levels[1]}</td><td>${p.levels[3]}</td><td>${p.levels[5]}</td>
   </tr>`).join('');
+  const kb = document.getElementById('klassBody');
+  if(kb) kb.innerHTML = Object.entries(KLASS_DEFS).map(([t,d])=>`<tr>
+    <td style="white-space:nowrap"><b>${t}</b><br><small style="color:var(--muted)">${escapeHtml(d.short)}</small></td>
+    <td>${escapeHtml(d.desc)}</td>
+    <td>${escapeHtml(d.prot)}</td>
+  </tr>`).join('');
 }
 
 
@@ -826,6 +875,29 @@ function sendRegisterTo3D(){
 /* Receive wells pushed back from the 3D Reviewer ("Push to Register" inside the iframe).
    Subscores are derived from reviewer fields using the register's own 1/3/5 anchors;
    Classification (Type 1-9), Access and Data need human verification after import. */
+
+/* Derive a GD-40 Table A-1 classification from 3D Reviewer evidence (heuristic —
+   flag for human verification). Penetration from caprock/reservoir booleans;
+   "protection" inferred from cement quality + plugging status; groundwater
+   protection assumed present when any casing string is recorded. */
+function deriveKlass(r){
+  const noRecords = r.cementQuality==='Unknown' && r.pluggingStatus==='Unknown' && !(r.casingStrings>0);
+  if (noRecords) return 'Type 1';
+  const gw = r.casingStrings > 0;
+  const sealProt = (r.cementQuality==='Excellent'||r.cementQuality==='Good') && (r.pluggingStatus==='Plugged & Verified'||r.pluggingStatus==='Plugged');
+  const resProt = sealProt && r.pluggingStatus==='Plugged & Verified';
+  if (r.reservoirPenetrated) {
+    if (resProt) return 'Type 7';
+    if (sealProt) return 'Type 4';
+    return gw ? 'Type 3' : 'Type 2';
+  }
+  if (r.caprockPenetrated) {
+    if (sealProt) return 'Type 8';
+    return gw ? 'Type 6' : 'Type 5';
+  }
+  return 'Type 9';
+}
+
 function mapFrom3D(r, prev){
   const now = new Date().toISOString();
   const yr = new Date().getFullYear();
@@ -852,9 +924,9 @@ function mapFrom3D(r, prev){
     type: typeMap(r.wellType),
     traj: r.orientation==='Deviated' ? 'Deviated' : r.orientation==='Horizontal' ? 'Horizontal' : 'Vertical',
     status: r.status || 'Unknown',
-    klass: prev?.klass || 'Type 1',
+    klass: prev?.klass || deriveKlass(r),
     reviewer: r.reviewer || '',
-    notes: ((r.notes||'') + ' [From 3D Reviewer' + (r.riskClass ? (': ' + r.riskClass + ' ' + r.riskScore + '/100') : '') + ' — subscores derived; verify Classification, Access, Data]').trim(),
+    notes: ((r.notes||'') + ' [From 3D Reviewer' + (r.riskClass ? (': ' + r.riskClass + ' ' + r.riskScore + '/100') : '') + ' — subscores and Type derived; verify Classification, Access, Data]').trim(),
     scores, total: Object.values(scores).reduce((a,b)=>a+b,0),
     createdAt: prev?.createdAt || now, updatedAt: now,
     updatedBy: (syncName() ? syncName() + ' ' : '') + '(3D Reviewer)',
