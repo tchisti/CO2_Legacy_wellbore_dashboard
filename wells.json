@@ -124,8 +124,8 @@
     "year": 1965,
     "type": "Unknown",
     "traj": "Vertical",
-    "status": "Abandoned",
-    "klass": "Type 1",
+    "status": "",
+    "klass": "Type 3",
     "reviewer": "",
     "notes": "1965 D&A, Redwater field. Surface casing only to 185.9 m. Tops: Calmar 1016, Nisku 1029, Ireton 1069, Leduc 1095 m — penetrates caprock and reservoir. Just outside the 5 km circles (~5.1 km from the Pine injector) but inside the review area. [From 3D Reviewer: critical 100/100 — subscores derived; verify Classification, Access, Data]",
     "scores": {
@@ -141,7 +141,7 @@
     },
     "total": 35,
     "createdAt": "2026-07-24T12:15:02.272Z",
-    "updatedAt": "2026-07-24T12:15:02.272Z",
-    "updatedBy": "Tahir Chisti (3D Reviewer)"
+    "updatedAt": "2026-07-24T16:03:31.365Z",
+    "updatedBy": "Tahir Chisti"
   }
 ]
