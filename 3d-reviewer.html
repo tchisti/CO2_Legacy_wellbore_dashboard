@@ -12,6 +12,18 @@
   --text: #dbe4f0; --muted: #7d8ba0; --accent: #4da3ff; --amber: #f5a623;
   --critical: #d32f2f; --high: #f57c00; --medium: #fbc02d; --low: #388e3c;
 }
+:root[data-theme="light"] {
+  --bg: #f2f5f9; --bg2: #ffffff; --bg3: #e7ecf3; --line: #ccd6e4;
+  --text: #1e2a38; --muted: #64748b; --accent: #1867c0; --amber: #a86400;
+}
+[data-theme="light"] #tooltip { background: rgba(255, 255, 255, .96); color: var(--text); box-shadow: 0 2px 10px rgba(0, 0, 0, .18); }
+[data-theme="light"] #wellTable tr.sel { background: #dbe7f6; }
+[data-theme="light"] .webgl-banner { background: #fdecea; color: #7a2e2e; }
+[data-theme="light"] button.primary, [data-theme="light"] #fabAdd { color: #fff; }
+[data-theme="light"] button.danger { border-color: #e0a9a9; color: #b3261e; }
+[data-theme="light"] .toast { box-shadow: 0 4px 14px rgba(0, 0, 0, .18); }
+[data-theme="light"] dialog::backdrop { background: rgba(30, 42, 56, .35); }
+
 * { box-sizing: border-box; }
 html, body { height: 100%; }
 body { margin: 0; font: 13px/1.45 system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); display: flex; flex-direction: column; }
@@ -23000,7 +23012,7 @@ dialog.confirm { max-width: 420px; }
   // src/scene3d.js
   var S = 0.1;
   var easeOut = (t) => 1 - Math.pow(1 - t, 3);
-  function createScene({ canvas, site: site2, onSelect, onEdit, onHover }) {
+  function createScene({ canvas, site: site2, onSelect, onEdit, onHover, theme: theme2 = "dark" }) {
     let renderer;
     try {
       renderer = new WebGLRenderer({ canvas, antialias: true });
@@ -23008,9 +23020,10 @@ dialog.confirm { max-width: 420px; }
     } catch {
       return { supported: false };
     }
+    const PAL = theme2 === "light" ? { bg: 15331062, ground: 13884391, gridMinor: 12569050, gridMajor: 9348034, selRing: 4018800 } : { bg: 1053981, ground: 1844272, gridMinor: 2437183, gridMajor: 4282490, selRing: 16777215 };
     const scene = new Scene();
-    scene.background = new Color(1053981);
-    scene.fog = new Fog(1053981, 1600, 4200);
+    scene.background = new Color(PAL.bg);
+    scene.fog = new Fog(PAL.bg, 1600, 4200);
     const D = site2.domainSize_m * S;
     const cx = D / 2, cz = D / 2;
     const toScene = (x, y) => [x * S - cx, y * S - cz];
@@ -23025,7 +23038,7 @@ dialog.confirm { max-width: 420px; }
     const sun = new DirectionalLight(16777215, 0.8);
     sun.position.set(400, 700, 300);
     scene.add(sun);
-    const ground = new Mesh(new PlaneGeometry(D, D), new MeshLambertMaterial({ color: 1844272 }));
+    const ground = new Mesh(new PlaneGeometry(D, D), new MeshLambertMaterial({ color: PAL.ground }));
     ground.rotation.x = -Math.PI / 2;
     scene.add(ground);
     {
@@ -23051,8 +23064,8 @@ dialog.confirm { max-width: 420px; }
         l.position.y = y;
         scene.add(l);
       };
-      addLines(minor, 2437183, 0.35, 0.8);
-      addLines(major, 4282490, 0.45, 0.9);
+      addLines(minor, PAL.gridMinor, 0.35, 0.8);
+      addLines(major, PAL.gridMajor, 0.45, 0.9);
     }
     {
       const centers = site2.aor.mode === "perInjector" ? site2.injectors.map((inj) => ({ x: inj.x, y: inj.y })) : [site2.aor.center];
@@ -23100,7 +23113,7 @@ dialog.confirm { max-width: 420px; }
     }
     const selRing = new Mesh(
       new RingGeometry(9, 12, 32),
-      new MeshBasicMaterial({ color: 16777215, transparent: true, opacity: 0.9, side: DoubleSide })
+      new MeshBasicMaterial({ color: PAL.selRing, transparent: true, opacity: 0.9, side: DoubleSide })
     );
     selRing.rotation.x = -Math.PI / 2;
     selRing.position.y = 1.6;
@@ -23299,25 +23312,26 @@ dialog.confirm { max-width: 420px; }
   }
 
   // src/fallback2d.js
-  function drawPlan(canvas, wells, site2) {
+  function drawPlan(canvas, wells, site2, theme2 = "dark") {
+    const pal = theme2 === "light" ? { bg: "#eef2f8", gridMinor: "#c9d3e2", gridMajor: "#8ea3c2", text: "#5b6b82" } : { bg: "#141a22", gridMinor: "#1e2735", gridMajor: "#3a4c66", text: "#7d8ba0" };
     const ctx = canvas.getContext("2d");
     const s = canvas.width / site2.domainSize_m;
     const px2 = (v) => v * s, py2 = (v) => canvas.height - v * s;
-    ctx.fillStyle = "#141a22";
+    ctx.fillStyle = pal.bg;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     if (site2.grid) {
       const sp = site2.grid.spacing_m, every = site2.grid.majorEvery || 6;
       const ax = site2.grid.anchor?.x || 0, ay = site2.grid.anchor?.y || 0;
       const mod = (v, m) => (v % m + m) % m;
       for (let xm = mod(ax, sp); xm <= site2.domainSize_m; xm += sp) {
-        ctx.strokeStyle = mod(Math.round((xm - ax) / sp), every) === 0 ? "#3a4c66" : "#1e2735";
+        ctx.strokeStyle = mod(Math.round((xm - ax) / sp), every) === 0 ? pal.gridMajor : pal.gridMinor;
         ctx.beginPath();
         ctx.moveTo(px2(xm), 0);
         ctx.lineTo(px2(xm), canvas.height);
         ctx.stroke();
       }
       for (let ym = mod(ay, sp); ym <= site2.domainSize_m; ym += sp) {
-        ctx.strokeStyle = mod(Math.round((ym - ay) / sp), every) === 0 ? "#3a4c66" : "#1e2735";
+        ctx.strokeStyle = mod(Math.round((ym - ay) / sp), every) === 0 ? pal.gridMajor : pal.gridMinor;
         ctx.beginPath();
         ctx.moveTo(0, py2(ym));
         ctx.lineTo(canvas.width, py2(ym));
@@ -23347,7 +23361,7 @@ dialog.confirm { max-width: 420px; }
         ctx.setLineDash([]);
       }
     }
-    ctx.fillStyle = "#7d8ba0";
+    ctx.fillStyle = pal.text;
     ctx.font = "13px system-ui";
     ctx.fillText("2D plan view (WebGL unavailable on this machine)", 12, 20);
   }
@@ -23702,6 +23716,13 @@ dialog.confirm { max-width: 420px; }
   } catch {
   }
   var activeEntry = SITES.find((s) => s.id === activeSiteId) || SITES[0];
+  var THEME_KEY = "lwms:theme";
+  var theme = "dark";
+  try {
+    theme = localStorage.getItem(THEME_KEY) === "light" ? "light" : "dark";
+  } catch {
+  }
+  if (theme === "light") document.documentElement.dataset.theme = "light";
   var site = { ...activeEntry.site, ...globalThis.SITE_CONTEXT || {} };
   document.title = `LWMS \u2014 ${site.name}`;
   $("#siteName").textContent = site.name;
@@ -23776,6 +23797,7 @@ dialog.confirm { max-width: 420px; }
   var sceneApi = createScene({
     canvas: $("#scene"),
     site,
+    theme,
     onSelect: (id) => store.setView({ selection: id }),
     onEdit: (id) => handlers.onEdit(id),
     onHover: showTooltip
@@ -23928,7 +23950,7 @@ dialog.confirm { max-width: 420px; }
   }
   function sceneSync(ev, wells, vis) {
     if (!sceneApi.supported) {
-      drawPlan($("#planCanvas"), wells.filter((w) => store.view.scenarioVisible || !w.isScenario), site);
+      drawPlan($("#planCanvas"), wells.filter((w) => store.view.scenarioVisible || !w.isScenario), site, theme);
       return;
     }
     if (ev.kind === "reset") sceneApi.syncAll(wells);
@@ -23970,6 +23992,18 @@ dialog.confirm { max-width: 420px; }
   $("#search").addEventListener("input", (e) => store.setView({ search: e.target.value }));
   $("#btnUndo").addEventListener("click", () => store.undo());
   $("#btnRedo").addEventListener("click", () => store.redo());
+  var themeBtn = document.createElement("button");
+  themeBtn.id = "btnTheme";
+  themeBtn.textContent = theme === "light" ? "\u{1F319} Dark" : "\u2600\uFE0F Light";
+  themeBtn.title = "Switch color theme";
+  themeBtn.addEventListener("click", () => {
+    try {
+      localStorage.setItem(THEME_KEY, theme === "light" ? "dark" : "light");
+    } catch {
+    }
+    location.reload();
+  });
+  $("#toolbar").append(themeBtn);
   $("#btnReset").addEventListener("click", async () => {
     if (await confirmDialog("Reset to the original 20-well demo dataset? Manually added wells will be removed (undoable)."))
       store.dispatch({ type: "wells/resetDemo" });
