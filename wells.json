@@ -93,16 +93,16 @@
     "lat": 53.814949,
     "lon": -113.243559,
     "year": 2004,
-    "type": "Gas Producer",
+    "type": "Strat Test",
     "traj": "Deviated",
-    "status": "Abandoned",
+    "status": "Abandoned (P&A)",
     "klass": "Type 1",
-    "reviewer": "",
+    "reviewer": "Tahir Chisti",
     "notes": "2004 deviated Viking gas well, Redwater field, abandoned 2017 to modern standards. TD in the Wabamun — does NOT penetrate the Calmar caprock or Nisku. Perfs squeezed on abandonment. [From 3D Reviewer: medium 25/100 — subscores derived; verify Classification, Access, Data]",
     "scores": {
       "plug": 3,
       "barriers": 1,
-      "cement": 3,
+      "cement": 1,
       "prox": 3,
       "depthR": 1,
       "depthC": 1,
@@ -110,10 +110,10 @@
       "access": 1,
       "data": 1
     },
-    "total": 15,
+    "total": 13,
     "createdAt": "2026-07-24T12:15:02.272Z",
-    "updatedAt": "2026-07-24T12:15:02.272Z",
-    "updatedBy": "Tahir Chisti (3D Reviewer)"
+    "updatedAt": "2026-07-24T13:01:16.642Z",
+    "updatedBy": "Tahir Chisti"
   },
   {
     "id": "W-4039S4",
