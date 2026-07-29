@@ -93,8 +93,9 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
 .score-row{display:grid;grid-template-columns:1.5fr 2.2fr 60px;gap:8px;align-items:center;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--field)}
 .score-row .name{font-size:12px;font-weight:600}
 .score-row .name small{display:block;color:var(--muted);font-weight:400;font-size:10px;margin-top:2px}
-.seg{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px}
-.seg button{padding:6px 4px;font-size:11px;border-radius:6px;border:1px solid var(--line);background:var(--field);color:var(--text)}
+.seg{display:grid;grid-template-columns:repeat(6,1fr);gap:4px}
+.seg button{padding:6px 2px;font-size:11px;border-radius:6px;border:1px solid var(--line);background:var(--field);color:var(--text)}
+.seg button.active{border-color:var(--accent)}
 .seg button.active.low{background:#1fbf75;color:#0b1220;border-color:#1fbf75}
 .seg button.active.med{background:#f0a93b;color:#0b1220;border-color:#f0a93b}
 .seg button.active.high{background:#e85a4f;color:#fff;border-color:#e85a4f}
@@ -174,6 +175,10 @@ footer{padding:18px 24px;color:var(--muted);font-size:11px;border-top:1px solid 
   </div>
 </header>
 
+<div id="methBanner" style="display:none;background:#5a3b12;border:1px solid #f0a93b;color:#ffe3b0;border-radius:8px;padding:8px 12px;margin:8px 24px 0 24px;font-size:12px">
+  ⚠ Live methodology unavailable — using the built-in fallback rulebook (rev <span id="methBannerRev"></span>). Scores shown are computed against the fallback.
+</div>
+
 <div class="kpis" style="padding:20px 24px 0 24px">
   <div class="kpi total"><div class="label">Wells in Review</div><div class="val" id="kTotal">0</div><div class="sub">within AoR</div></div>
   <div class="kpi low"><div class="label">Low Risk</div><div class="val" id="kLow">0</div><div class="sub">Score 9 – 18</div></div>
@@ -233,15 +238,15 @@ footer{padding:18px 24px;color:var(--muted);font-size:11px;border-top:1px solid 
 
       <div class="divider"></div>
       <h2 style="margin-bottom:4px">Risk Scoring — Appendix D</h2>
-      <div class="muted" style="margin-bottom:8px">Score each parameter: Low (1) · Medium (3) · High (5)</div>
+      <div class="muted" style="margin-bottom:8px">Score each parameter 1–5 (anchors at 1/3/5 · ? = unknown, scored conservatively per parameter)</div>
 
       <div class="scoring" id="scoringBlock"></div>
 
       <div class="divider"></div>
       <div class="row spread">
         <div>
-          <div class="muted" style="font-size:11px">Total Risk Score</div>
-          <div style="font-size:28px;font-weight:800" id="liveTotal">9</div>
+          <div class="muted" style="font-size:11px">L × C — Risk Index</div>
+          <div style="font-size:28px;font-weight:800" id="liveTotal">—</div>
           <div id="liveBadge"></div>
         </div>
         <div class="actions-row">
@@ -479,22 +484,13 @@ footer{padding:18px 24px;color:var(--muted);font-size:11px;border-top:1px solid 
   Arbad et al., IJGGC vol. 133 (2024).
 </footer>
 
+<script src="scoring.js"></script>
 <script>
 /* ============ SCORING MODEL — Appendix D + § 7.2 ============ */
 
 /* Legacy well classifications — Table A-1 / Figure A-4, Enbridge "CO2 Underground
    Storage Legacy Well Review Guideline" GD-40-0B42-524E.1.0.0 (2025-10-03). */
-const KLASS_DEFS = {
-  'Type 1': {short:'No records — undocumented construction', desc:'No documentation available, minimal or no records; only drilling is known. Construction details are absent, so schematics cannot be produced.', prot:'Unknown'},
-  'Type 2': {short:'Thru seal + reservoir — nothing protected', desc:'Penetrates both the primary geologic seal and storage reservoir.', prot:'No protection for groundwater/USDWs, primary geologic seal, or storage reservoir.'},
-  'Type 3': {short:'Thru seal + reservoir — groundwater only', desc:'Penetrates both the primary geologic seal and storage reservoir.', prot:'Protection for groundwater/USDWs only; no protection for primary geologic seal or storage reservoir.'},
-  'Type 4': {short:'Thru seal + reservoir — groundwater + seal', desc:'Penetrates both the primary geologic seal and storage reservoir.', prot:'Protection for groundwater/USDWs and primary geologic seal; storage reservoir not protected.'},
-  'Type 5': {short:'Thru seal only — nothing protected', desc:'Penetrates only the primary geologic seal.', prot:'No protection for groundwater/USDWs or primary geologic seal.'},
-  'Type 6': {short:'Thru seal only — groundwater protected', desc:'Penetrates only the primary geologic seal.', prot:'Protection for groundwater/USDWs; primary geologic seal not protected.'},
-  'Type 7': {short:'Thru seal + reservoir — fully protected', desc:'Penetrates both the primary geologic seal and storage reservoir.', prot:'Protection for groundwater/USDWs, primary geologic seal, and storage reservoir.'},
-  'Type 8': {short:'Thru seal only — groundwater + seal', desc:'Penetrates only the primary geologic seal.', prot:'Protection for groundwater/USDWs and primary geologic seal.'},
-  'Type 9': {short:'Above seal & reservoir — lowest risk', desc:'Does not penetrate either the primary geologic seal or storage reservoir.', prot:'Dependent on confining-zone integrity; if the confining zone is intact, represents the lowest level of risk.'},
-};
+const KLASS_DEFS = WellScoring.FALLBACK_METHODOLOGY.wellTypes;
 function updateClassHint(){
   const v = document.getElementById('f_class').value;
   const d = KLASS_DEFS[v];
@@ -502,47 +498,45 @@ function updateClassHint(){
   if(h) h.innerHTML = d ? `<b>${v}:</b> ${escapeHtml(d.desc)} <i>Protection: ${escapeHtml(d.prot)}</i>` : '';
 }
 
-const PARAMS = [
-  {key:'plug',   name:'Plug Quality',          group:'L', desc:'Verified modern plugs vs. missing/unverifiable',
-    levels:{1:'Verified, modern, ≥2 barriers',3:'Unknown / old but present',5:'Missing or unverifiable'}},
-  {key:'barriers',name:'Number of Barriers',   group:'L', desc:'Permanent barriers across all flow zones',
-    levels:{1:'≥2 barriers',3:'1 barrier',5:'None'}},
-  {key:'cement', name:'Cement Coverage',       group:'L', desc:'TOC vs. caprock / storage complex',
-    levels:{1:'Full to caprock (CBL verified)',3:'Below caprock',5:'No data / likely absent'}},
-  {key:'prox',   name:'Proximity to CO₂ Plume',group:'C', desc:'Lateral distance from modeled plume',
-    levels:{1:'> 3.2 km',3:'1.6 – 3.2 km',5:'< 1.6 km'}},
-  {key:'depthR', name:'Depth vs. Reservoir',   group:'C', desc:'Penetration relative to storage reservoir',
-    levels:{1:'Far above primary seal',3:'Penetrates primary caprock',5:'Intersects storage reservoir'}},
-  {key:'depthC', name:'Depth vs. Storage Complex', group:'C', desc:'Penetration relative to complex final seal',
-    levels:{1:'Above storage complex final seal',3:'Penetrates non-primary seal',5:'Penetrates secondary/final reservoir'}},
-  {key:'age',    name:'Well Age',              group:'L', desc:'Carbon-steel corrosion / standards vintage',
-    levels:{1:'< 30 years',3:'30 – 50 years',5:'> 50 years'}},
-  {key:'access', name:'Access & Ownership',    group:'L', desc:'Ability to re-enter / re-abandon',
-    levels:{1:'Owned, licensee active, accessible',3:'Suspended / no marker',5:'Orphaned / unknown location'}},
-  {key:'data',   name:'Data Availability',     group:'L', desc:'Drilling/completion/abandonment records',
-    levels:{1:'Complete with logs',3:'Partial / incomplete',5:'None or analog only'}},
-];
-
-const TIERS = [
-  {min:9, max:18, label:'Low',      cls:'low',  color:'#1fbf75'},
-  {min:19,max:30, label:'Moderate', cls:'mod',  color:'#f0a93b'},
-  {min:31,max:40, label:'High',     cls:'high', color:'#e85a4f'},
-  {min:41,max:45, label:'Very High', cls:'crit', color:'#a8324a'},
-];
-
-function tierFor(s){ return TIERS.find(t=>s>=t.min && s<=t.max) || TIERS[0]; }
+/* Unified methodology — single source of truth is methodology.json / WellScoring.FALLBACK_METHODOLOGY.
+   METHODOLOGY is swapped live when the remote rulebook loads or the admin panel saves. */
+let METHODOLOGY = WellScoring.FALLBACK_METHODOLOGY;
+let METHODOLOGY_SOURCE = 'fallback';
+Object.defineProperty(window, 'PARAMS', { get: () => METHODOLOGY.params });
+function computeFor(scores){ return WellScoring.computeWell(scores, METHODOLOGY); }
+function rankOf(w){
+  const c = w.computed || WellScoring.normalizeWell(w, METHODOLOGY).computed;
+  return WellScoring.bandFor(c.cell, METHODOLOGY);
+}
+function methodologyBanner(){
+  const el = document.getElementById('methBanner');
+  if (!el) return;
+  el.style.display = METHODOLOGY_SOURCE === 'fallback' ? 'block' : 'none';
+  const rev = document.getElementById('methBannerRev');
+  if (rev) rev.textContent = METHODOLOGY.revision;
+}
+function applyMethodology(m, source){
+  METHODOLOGY = m; METHODOLOGY_SOURCE = source;
+  state.wells = state.wells.map(w => WellScoring.normalizeWell(w, METHODOLOGY));
+  methodologyBanner();
+  if (document.getElementById('scoringBlock')) buildScoring();
+  render();
+}
 
 /* ============ STATE ============ */
 let state = { wells: [], editingId: null, currentForm: defaultScores(), selected: null };
 
-function defaultScores(){ const o={}; PARAMS.forEach(p=>o[p.key]=1); return o; }
+function defaultScores(){ const o={}; PARAMS.forEach(p=>o[p.key]=null); return o; }  // new wells start Unknown
 function uid(){ return 'W-'+Math.random().toString(36).slice(2,8).toUpperCase(); }
 
 function persistLocal(){ localStorage.setItem('co2_legacy_wells', JSON.stringify(state.wells)); }
 /* save() = keep a local copy (offline cache) AND queue a push to the shared team register */
 function save(msg){ persistLocal(); markDirty(msg); schedulePush(); }
+/* normalizeAll — the single choke-point wells pass through at every data boundary (local
+   storage, JSON import, and both sides of a sync merge) so v1 wells always migrate to v2. */
+function normalizeAll(list){ return (list||[]).map(w => WellScoring.normalizeWell(w, METHODOLOGY)); }
 function load(){
-  try{ const x=JSON.parse(localStorage.getItem('co2_legacy_wells')); if(Array.isArray(x)) state.wells=x; }catch(e){}
+  try{ const x=JSON.parse(localStorage.getItem('co2_legacy_wells')); if(Array.isArray(x)) state.wells=normalizeAll(x); }catch(e){}
 }
 
 /* ============ FORM ============ */
@@ -551,45 +545,45 @@ function buildScoring(){
   host.innerHTML = '';
   PARAMS.forEach(p=>{
     const row = document.createElement('div'); row.className='score-row';
+    const axisLabel = p.axis==='L' ? 'Likelihood' : 'Consequence';
     row.innerHTML = `
-      <div class="name">${p.name}<small>${p.desc}</small></div>
-      <div class="seg" data-key="${p.key}">
-        <button data-v="1" title="${p.levels[1]}">Low</button>
-        <button data-v="3" title="${p.levels[3]}">Med</button>
-        <button data-v="5" title="${p.levels[5]}">High</button>
+      <div class="name">${p.name} <span class="score-pill" style="font-size:9px">${axisLabel} · w ${p.weight.toFixed(2)}</span>
+        <small>${p.desc}</small></div>
+      <div class="seg" id="seg-${p.key}">
+        ${['?',1,2,3,4,5].map(v=>{
+          const val = v==='?' ? 'null' : v;
+          const tip = WellScoring.anchorText(p, v==='?' ? null : v);
+          return `<button type="button" data-v="${val}" title="${escapeHtml(tip)}" onclick="setScore('${p.key}', ${val})">${v}</button>`;
+        }).join('')}
       </div>
-      <div class="pts" id="pts-${p.key}">1</div>`;
+      <div class="pts" id="pts-${p.key}"></div>`;
     host.appendChild(row);
-    row.querySelectorAll('button').forEach(b=>{
-      b.addEventListener('click',()=>{
-        const v = +b.dataset.v;
-        state.currentForm[p.key] = v;
-        updateSeg(p.key);
-        updateLiveTotal();
-      });
-    });
   });
   updateAllSegs();
 }
+function setScore(key, v){ state.currentForm[key] = v; updateSeg(key); updateLiveTotal(); }
 function updateSeg(key){
-  const seg = document.querySelector(`.seg[data-key="${key}"]`);
-  if(!seg) return;
+  const p = PARAMS.find(x=>x.key===key); if(!p) return;
   const v = state.currentForm[key];
-  seg.querySelectorAll('button').forEach(b=>{
+  document.querySelectorAll(`#seg-${key} button`).forEach(b=>{
+    const bv = b.dataset.v==='null' ? null : +b.dataset.v;
     b.classList.remove('active','low','med','high');
-    if(+b.dataset.v===v){
+    if(bv===v){
       b.classList.add('active');
-      b.classList.add(v===1?'low':v===3?'med':'high');
+      if(bv!==null) b.classList.add(bv<=2?'low':bv===3?'med':'high');
     }
   });
-  document.getElementById('pts-'+key).textContent = v;
+  const eff = WellScoring.resolveScore(p, v);
+  const pts = document.getElementById('pts-'+key);
+  if (pts) pts.textContent = (v===null?'?':v) + ' → ' + (p.weight*eff).toFixed(2);
 }
 function updateAllSegs(){ PARAMS.forEach(p=>updateSeg(p.key)); }
 function updateLiveTotal(){
-  const t = PARAMS.reduce((a,p)=>a+state.currentForm[p.key],0);
-  document.getElementById('liveTotal').textContent = t;
-  const tier = tierFor(t);
-  document.getElementById('liveBadge').innerHTML = `<span class="tag ${tier.cls}">${tier.label} Risk</span>`;
+  const c = computeFor(state.currentForm);
+  document.getElementById('liveTotal').innerHTML =
+    `${c.L.toFixed(2)} × ${c.C.toFixed(2)} <span style="font-size:14px;color:var(--muted)">= ${c.riskIndex}</span>`;
+  document.getElementById('liveBadge').innerHTML =
+    `<span class="tag ${c.rank.cls}">${c.rank.label} · cell ${c.cell}</span>`;
 }
 
 function readForm(){
@@ -614,8 +608,13 @@ function readForm(){
     klass: document.getElementById('f_class').value,
     reviewer: document.getElementById('f_reviewer').value.trim() || '',
     notes: document.getElementById('f_notes').value.trim() || '',
+    schema: WellScoring.CURRENT_SCHEMA,
     scores: {...state.currentForm},
-    total: PARAMS.reduce((a,p)=>a+state.currentForm[p.key],0),
+    computed: (({L,C,Lr,Cr,cell,riskIndex,rank,integrity}) =>
+      ({L,C,Lr,Cr,cell,riskIndex,rankLabel:rank.label,integrity}))(computeFor(state.currentForm)),
+    scoredUnder: METHODOLOGY.revision,
+    needsReview: false,                       // a human just scored it
+    legacy: prev?.legacy,                     // preserve the v1 audit block across edits
     createdAt: prev?.createdAt || new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     updatedBy: syncName() || prev?.updatedBy || '',
@@ -671,7 +670,8 @@ function editWell(id){
   document.getElementById('f_traj').value=w.traj;
   document.getElementById('f_status').value=w.status;
   document.getElementById('f_class').value=w.klass; updateClassHint();
-  state.currentForm = {...w.scores};
+  const nw = WellScoring.normalizeWell(w, METHODOLOGY);
+  state.currentForm = {...nw.scores};
   updateAllSegs(); updateLiveTotal();
   window.scrollTo({top:0,behavior:'smooth'});
 }
@@ -1097,7 +1097,7 @@ function exportJSON(){
 function importJSON(e){
   const f=e.target.files[0]; if(!f) return;
   const r=new FileReader(); r.onload=()=>{
-    try{ const d=JSON.parse(r.result); if(Array.isArray(d)){state.wells=d;SYNC.replaceNext=true;save('Import JSON ('+d.length+' wells)');render();}}catch(err){alert('Invalid JSON');}
+    try{ const d=JSON.parse(r.result); if(Array.isArray(d)){state.wells=normalizeAll(d);SYNC.replaceNext=true;save('Import JSON ('+d.length+' wells)');render();}}catch(err){alert('Invalid JSON');}
     e.target.value='';
   }; r.readAsText(f);
 }
@@ -1721,6 +1721,7 @@ function setSyncStatus(mode, detail){
   }
 }
 function mergeWells(local, remote){
+  local = normalizeAll(local); remote = normalizeAll(remote);
   const byId = new Map();
   (remote||[]).forEach(w=>{ if(w && w.id && !SYNC.pendingDeletes.has(w.id)) byId.set(w.id, w); });
   (local||[]).forEach(w=>{
@@ -1758,7 +1759,7 @@ async function pullRemote(initial){
       return;
     }
     SYNC.sha=r.sha; SYNC.etag=r.etag; SYNC.lastSync=Date.now();
-    if(r.wells){ state.wells = r.wells; persistLocal(); render(); }
+    if(r.wells){ state.wells = normalizeAll(r.wells); persistLocal(); render(); }
     setSyncStatus(syncToken()?'live':'view');
   }catch(e){
     setSyncStatus(syncToken()?'error':'local', e.message);
@@ -1864,6 +1865,7 @@ function startPolling(){
   SYNC.pollTimer = setInterval(()=>pullRemote(false), syncToken()?45000:120000);
 }
 function initSync(){
+  WellScoring.loadMethodology('methodology.json').then(r => applyMethodology(r.methodology, r.source));
   setSyncStatus('local');
   pullRemote(true);
   startPolling();
@@ -1878,8 +1880,8 @@ function initSync(){
 load();           // local cache first (instant paint, offline fallback)
 buildScoring();
 updateLiveTotal();
-render();
-initSync();       // then pull the shared team register and start auto-refresh
+try { render(); } catch(e) { console.error('render() failed — pending Task 5 table/chart rework:', e); }
+initSync();       // then pull the shared team register and start auto-refresh; must run even if render() above failed
 </script>
 </body>
 </html>
