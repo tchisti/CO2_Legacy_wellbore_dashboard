@@ -160,6 +160,7 @@ footer{padding:18px 24px;color:var(--muted);font-size:11px;border-top:1px solid 
   <div class="actions">
     <button class="ghost" id="themeBtn" onclick="toggleTheme()" title="Switch color theme">☀️ Light</button>
     <button class="ghost" id="syncPill" onclick="openSyncModal()" title="Shared team register — click for settings"><span class="dot local"></span> Connecting…</button>
+    <button class="ghost" onclick="openMethodologyModal()" title="View or edit the scoring rulebook">⚖ Methodology</button>
     <button class="ghost" onclick="loadDemo()" title="Seed dashboard with six sample legacy wells">Load Demo</button>
     <button class="ghost" onclick="downloadCSVTemplate()" title="Download a CSV template prefilled with a sample legacy well — edit it, then re-upload via Import CSV">📄 CSV Template</button>
     <label class="btn primary" style="margin:0;cursor:pointer;background:linear-gradient(135deg,#1f7ad6,#3aa0ff);border:none" title="Bulk upload legacy wells from a CSV file">
@@ -479,6 +480,29 @@ footer{padding:18px 24px;color:var(--muted);font-size:11px;border-top:1px solid 
     <div class="actions-row" style="margin-top:14px">
       <button class="danger" onclick="disconnectSync()">Disconnect</button>
       <button class="primary" onclick="connectSync()">Save &amp; Test Connection</button>
+    </div>
+  </div>
+</div>
+
+<!-- Methodology admin modal -->
+<div class="modal-back" id="methModal">
+  <div class="modal" style="width:min(900px,92vw)">
+    <div class="row spread" style="margin-bottom:8px">
+      <h2>Methodology — rev <span id="mmRev"></span></h2>
+      <button class="ghost" onclick="closeMethodologyModal()" style="padding:4px 10px">✕</button>
+    </div>
+    <p class="muted" style="margin:0 0 12px 0">
+      Edits commit <code>methodology.json</code> to the shared repo (needs the same token as well saves).
+      Weight/band/unknown changes bump the minor version; wording changes bump the patch.
+      Wells scored under older revisions are flagged for re-review — scores are never rewritten silently.
+    </p>
+    <div id="mmParams"></div>
+    <h2 style="margin-top:12px">Matrix bands (cell = round L × round C, 1–25)</h2>
+    <div id="mmBands"></div>
+    <div id="mmValidation" style="margin-top:10px;font-size:12px"></div>
+    <div class="actions-row" style="margin-top:14px">
+      <button class="ghost" onclick="closeMethodologyModal()">Cancel</button>
+      <button class="primary" id="mmSave" onclick="saveMethodologyEdits()" disabled>Save &amp; Commit</button>
     </div>
   </div>
 </div>
@@ -1719,6 +1743,7 @@ const SYNC = {
   sha:null, etag:null, mode:'local', dirty:false, pushing:false, queued:false,
   replaceNext:false, pendingMsg:'', pendingDeletes:new Set(),
   pushTimer:null, pollTimer:null, lastSync:null,
+  methodologyPath:'methodology.json', methodologySha:null,
 };
 function syncToken(){ return localStorage.getItem('co2_sync_token')||''; }
 function syncName(){ return localStorage.getItem('co2_sync_name')||''; }
@@ -1785,6 +1810,34 @@ async function fetchRemote(useEtag){
   let wells = null;
   try{ const arr = JSON.parse(b64decode(j.content||'')); if(Array.isArray(arr)) wells = arr; }catch(e){}
   return {sha:j.sha, wells, etag};
+}
+/* ---- methodology.json remote tracking (mirrors the wells.json fetch/push conventions above) ---- */
+function apiMethUrl(){ return `https://api.github.com/repos/${SYNC.owner}/${SYNC.repo}/contents/${SYNC.methodologyPath}`; }
+async function fetchMethodologyRemote(){
+  try{
+    const res = await fetch(apiMethUrl()+'?ref='+encodeURIComponent(SYNC.branch), {headers: apiHeaders(), cache:'no-store'});
+    if(!res.ok) return null;
+    const j = await res.json();
+    SYNC.methodologySha = j.sha;
+    const m = JSON.parse(b64decode(j.content||''));
+    if(!WellScoring.validateMethodology(m).ok) return null;
+    return { m, sha: j.sha };
+  }catch(e){ return null; }
+}
+async function pushMethodologyRemote(newM){
+  for(let attempt=0; attempt<2; attempt++){
+    const body = {
+      message: 'Methodology '+newM.revision+' — '+(syncName()||'unknown'),
+      content: b64encode(JSON.stringify(newM,null,2)+'\n'),
+      branch: SYNC.branch,
+    };
+    if(SYNC.methodologySha) body.sha = SYNC.methodologySha;
+    const res = await fetch(apiMethUrl(), {method:'PUT', headers:{...apiHeaders(),'Content-Type':'application/json'}, body:JSON.stringify(body)});
+    if(res.ok){ const j = await res.json(); SYNC.methodologySha = j.content && j.content.sha; return true; }
+    if(res.status===409 || res.status===422){ await fetchMethodologyRemote(); continue; } // SHA collision → refetch, retry
+    return false;
+  }
+  return false;
 }
 async function pullRemote(initial){
   if(SYNC.pushing || SYNC.dirty) return; // never clobber unsaved local edits; push() merges instead
@@ -1876,7 +1929,7 @@ async function connectSync(){
     SYNC.etag = null;
     const r = await fetchRemote(false);
     if(r.wells){
-      state.wells = SYNC.dirty ? mergeWells(state.wells, r.wells) : r.wells;
+      state.wells = SYNC.dirty ? mergeWells(state.wells, r.wells) : normalizeAll(r.wells);
       SYNC.sha=r.sha; SYNC.etag=r.etag;
       persistLocal(); render();
     }
@@ -1898,20 +1951,86 @@ function disconnectSync(){
   const msg = document.getElementById('syncMsg');
   if(msg) msg.innerHTML = '<div class="note" style="margin-top:10px">Disconnected. The shared register is untouched; this browser is now local-only.</div>';
 }
+/* ---- methodology admin modal ---- */
+let mmDraft = null;
+function openMethodologyModal(){
+  mmDraft = JSON.parse(JSON.stringify(METHODOLOGY));
+  document.getElementById('mmRev').textContent = METHODOLOGY.revision;
+  const host = document.getElementById('mmParams');
+  host.innerHTML = ['L','C'].map(axis => `
+    <h2 style="margin-top:10px">${axis==='L'?'Likelihood':'Consequence'} <span class="score-pill" id="mmSum${axis}"></span></h2>
+    ${mmDraft.params.map((p,i)=>({p,i})).filter(x=>x.p.axis===axis).map(({p,i})=>`
+      <div class="score-row" style="grid-template-columns:1.2fr 90px 70px 2.4fr">
+        <div class="name">${escapeHtml(p.name)}<small>${escapeHtml(p.desc)}</small></div>
+        <div><input type="number" step="0.01" min="0" max="1" value="${p.weight}" style="width:70px"
+             onchange="mmSet(${i},'weight',parseFloat(this.value))"> w</div>
+        <div><select onchange="mmSet(${i},'unknownScore',parseInt(this.value,10))">
+          ${[1,2,3,4,5].map(v=>`<option ${v===p.unknownScore?'selected':''}>${v}</option>`).join('')}
+        </select> ?</div>
+        <div>${[1,3,5].map(a=>`<textarea rows="1" style="width:100%;font-size:11px;margin:1px 0"
+             onchange="mmSetAnchor(${i},${a},this.value)">${escapeHtml(p.anchors[a])}</textarea>`).join('')}</div>
+      </div>`).join('')}`).join('');
+  const bh = document.getElementById('mmBands');
+  bh.innerHTML = mmDraft.matrix.bands.map((b,i)=>`
+    <span class="tag ${b.cls}" style="margin-right:8px">${escapeHtml(b.label)}
+      <input type="number" min="1" max="25" value="${b.min}" style="width:48px" onchange="mmSetBand(${i},'min',parseInt(this.value,10))"> –
+      <input type="number" min="1" max="25" value="${b.max}" style="width:48px" onchange="mmSetBand(${i},'max',parseInt(this.value,10))">
+    </span>`).join('');
+  mmValidate();
+  document.getElementById('methModal').classList.add('open');
+}
+function closeMethodologyModal(){ document.getElementById('methModal').classList.remove('open'); mmDraft=null; }
+function mmSet(i,k,v){ mmDraft.params[i][k]=v; mmValidate(); }
+function mmSetAnchor(i,a,v){ mmDraft.params[i].anchors[a]=v; mmValidate(); }
+function mmSetBand(i,k,v){ mmDraft.matrix.bands[i][k]=v; mmValidate(); }
+function mmValidate(){
+  const val = WellScoring.validateMethodology(mmDraft);
+  for (const axis of ['L','C']) {
+    const sum = WellScoring.paramsOf(mmDraft, axis).reduce((a,p)=>a+(+p.weight||0),0);
+    const el = document.getElementById('mmSum'+axis);
+    if (el){ el.textContent = 'Σw = '+sum.toFixed(2); el.style.color = Math.abs(sum-1)>0.001 ? '#e85a4f' : '#1fbf75'; }
+  }
+  document.getElementById('mmValidation').innerHTML =
+    val.ok ? '<span style="color:#1fbf75">Valid — next revision: '+WellScoring.bumpRevision(METHODOLOGY, mmDraft)+'</span>'
+           : '<span style="color:#e85a4f">'+val.errors.map(escapeHtml).join('<br>')+'</span>';
+  document.getElementById('mmSave').disabled = !val.ok || !syncToken();
+  if (!syncToken() && val.ok) document.getElementById('mmValidation').innerHTML += '<br><span class="muted">Connect a token (sync pill) to commit changes.</span>';
+}
+async function saveMethodologyEdits(){
+  const rev = WellScoring.bumpRevision(METHODOLOGY, mmDraft);
+  if (rev === METHODOLOGY.revision + '' && JSON.stringify(mmDraft) === JSON.stringify(METHODOLOGY)) { closeMethodologyModal(); return; }
+  mmDraft.revision = rev;
+  mmDraft.updatedBy = syncName() || 'unknown';
+  mmDraft.updatedAt = new Date().toISOString();
+  document.getElementById('mmSave').disabled = true;
+  const ok = await pushMethodologyRemote(mmDraft);
+  if (ok) { applyMethodology(mmDraft, 'remote'); closeMethodologyModal(); setSyncStatus('live', 'Methodology '+rev+' committed'); }
+  else { document.getElementById('mmValidation').innerHTML = '<span style="color:#e85a4f">Commit failed — check token permissions / rate limit, then retry.</span>'; document.getElementById('mmSave').disabled = false; }
+}
+/* pollMethodology — refetches methodology.json (also keeps SYNC.methodologySha current for
+   the admin panel's commit path) and applies it live only when the revision actually changed,
+   so wells never get silently re-normalized against a rulebook nobody asked for. */
+function pollMethodology(){
+  fetchMethodologyRemote().then(r => {
+    if (r && r.m.revision !== METHODOLOGY.revision) applyMethodology(r.m, 'remote');
+  });
+}
 function startPolling(){
   clearInterval(SYNC.pollTimer);
-  SYNC.pollTimer = setInterval(()=>pullRemote(false), syncToken()?45000:120000);
+  SYNC.pollTimer = setInterval(()=>{ pullRemote(false); pollMethodology(); }, syncToken()?45000:120000);
 }
 function initSync(){
   WellScoring.loadMethodology('methodology.json').then(r => applyMethodology(r.methodology, r.source));
   setSyncStatus('local');
   pullRemote(true);
+  pollMethodology();
   startPolling();
-  window.addEventListener('focus', ()=>pullRemote(false));
+  window.addEventListener('focus', ()=>{ pullRemote(false); pollMethodology(); });
   window.addEventListener('beforeunload', (e)=>{
     if(SYNC.dirty && syncToken()){ e.preventDefault(); e.returnValue=''; }
   });
   document.getElementById('syncModal').addEventListener('click',(e)=>{ if(e.target.id==='syncModal') closeSyncModal(); });
+  document.getElementById('methModal').addEventListener('click',(e)=>{ if(e.target.id==='methModal') closeMethodologyModal(); });
 }
 
 /* ============ INIT ============ */
