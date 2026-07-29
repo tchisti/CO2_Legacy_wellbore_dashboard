@@ -1269,8 +1269,8 @@ function mmValidate(){
   if (!syncToken() && val.ok) document.getElementById('mmValidation').innerHTML += '<br><span class="muted">Connect a token (sync pill) to commit changes.</span>';
 }
 async function saveMethodologyEdits(){
+  if (JSON.stringify(mmDraft) === JSON.stringify(METHODOLOGY)) { closeMethodologyModal(); return; }  // no-op Save must never bump the revision
   const rev = WellScoring.bumpRevision(METHODOLOGY, mmDraft);
-  if (rev === METHODOLOGY.revision + '' && JSON.stringify(mmDraft) === JSON.stringify(METHODOLOGY)) { closeMethodologyModal(); return; }
   mmDraft.revision = rev;
   mmDraft.updatedBy = syncName() || 'unknown';
   mmDraft.updatedAt = new Date().toISOString();
