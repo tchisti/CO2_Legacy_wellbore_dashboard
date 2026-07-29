@@ -1621,3 +1621,7 @@ Show the user: (a) the full shift table from Step 1, (b) the checklist results f
 - **Known judgment calls encoded above** (all consistent with the approved spec): new wells default to Unknown (`null`) rather than v1's all-1s; migrated wells store `null` for the three new parameters (engine applies the spec's unknown defaults 3/3/3 — computed results identical to storing 3 literally, plus honesty about what was never assessed); reviewer score fields are flat `s_<key>` numbers so the existing FIELDS form/CSV machinery renders them for free.
 - **Line numbers are pre-edit anchors.** Executors MUST locate edits by the quoted code snippets; numbers drift as earlier tasks land.
 
+
+## Amendments (owner-ruled during execution)
+
+- 2026-07-29 — **Derived-push flagging (supersedes the literal `needsReview: !native` in Task 8 and the unconditional "lossless" README sentence in Task 10):** 3D-Reviewer push rows additionally carry `scoreSources` (per-parameter `'scored'|'derived'|'unknown'` from `resolveWellScores`); the register sets `needsReview: !native || any source === 'derived'`. README Bridge wording: scores travel losslessly; wells containing machine-derived parameters arrive flagged for re-review. Rationale: machine-derived scores must not enter the shared register looking human-confirmed (v1's "verify after push" safeguard, owner decision at Task 10 review).
