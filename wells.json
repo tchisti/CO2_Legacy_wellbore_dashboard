@@ -13,20 +13,48 @@
     "reviewer": "",
     "notes": "1949 New Field Wildcat, D&A after 6 weeks. Surface casing only to 186.5 m; open hole through the full Devonian section. Tops: Wabamun 1059, Calmar 1117, Nisku 1132, Ireton 1181, Cooking Lake 1427 m. Pre-regulation abandonment — no cement/plug records. [From 3D Reviewer: critical 100/100 — subscores derived; verify Classification, Access, Data]",
     "scores": {
-      "plug": 5,
-      "barriers": 3,
+      "plugQuality": 5,
       "cement": 5,
-      "prox": 1,
-      "depthR": 5,
-      "depthC": 5,
+      "barriers": 3,
+      "scvf": null,
       "age": 5,
-      "access": 1,
-      "data": 5
+      "complexity": null,
+      "data": 5,
+      "penetration": 5,
+      "plume": 1,
+      "usdw": null,
+      "access": 1
     },
-    "total": 35,
     "createdAt": "2026-07-24T12:15:02.271Z",
     "updatedAt": "2026-07-24T12:15:02.271Z",
-    "updatedBy": "Tahir Chisti (3D Reviewer)"
+    "updatedBy": "Tahir Chisti (3D Reviewer)",
+    "schema": 2,
+    "computed": {
+      "L": 4.24,
+      "C": 2.7,
+      "Lr": 4,
+      "Cr": 3,
+      "cell": 12,
+      "riskIndex": 11.45,
+      "rankLabel": "High",
+      "integrity": 56
+    },
+    "scoredUnder": "1.0.0",
+    "needsReview": true,
+    "legacy": {
+      "scores": {
+        "plug": 5,
+        "barriers": 3,
+        "cement": 5,
+        "prox": 1,
+        "depthR": 5,
+        "depthC": 5,
+        "age": 5,
+        "access": 1,
+        "data": 5
+      },
+      "total": 35
+    }
   },
   {
     "id": "W-ZVX8JD",
@@ -42,20 +70,48 @@
     "reviewer": "T. Chisti",
     "notes": "Enbridge disposal well, spud 2025-11-16, Fort Saskatchewan field. Modern four-string design with CRS bottom liner — engineered for injection service. Risk override LOW: active engineered wellbore, not a legacy abandonment. [From 3D Reviewer: low 67/100 — subscores derived; verify Classification, Access, Data]",
     "scores": {
-      "plug": 1,
-      "barriers": 1,
+      "plugQuality": 1,
       "cement": 1,
-      "prox": 3,
-      "depthR": 3,
-      "depthC": 3,
+      "barriers": 1,
+      "scvf": null,
       "age": 1,
-      "access": 1,
-      "data": 1
+      "complexity": null,
+      "data": 1,
+      "penetration": 3,
+      "plume": 3,
+      "usdw": null,
+      "access": 1
     },
-    "total": 15,
     "createdAt": "2026-07-24T12:15:02.272Z",
     "updatedAt": "2026-07-24T16:14:59.568Z",
-    "updatedBy": "Tahir Chisti"
+    "updatedBy": "Tahir Chisti",
+    "schema": 2,
+    "computed": {
+      "L": 1.52,
+      "C": 2.6,
+      "Lr": 2,
+      "Cr": 3,
+      "cell": 6,
+      "riskIndex": 3.95,
+      "rankLabel": "Moderate",
+      "integrity": 88
+    },
+    "scoredUnder": "1.0.0",
+    "needsReview": true,
+    "legacy": {
+      "scores": {
+        "plug": 1,
+        "barriers": 1,
+        "cement": 1,
+        "prox": 3,
+        "depthR": 3,
+        "depthC": 3,
+        "age": 1,
+        "access": 1,
+        "data": 1
+      },
+      "total": 15
+    }
   },
   {
     "id": "W-4A62O7",
@@ -71,20 +127,48 @@
     "reviewer": "Tahir Chisti",
     "notes": "1953 D&A, Fort Saskatchewan field. Surface casing only to 186.2 m. Tops: Wabamun 1022, Calmar 1053, Nisku 1065, Ireton 1117, Beaverhill Lake 1450 m. Abandonment predates modern cementing standards. [From 3D Reviewer: critical 100/100 — subscores derived; verify Classification, Access, Data]",
     "scores": {
-      "plug": 5,
-      "barriers": 3,
+      "plugQuality": 5,
       "cement": 5,
-      "prox": 3,
-      "depthR": 5,
-      "depthC": 5,
+      "barriers": 3,
+      "scvf": null,
       "age": 5,
-      "access": 3,
-      "data": 3
+      "complexity": null,
+      "data": 3,
+      "penetration": 5,
+      "plume": 3,
+      "usdw": null,
+      "access": 3
     },
-    "total": 37,
     "createdAt": "2026-07-24T12:15:02.272Z",
     "updatedAt": "2026-07-24T16:53:01.390Z",
-    "updatedBy": "Tahir Chisti"
+    "updatedBy": "Tahir Chisti",
+    "schema": 2,
+    "computed": {
+      "L": 4.04,
+      "C": 3.6,
+      "Lr": 4,
+      "Cr": 4,
+      "cell": 16,
+      "riskIndex": 14.54,
+      "rankLabel": "High",
+      "integrity": 44
+    },
+    "scoredUnder": "1.0.0",
+    "needsReview": true,
+    "legacy": {
+      "scores": {
+        "plug": 5,
+        "barriers": 3,
+        "cement": 5,
+        "prox": 3,
+        "depthR": 5,
+        "depthC": 5,
+        "age": 5,
+        "access": 3,
+        "data": 3
+      },
+      "total": 37
+    }
   },
   {
     "id": "W-LX242Q",
@@ -100,20 +184,48 @@
     "reviewer": "Tahir Chisti",
     "notes": "2004 deviated Viking gas well, Redwater field, abandoned 2017 to modern standards. TD in the Wabamun — does NOT penetrate the Calmar caprock or Nisku. Perfs squeezed on abandonment. [From 3D Reviewer: medium 25/100 — subscores derived; verify Classification, Access, Data]",
     "scores": {
-      "plug": 1,
-      "barriers": 1,
+      "plugQuality": 1,
       "cement": 1,
-      "prox": 3,
-      "depthR": 1,
-      "depthC": 1,
+      "barriers": 1,
+      "scvf": null,
       "age": 1,
-      "access": 1,
-      "data": 1
+      "complexity": null,
+      "data": 1,
+      "penetration": 1,
+      "plume": 3,
+      "usdw": null,
+      "access": 1
     },
-    "total": 11,
     "createdAt": "2026-07-24T12:15:02.272Z",
     "updatedAt": "2026-07-24T16:01:23.221Z",
-    "updatedBy": "Tahir Chisti"
+    "updatedBy": "Tahir Chisti",
+    "schema": 2,
+    "computed": {
+      "L": 1.52,
+      "C": 2,
+      "Lr": 2,
+      "Cr": 2,
+      "cell": 4,
+      "riskIndex": 3.04,
+      "rankLabel": "Low",
+      "integrity": 91
+    },
+    "scoredUnder": "1.0.0",
+    "needsReview": true,
+    "legacy": {
+      "scores": {
+        "plug": 1,
+        "barriers": 1,
+        "cement": 1,
+        "prox": 3,
+        "depthR": 1,
+        "depthC": 1,
+        "age": 1,
+        "access": 1,
+        "data": 1
+      },
+      "total": 11
+    }
   },
   {
     "id": "W-4039S4",
@@ -129,20 +241,48 @@
     "reviewer": "",
     "notes": "1965 D&A, Redwater field. Surface casing only to 185.9 m. Tops: Calmar 1016, Nisku 1029, Ireton 1069, Leduc 1095 m — penetrates caprock and reservoir. Just outside the 5 km circles (~5.1 km from the Pine injector) but inside the review area. [From 3D Reviewer: critical 100/100 — subscores derived; verify Classification, Access, Data]",
     "scores": {
-      "plug": 5,
-      "barriers": 3,
+      "plugQuality": 5,
       "cement": 5,
-      "prox": 1,
-      "depthR": 5,
-      "depthC": 5,
+      "barriers": 3,
+      "scvf": null,
       "age": 5,
-      "access": 1,
-      "data": 5
+      "complexity": null,
+      "data": 5,
+      "penetration": 5,
+      "plume": 1,
+      "usdw": null,
+      "access": 1
     },
-    "total": 35,
     "createdAt": "2026-07-24T12:15:02.272Z",
     "updatedAt": "2026-07-24T16:05:01.676Z",
-    "updatedBy": "Tahir Chisti"
+    "updatedBy": "Tahir Chisti",
+    "schema": 2,
+    "computed": {
+      "L": 4.24,
+      "C": 2.7,
+      "Lr": 4,
+      "Cr": 3,
+      "cell": 12,
+      "riskIndex": 11.45,
+      "rankLabel": "High",
+      "integrity": 56
+    },
+    "scoredUnder": "1.0.0",
+    "needsReview": true,
+    "legacy": {
+      "scores": {
+        "plug": 5,
+        "barriers": 3,
+        "cement": 5,
+        "prox": 1,
+        "depthR": 5,
+        "depthC": 5,
+        "age": 5,
+        "access": 1,
+        "data": 5
+      },
+      "total": 35
+    }
   },
   {
     "id": "W-KH1IPQ",
@@ -158,20 +298,48 @@
     "reviewer": "",
     "notes": "1991 Oil Abandoned Zone, abandoned 2022. 2 casing string(s), surface to 305 m. 17 formation tops on record, TD in Banff @ 1691 m. 10 plug/treatment record(s). [Auto-compiled from South Seq. Eval. Area wellbore review; integrity score is rule-based screening judgment] [From 3D Reviewer: Low 23/100 — subscores and Type derived; verify Classification, Access, Data]",
     "scores": {
-      "plug": 3,
-      "barriers": 1,
+      "plugQuality": 3,
       "cement": 3,
-      "prox": 3,
-      "depthR": 1,
-      "depthC": 1,
+      "barriers": 1,
+      "scvf": null,
       "age": 3,
-      "access": 1,
-      "data": 1
+      "complexity": null,
+      "data": 1,
+      "penetration": 1,
+      "plume": 3,
+      "usdw": null,
+      "access": 1
     },
-    "total": 17,
     "createdAt": "2026-07-24T16:17:13.480Z",
     "updatedAt": "2026-07-24T17:13:00.401Z",
-    "updatedBy": "Tahir Chisti (3D Reviewer)"
+    "updatedBy": "Tahir Chisti (3D Reviewer)",
+    "schema": 2,
+    "computed": {
+      "L": 2.56,
+      "C": 2,
+      "Lr": 3,
+      "Cr": 2,
+      "cell": 6,
+      "riskIndex": 5.12,
+      "rankLabel": "Moderate",
+      "integrity": 83
+    },
+    "scoredUnder": "1.0.0",
+    "needsReview": true,
+    "legacy": {
+      "scores": {
+        "plug": 3,
+        "barriers": 1,
+        "cement": 3,
+        "prox": 3,
+        "depthR": 1,
+        "depthC": 1,
+        "age": 3,
+        "access": 1,
+        "data": 1
+      },
+      "total": 17
+    }
   },
   {
     "id": "W-ISFSC3",
@@ -187,20 +355,48 @@
     "reviewer": "",
     "notes": "1991 Abandoned, abandoned 2022. 2 casing string(s), surface to 305 m. 17 formation tops on record, TD in Banff @ 1691 m. 10 plug/treatment record(s). [Auto-compiled from South Seq. Eval. Area wellbore review; integrity score is rule-based screening judgment] [From 3D Reviewer: Low 23/100 — subscores and Type derived; verify Classification, Access, Data]",
     "scores": {
-      "plug": 3,
-      "barriers": 1,
+      "plugQuality": 3,
       "cement": 3,
-      "prox": 3,
-      "depthR": 1,
-      "depthC": 1,
+      "barriers": 1,
+      "scvf": null,
       "age": 3,
-      "access": 1,
-      "data": 1
+      "complexity": null,
+      "data": 1,
+      "penetration": 1,
+      "plume": 3,
+      "usdw": null,
+      "access": 1
     },
-    "total": 17,
     "createdAt": "2026-07-24T16:17:13.481Z",
     "updatedAt": "2026-07-24T17:13:00.401Z",
-    "updatedBy": "Tahir Chisti (3D Reviewer)"
+    "updatedBy": "Tahir Chisti (3D Reviewer)",
+    "schema": 2,
+    "computed": {
+      "L": 2.56,
+      "C": 2,
+      "Lr": 3,
+      "Cr": 2,
+      "cell": 6,
+      "riskIndex": 5.12,
+      "rankLabel": "Moderate",
+      "integrity": 83
+    },
+    "scoredUnder": "1.0.0",
+    "needsReview": true,
+    "legacy": {
+      "scores": {
+        "plug": 3,
+        "barriers": 1,
+        "cement": 3,
+        "prox": 3,
+        "depthR": 1,
+        "depthC": 1,
+        "age": 3,
+        "access": 1,
+        "data": 1
+      },
+      "total": 17
+    }
   },
   {
     "id": "W-4GQB38",
@@ -216,20 +412,48 @@
     "reviewer": "",
     "notes": "2018 Abandoned, abandoned 2025. 2 casing string(s), surface to 608.2 m. 27 formation tops on record, TD in Beaverhill Lake @ 2463 m. 2 plug/treatment record(s). [Auto-compiled from South Seq. Eval. Area wellbore review; integrity score is rule-based screening judgment] [From 3D Reviewer: Medium 35/100 — subscores and Type derived; verify Classification, Access, Data]",
     "scores": {
-      "plug": 3,
-      "barriers": 1,
+      "plugQuality": 3,
       "cement": 3,
-      "prox": 3,
-      "depthR": 5,
-      "depthC": 5,
+      "barriers": 1,
+      "scvf": null,
       "age": 1,
-      "access": 1,
-      "data": 1
+      "complexity": null,
+      "data": 1,
+      "penetration": 5,
+      "plume": 3,
+      "usdw": null,
+      "access": 1
     },
-    "total": 23,
     "createdAt": "2026-07-24T16:17:13.481Z",
     "updatedAt": "2026-07-24T17:13:00.401Z",
-    "updatedBy": "Tahir Chisti (3D Reviewer)"
+    "updatedBy": "Tahir Chisti (3D Reviewer)",
+    "schema": 2,
+    "computed": {
+      "L": 2.36,
+      "C": 3.2,
+      "Lr": 2,
+      "Cr": 3,
+      "cell": 6,
+      "riskIndex": 7.55,
+      "rankLabel": "Moderate",
+      "integrity": 73
+    },
+    "scoredUnder": "1.0.0",
+    "needsReview": true,
+    "legacy": {
+      "scores": {
+        "plug": 3,
+        "barriers": 1,
+        "cement": 3,
+        "prox": 3,
+        "depthR": 5,
+        "depthC": 5,
+        "age": 1,
+        "access": 1,
+        "data": 1
+      },
+      "total": 23
+    }
   },
   {
     "id": "W-IRKTDE",
@@ -245,20 +469,48 @@
     "reviewer": "",
     "notes": "2000 Abandoned, Re-Entered Gas, abandoned 2015. 2 casing string(s), surface to 327 m. 17 formation tops on record, TD in Banff @ 1819 m. 3 plug/treatment record(s). [Auto-compiled from South Seq. Eval. Area wellbore review; integrity score is rule-based screening judgment] [From 3D Reviewer: Low 15/100 — subscores and Type derived; verify Classification, Access, Data]",
     "scores": {
-      "plug": 3,
-      "barriers": 1,
+      "plugQuality": 3,
       "cement": 3,
-      "prox": 3,
-      "depthR": 1,
-      "depthC": 1,
+      "barriers": 1,
+      "scvf": null,
       "age": 1,
-      "access": 1,
-      "data": 1
+      "complexity": null,
+      "data": 1,
+      "penetration": 1,
+      "plume": 3,
+      "usdw": null,
+      "access": 1
     },
-    "total": 15,
     "createdAt": "2026-07-24T16:17:13.481Z",
     "updatedAt": "2026-07-24T17:13:00.401Z",
-    "updatedBy": "Tahir Chisti (3D Reviewer)"
+    "updatedBy": "Tahir Chisti (3D Reviewer)",
+    "schema": 2,
+    "computed": {
+      "L": 2.36,
+      "C": 2,
+      "Lr": 2,
+      "Cr": 2,
+      "cell": 4,
+      "riskIndex": 4.72,
+      "rankLabel": "Low",
+      "integrity": 84
+    },
+    "scoredUnder": "1.0.0",
+    "needsReview": true,
+    "legacy": {
+      "scores": {
+        "plug": 3,
+        "barriers": 1,
+        "cement": 3,
+        "prox": 3,
+        "depthR": 1,
+        "depthC": 1,
+        "age": 1,
+        "access": 1,
+        "data": 1
+      },
+      "total": 15
+    }
   },
   {
     "id": "W-M3JVK8",
@@ -274,20 +526,48 @@
     "reviewer": "",
     "notes": "2015 Abandoned, abandoned 2015. 2 casing string(s), surface to 328.4 m. 17 formation tops on record, TD in Banff @ 1819 m. No plug records — verify abandonment. [Auto-compiled from South Seq. Eval. Area wellbore review; integrity score is rule-based screening judgment] [From 3D Reviewer: Medium 42/100 — subscores and Type derived; verify Classification, Access, Data]",
     "scores": {
-      "plug": 5,
-      "barriers": 1,
+      "plugQuality": 5,
       "cement": 3,
-      "prox": 3,
-      "depthR": 1,
-      "depthC": 1,
+      "barriers": 1,
+      "scvf": null,
       "age": 1,
-      "access": 1,
-      "data": 3
+      "complexity": null,
+      "data": 3,
+      "penetration": 1,
+      "plume": 3,
+      "usdw": null,
+      "access": 1
     },
-    "total": 19,
     "createdAt": "2026-07-24T16:17:13.481Z",
     "updatedAt": "2026-07-24T17:13:00.401Z",
-    "updatedBy": "Tahir Chisti (3D Reviewer)"
+    "updatedBy": "Tahir Chisti (3D Reviewer)",
+    "schema": 2,
+    "computed": {
+      "L": 3,
+      "C": 2,
+      "Lr": 3,
+      "Cr": 2,
+      "cell": 6,
+      "riskIndex": 6,
+      "rankLabel": "Moderate",
+      "integrity": 79
+    },
+    "scoredUnder": "1.0.0",
+    "needsReview": true,
+    "legacy": {
+      "scores": {
+        "plug": 5,
+        "barriers": 1,
+        "cement": 3,
+        "prox": 3,
+        "depthR": 1,
+        "depthC": 1,
+        "age": 1,
+        "access": 1,
+        "data": 3
+      },
+      "total": 19
+    }
   },
   {
     "id": "W-JOO892",
@@ -303,20 +583,48 @@
     "reviewer": "",
     "notes": "2011 Abandoned, abandoned 2011. 2 casing string(s), surface to 255 m. 24 formation tops on record, TD in Leduc @ 2199 m. 1 plug/treatment record(s). [Auto-compiled from South Seq. Eval. Area wellbore review; integrity score is rule-based screening judgment] [From 3D Reviewer: Medium 37/100 — subscores and Type derived; verify Classification, Access, Data]",
     "scores": {
-      "plug": 3,
-      "barriers": 1,
+      "plugQuality": 3,
       "cement": 3,
-      "prox": 3,
-      "depthR": 5,
-      "depthC": 5,
+      "barriers": 1,
+      "scvf": null,
       "age": 1,
-      "access": 1,
-      "data": 1
+      "complexity": null,
+      "data": 1,
+      "penetration": 5,
+      "plume": 3,
+      "usdw": null,
+      "access": 1
     },
-    "total": 23,
     "createdAt": "2026-07-24T16:17:13.481Z",
     "updatedAt": "2026-07-24T17:13:00.401Z",
-    "updatedBy": "Tahir Chisti (3D Reviewer)"
+    "updatedBy": "Tahir Chisti (3D Reviewer)",
+    "schema": 2,
+    "computed": {
+      "L": 2.36,
+      "C": 3.2,
+      "Lr": 2,
+      "Cr": 3,
+      "cell": 6,
+      "riskIndex": 7.55,
+      "rankLabel": "Moderate",
+      "integrity": 73
+    },
+    "scoredUnder": "1.0.0",
+    "needsReview": true,
+    "legacy": {
+      "scores": {
+        "plug": 3,
+        "barriers": 1,
+        "cement": 3,
+        "prox": 3,
+        "depthR": 5,
+        "depthC": 5,
+        "age": 1,
+        "access": 1,
+        "data": 1
+      },
+      "total": 23
+    }
   },
   {
     "id": "W-FOURRD",
@@ -332,20 +640,48 @@
     "reviewer": "",
     "notes": "1960 Abandoned, abandoned 1960. 1 casing string(s), surface to 223.7 m. 21 formation tops on record, TD in Beaverhill Lake @ 2206 m. No plug records — verify abandonment. [Auto-compiled from South Seq. Eval. Area wellbore review; integrity score is rule-based screening judgment] [From 3D Reviewer: Very High 100/100 — subscores and Type derived; verify Classification, Access, Data]",
     "scores": {
-      "plug": 5,
-      "barriers": 3,
+      "plugQuality": 5,
       "cement": 5,
-      "prox": 3,
-      "depthR": 5,
-      "depthC": 5,
+      "barriers": 3,
+      "scvf": null,
       "age": 5,
-      "access": 1,
-      "data": 5
+      "complexity": null,
+      "data": 5,
+      "penetration": 5,
+      "plume": 3,
+      "usdw": null,
+      "access": 1
     },
-    "total": 37,
     "createdAt": "2026-07-24T16:17:13.481Z",
     "updatedAt": "2026-07-24T17:13:00.401Z",
-    "updatedBy": "Tahir Chisti (3D Reviewer)"
+    "updatedBy": "Tahir Chisti (3D Reviewer)",
+    "schema": 2,
+    "computed": {
+      "L": 4.24,
+      "C": 3.2,
+      "Lr": 4,
+      "Cr": 3,
+      "cell": 12,
+      "riskIndex": 13.57,
+      "rankLabel": "High",
+      "integrity": 48
+    },
+    "scoredUnder": "1.0.0",
+    "needsReview": true,
+    "legacy": {
+      "scores": {
+        "plug": 5,
+        "barriers": 3,
+        "cement": 5,
+        "prox": 3,
+        "depthR": 5,
+        "depthC": 5,
+        "age": 5,
+        "access": 1,
+        "data": 5
+      },
+      "total": 37
+    }
   },
   {
     "id": "W-70HJY0",
@@ -361,20 +697,48 @@
     "reviewer": "",
     "notes": "1958 Abandoned, abandoned 2001. 2 casing string(s), surface to 236.8 m. 18 formation tops on record, TD in Ireton @ 1925 m. 9 plug/treatment record(s). [Auto-compiled from South Seq. Eval. Area wellbore review; integrity score is rule-based screening judgment] [From 3D Reviewer: High 59/100 — subscores and Type derived; verify Classification, Access, Data]",
     "scores": {
-      "plug": 3,
-      "barriers": 1,
+      "plugQuality": 3,
       "cement": 3,
-      "prox": 3,
-      "depthR": 5,
-      "depthC": 5,
+      "barriers": 1,
+      "scvf": null,
       "age": 5,
-      "access": 1,
-      "data": 1
+      "complexity": null,
+      "data": 1,
+      "penetration": 5,
+      "plume": 3,
+      "usdw": null,
+      "access": 1
     },
-    "total": 27,
     "createdAt": "2026-07-24T16:17:13.481Z",
     "updatedAt": "2026-07-24T17:13:00.401Z",
-    "updatedBy": "Tahir Chisti (3D Reviewer)"
+    "updatedBy": "Tahir Chisti (3D Reviewer)",
+    "schema": 2,
+    "computed": {
+      "L": 2.76,
+      "C": 3.2,
+      "Lr": 3,
+      "Cr": 3,
+      "cell": 9,
+      "riskIndex": 8.83,
+      "rankLabel": "Moderate",
+      "integrity": 67
+    },
+    "scoredUnder": "1.0.0",
+    "needsReview": true,
+    "legacy": {
+      "scores": {
+        "plug": 3,
+        "barriers": 1,
+        "cement": 3,
+        "prox": 3,
+        "depthR": 5,
+        "depthC": 5,
+        "age": 5,
+        "access": 1,
+        "data": 1
+      },
+      "total": 27
+    }
   },
   {
     "id": "W-DDB4VY",
@@ -390,20 +754,48 @@
     "reviewer": "",
     "notes": "1965 Abandoned. 2 casing string(s), surface to 232.3 m. 22 formation tops on record, TD in Beaverhill Lake @ 2227 m. 12 plug/treatment record(s). [Auto-compiled from South Seq. Eval. Area wellbore review; integrity score is rule-based screening judgment] [From 3D Reviewer: High 72/100 — subscores and Type derived; verify Classification, Access, Data]",
     "scores": {
-      "plug": 3,
-      "barriers": 1,
+      "plugQuality": 3,
       "cement": 5,
-      "prox": 3,
-      "depthR": 5,
-      "depthC": 5,
+      "barriers": 1,
+      "scvf": null,
       "age": 5,
-      "access": 1,
-      "data": 3
+      "complexity": null,
+      "data": 3,
+      "penetration": 5,
+      "plume": 3,
+      "usdw": null,
+      "access": 1
     },
-    "total": 31,
     "createdAt": "2026-07-24T16:17:13.481Z",
     "updatedAt": "2026-07-24T17:13:00.401Z",
-    "updatedBy": "Tahir Chisti (3D Reviewer)"
+    "updatedBy": "Tahir Chisti (3D Reviewer)",
+    "schema": 2,
+    "computed": {
+      "L": 3.36,
+      "C": 3.2,
+      "Lr": 3,
+      "Cr": 3,
+      "cell": 9,
+      "riskIndex": 10.75,
+      "rankLabel": "Moderate",
+      "integrity": 59
+    },
+    "scoredUnder": "1.0.0",
+    "needsReview": true,
+    "legacy": {
+      "scores": {
+        "plug": 3,
+        "barriers": 1,
+        "cement": 5,
+        "prox": 3,
+        "depthR": 5,
+        "depthC": 5,
+        "age": 5,
+        "access": 1,
+        "data": 3
+      },
+      "total": 31
+    }
   },
   {
     "id": "W-J1JV0W",
@@ -419,20 +811,48 @@
     "reviewer": "",
     "notes": "1997 Abandoned Gas, abandoned 2009. 2 casing string(s), surface to 401 m. 6 formation tops on record, TD in Ireton @ 1881 m. 19 plug/treatment record(s). [Auto-compiled from South Seq. Eval. Area wellbore review; integrity score is rule-based screening judgment] [From 3D Reviewer: Medium 43/100 — subscores and Type derived; verify Classification, Access, Data]",
     "scores": {
-      "plug": 3,
-      "barriers": 1,
+      "plugQuality": 3,
       "cement": 3,
-      "prox": 3,
-      "depthR": 5,
-      "depthC": 5,
+      "barriers": 1,
+      "scvf": null,
       "age": 1,
-      "access": 1,
-      "data": 1
+      "complexity": null,
+      "data": 1,
+      "penetration": 5,
+      "plume": 3,
+      "usdw": null,
+      "access": 1
     },
-    "total": 23,
     "createdAt": "2026-07-24T16:17:13.481Z",
     "updatedAt": "2026-07-24T17:13:00.401Z",
-    "updatedBy": "Tahir Chisti (3D Reviewer)"
+    "updatedBy": "Tahir Chisti (3D Reviewer)",
+    "schema": 2,
+    "computed": {
+      "L": 2.36,
+      "C": 3.2,
+      "Lr": 2,
+      "Cr": 3,
+      "cell": 6,
+      "riskIndex": 7.55,
+      "rankLabel": "Moderate",
+      "integrity": 73
+    },
+    "scoredUnder": "1.0.0",
+    "needsReview": true,
+    "legacy": {
+      "scores": {
+        "plug": 3,
+        "barriers": 1,
+        "cement": 3,
+        "prox": 3,
+        "depthR": 5,
+        "depthC": 5,
+        "age": 1,
+        "access": 1,
+        "data": 1
+      },
+      "total": 23
+    }
   },
   {
     "id": "W-DI9O90",
@@ -448,20 +868,48 @@
     "reviewer": "Tahir Chisti",
     "notes": "2023 Potential Water Disposal. 5 casing string(s), surface to 450 m. 0 formation tops on record. 2 plug/treatment record(s). [Auto-compiled from South Seq. Eval. Area wellbore review; integrity score is rule-based screening judgment] [From 3D Reviewer: Medium 27/100 — subscores and Type derived; verify Classification, Access, Data]",
     "scores": {
-      "plug": 1,
-      "barriers": 1,
+      "plugQuality": 1,
       "cement": 1,
-      "prox": 3,
-      "depthR": 5,
-      "depthC": 5,
+      "barriers": 1,
+      "scvf": null,
       "age": 1,
-      "access": 1,
-      "data": 1
+      "complexity": null,
+      "data": 1,
+      "penetration": 5,
+      "plume": 3,
+      "usdw": null,
+      "access": 1
     },
-    "total": 19,
     "createdAt": "2026-07-24T16:17:13.481Z",
     "updatedAt": "2026-07-24T17:13:00.401Z",
-    "updatedBy": "Tahir Chisti (3D Reviewer)"
+    "updatedBy": "Tahir Chisti (3D Reviewer)",
+    "schema": 2,
+    "computed": {
+      "L": 1.52,
+      "C": 3.2,
+      "Lr": 2,
+      "Cr": 3,
+      "cell": 6,
+      "riskIndex": 4.86,
+      "rankLabel": "Moderate",
+      "integrity": 84
+    },
+    "scoredUnder": "1.0.0",
+    "needsReview": true,
+    "legacy": {
+      "scores": {
+        "plug": 1,
+        "barriers": 1,
+        "cement": 1,
+        "prox": 3,
+        "depthR": 5,
+        "depthC": 5,
+        "age": 1,
+        "access": 1,
+        "data": 1
+      },
+      "total": 19
+    }
   },
   {
     "id": "W-67L0SH",
@@ -477,20 +925,48 @@
     "reviewer": "",
     "notes": "2018 Pumping Oil. 4 casing string(s), surface to 607.3 m. 25 formation tops on record, TD in Duvernay @ 2373 m. 257 plug/treatment record(s). [Auto-compiled from South Seq. Eval. Area wellbore review; integrity score is rule-based screening judgment] [From 3D Reviewer: High 55/100 — subscores and Type derived; verify Classification, Access, Data]",
     "scores": {
-      "plug": 3,
-      "barriers": 1,
+      "plugQuality": 3,
       "cement": 5,
-      "prox": 3,
-      "depthR": 5,
-      "depthC": 5,
+      "barriers": 1,
+      "scvf": null,
       "age": 1,
-      "access": 1,
-      "data": 3
+      "complexity": null,
+      "data": 3,
+      "penetration": 5,
+      "plume": 3,
+      "usdw": null,
+      "access": 1
     },
-    "total": 27,
     "createdAt": "2026-07-24T16:17:13.481Z",
     "updatedAt": "2026-07-24T17:13:00.401Z",
-    "updatedBy": "Tahir Chisti (3D Reviewer)"
+    "updatedBy": "Tahir Chisti (3D Reviewer)",
+    "schema": 2,
+    "computed": {
+      "L": 2.96,
+      "C": 3.2,
+      "Lr": 3,
+      "Cr": 3,
+      "cell": 9,
+      "riskIndex": 9.47,
+      "rankLabel": "Moderate",
+      "integrity": 65
+    },
+    "scoredUnder": "1.0.0",
+    "needsReview": true,
+    "legacy": {
+      "scores": {
+        "plug": 3,
+        "barriers": 1,
+        "cement": 5,
+        "prox": 3,
+        "depthR": 5,
+        "depthC": 5,
+        "age": 1,
+        "access": 1,
+        "data": 3
+      },
+      "total": 27
+    }
   },
   {
     "id": "W-3MJRZR",
@@ -506,20 +982,48 @@
     "reviewer": "",
     "notes": "2009 Abandoned Oil, abandoned 2017. 3 casing string(s), surface to 337 m. 24 formation tops on record, TD in Ireton @ 2055 m. 5 plug/treatment record(s). [Auto-compiled from South Seq. Eval. Area wellbore review; integrity score is rule-based screening judgment] [From 3D Reviewer: Medium 35/100 — subscores and Type derived; verify Classification, Access, Data]",
     "scores": {
-      "plug": 3,
-      "barriers": 1,
+      "plugQuality": 3,
       "cement": 3,
-      "prox": 3,
-      "depthR": 5,
-      "depthC": 5,
+      "barriers": 1,
+      "scvf": null,
       "age": 1,
-      "access": 1,
-      "data": 1
+      "complexity": null,
+      "data": 1,
+      "penetration": 5,
+      "plume": 3,
+      "usdw": null,
+      "access": 1
     },
-    "total": 23,
     "createdAt": "2026-07-24T16:17:13.481Z",
     "updatedAt": "2026-07-24T17:13:00.401Z",
-    "updatedBy": "Tahir Chisti (3D Reviewer)"
+    "updatedBy": "Tahir Chisti (3D Reviewer)",
+    "schema": 2,
+    "computed": {
+      "L": 2.36,
+      "C": 3.2,
+      "Lr": 2,
+      "Cr": 3,
+      "cell": 6,
+      "riskIndex": 7.55,
+      "rankLabel": "Moderate",
+      "integrity": 73
+    },
+    "scoredUnder": "1.0.0",
+    "needsReview": true,
+    "legacy": {
+      "scores": {
+        "plug": 3,
+        "barriers": 1,
+        "cement": 3,
+        "prox": 3,
+        "depthR": 5,
+        "depthC": 5,
+        "age": 1,
+        "access": 1,
+        "data": 1
+      },
+      "total": 23
+    }
   },
   {
     "id": "W-SZGF3H",
@@ -535,20 +1039,48 @@
     "reviewer": "",
     "notes": "1950 Abandoned, abandoned 1950. 1 casing string(s), surface to 185.9 m. 21 formation tops on record, TD in Majeau Lake @ 2026 m. No plug records — verify abandonment. [Auto-compiled from South Seq. Eval. Area wellbore review; integrity score is rule-based screening judgment] [From 3D Reviewer: Very High 100/100 — subscores and Type derived; verify Classification, Access, Data]",
     "scores": {
-      "plug": 5,
-      "barriers": 3,
+      "plugQuality": 5,
       "cement": 5,
-      "prox": 3,
-      "depthR": 5,
-      "depthC": 5,
+      "barriers": 3,
+      "scvf": null,
       "age": 5,
-      "access": 1,
-      "data": 5
+      "complexity": null,
+      "data": 5,
+      "penetration": 5,
+      "plume": 3,
+      "usdw": null,
+      "access": 1
     },
-    "total": 37,
     "createdAt": "2026-07-24T16:17:13.481Z",
     "updatedAt": "2026-07-24T17:13:00.401Z",
-    "updatedBy": "Tahir Chisti (3D Reviewer)"
+    "updatedBy": "Tahir Chisti (3D Reviewer)",
+    "schema": 2,
+    "computed": {
+      "L": 4.24,
+      "C": 3.2,
+      "Lr": 4,
+      "Cr": 3,
+      "cell": 12,
+      "riskIndex": 13.57,
+      "rankLabel": "High",
+      "integrity": 48
+    },
+    "scoredUnder": "1.0.0",
+    "needsReview": true,
+    "legacy": {
+      "scores": {
+        "plug": 5,
+        "barriers": 3,
+        "cement": 5,
+        "prox": 3,
+        "depthR": 5,
+        "depthC": 5,
+        "age": 5,
+        "access": 1,
+        "data": 5
+      },
+      "total": 37
+    }
   },
   {
     "id": "W-19EJU0",
@@ -564,20 +1096,48 @@
     "reviewer": "",
     "notes": "1954 Abandoned Gas, abandoned 1996. 2 casing string(s), surface to 187.5 m. 22 formation tops on record, TD in Beaverhill Lake @ 2084 m. 12 plug/treatment record(s). [Auto-compiled from South Seq. Eval. Area wellbore review; integrity score is rule-based screening judgment] [From 3D Reviewer: High 69/100 — subscores and Type derived; verify Classification, Access, Data]",
     "scores": {
-      "plug": 3,
-      "barriers": 1,
+      "plugQuality": 3,
       "cement": 3,
-      "prox": 3,
-      "depthR": 5,
-      "depthC": 5,
+      "barriers": 1,
+      "scvf": null,
       "age": 5,
-      "access": 1,
-      "data": 1
+      "complexity": null,
+      "data": 1,
+      "penetration": 5,
+      "plume": 3,
+      "usdw": null,
+      "access": 1
     },
-    "total": 27,
     "createdAt": "2026-07-24T16:17:13.481Z",
     "updatedAt": "2026-07-24T17:13:00.402Z",
-    "updatedBy": "Tahir Chisti (3D Reviewer)"
+    "updatedBy": "Tahir Chisti (3D Reviewer)",
+    "schema": 2,
+    "computed": {
+      "L": 2.76,
+      "C": 3.2,
+      "Lr": 3,
+      "Cr": 3,
+      "cell": 9,
+      "riskIndex": 8.83,
+      "rankLabel": "Moderate",
+      "integrity": 67
+    },
+    "scoredUnder": "1.0.0",
+    "needsReview": true,
+    "legacy": {
+      "scores": {
+        "plug": 3,
+        "barriers": 1,
+        "cement": 3,
+        "prox": 3,
+        "depthR": 5,
+        "depthC": 5,
+        "age": 5,
+        "access": 1,
+        "data": 1
+      },
+      "total": 27
+    }
   },
   {
     "id": "W-XPXXGZ",
@@ -593,20 +1153,48 @@
     "reviewer": "",
     "notes": "1948 Abandoned. 1 casing string(s), surface to 111.9 m. 14 formation tops on record, TD in Cooking Lake @ 2039 m. No plug records — verify abandonment. [Auto-compiled from South Seq. Eval. Area wellbore review; integrity score is rule-based screening judgment] [From 3D Reviewer: Very High 100/100 — subscores and Type derived; verify Classification, Access, Data]",
     "scores": {
-      "plug": 5,
-      "barriers": 3,
+      "plugQuality": 5,
       "cement": 5,
-      "prox": 3,
-      "depthR": 5,
-      "depthC": 5,
+      "barriers": 3,
+      "scvf": null,
       "age": 5,
-      "access": 1,
-      "data": 5
+      "complexity": null,
+      "data": 5,
+      "penetration": 5,
+      "plume": 3,
+      "usdw": null,
+      "access": 1
     },
-    "total": 37,
     "createdAt": "2026-07-24T16:17:13.481Z",
     "updatedAt": "2026-07-24T17:13:00.402Z",
-    "updatedBy": "Tahir Chisti (3D Reviewer)"
+    "updatedBy": "Tahir Chisti (3D Reviewer)",
+    "schema": 2,
+    "computed": {
+      "L": 4.24,
+      "C": 3.2,
+      "Lr": 4,
+      "Cr": 3,
+      "cell": 12,
+      "riskIndex": 13.57,
+      "rankLabel": "High",
+      "integrity": 48
+    },
+    "scoredUnder": "1.0.0",
+    "needsReview": true,
+    "legacy": {
+      "scores": {
+        "plug": 5,
+        "barriers": 3,
+        "cement": 5,
+        "prox": 3,
+        "depthR": 5,
+        "depthC": 5,
+        "age": 5,
+        "access": 1,
+        "data": 5
+      },
+      "total": 37
+    }
   },
   {
     "id": "W-79I2V4",
@@ -622,20 +1210,48 @@
     "reviewer": "",
     "notes": "1949 Abandoned, abandoned 1950. 1 casing string(s), surface to 185.3 m. 22 formation tops on record, TD in Beaverhill Lake @ 2130 m. No plug records — verify abandonment. [Auto-compiled from South Seq. Eval. Area wellbore review; integrity score is rule-based screening judgment] [From 3D Reviewer: Very High 100/100 — subscores and Type derived; verify Classification, Access, Data]",
     "scores": {
-      "plug": 5,
-      "barriers": 3,
+      "plugQuality": 5,
       "cement": 5,
-      "prox": 3,
-      "depthR": 5,
-      "depthC": 5,
+      "barriers": 3,
+      "scvf": null,
       "age": 5,
-      "access": 1,
-      "data": 5
+      "complexity": null,
+      "data": 5,
+      "penetration": 5,
+      "plume": 3,
+      "usdw": null,
+      "access": 1
     },
-    "total": 37,
     "createdAt": "2026-07-24T16:17:13.481Z",
     "updatedAt": "2026-07-24T17:13:00.402Z",
-    "updatedBy": "Tahir Chisti (3D Reviewer)"
+    "updatedBy": "Tahir Chisti (3D Reviewer)",
+    "schema": 2,
+    "computed": {
+      "L": 4.24,
+      "C": 3.2,
+      "Lr": 4,
+      "Cr": 3,
+      "cell": 12,
+      "riskIndex": 13.57,
+      "rankLabel": "High",
+      "integrity": 48
+    },
+    "scoredUnder": "1.0.0",
+    "needsReview": true,
+    "legacy": {
+      "scores": {
+        "plug": 5,
+        "barriers": 3,
+        "cement": 5,
+        "prox": 3,
+        "depthR": 5,
+        "depthC": 5,
+        "age": 5,
+        "access": 1,
+        "data": 5
+      },
+      "total": 37
+    }
   },
   {
     "id": "W-QPIUGW",
@@ -651,20 +1267,48 @@
     "reviewer": "",
     "notes": "1963 Abandoned, abandoned 1963. 1 casing string(s), surface to 200.3 m. 19 formation tops on record, TD in Ireton @ 1868 m. No plug records — verify abandonment. [Auto-compiled from South Seq. Eval. Area wellbore review; integrity score is rule-based screening judgment] [From 3D Reviewer: Very High 100/100 — subscores and Type derived; verify Classification, Access, Data]",
     "scores": {
-      "plug": 5,
-      "barriers": 3,
+      "plugQuality": 5,
       "cement": 5,
-      "prox": 3,
-      "depthR": 5,
-      "depthC": 5,
+      "barriers": 3,
+      "scvf": null,
       "age": 5,
-      "access": 1,
-      "data": 5
+      "complexity": null,
+      "data": 5,
+      "penetration": 5,
+      "plume": 3,
+      "usdw": null,
+      "access": 1
     },
-    "total": 37,
     "createdAt": "2026-07-24T16:17:13.481Z",
     "updatedAt": "2026-07-24T17:13:00.402Z",
-    "updatedBy": "Tahir Chisti (3D Reviewer)"
+    "updatedBy": "Tahir Chisti (3D Reviewer)",
+    "schema": 2,
+    "computed": {
+      "L": 4.24,
+      "C": 3.2,
+      "Lr": 4,
+      "Cr": 3,
+      "cell": 12,
+      "riskIndex": 13.57,
+      "rankLabel": "High",
+      "integrity": 48
+    },
+    "scoredUnder": "1.0.0",
+    "needsReview": true,
+    "legacy": {
+      "scores": {
+        "plug": 5,
+        "barriers": 3,
+        "cement": 5,
+        "prox": 3,
+        "depthR": 5,
+        "depthC": 5,
+        "age": 5,
+        "access": 1,
+        "data": 5
+      },
+      "total": 37
+    }
   },
   {
     "id": "W-W8YII4",
@@ -680,20 +1324,48 @@
     "reviewer": "",
     "notes": "2011 Abandoned, abandoned 2012. 3 casing string(s), surface to 637.1 m. 18 formation tops on record, TD in Nisku @ 1794 m. 5 plug/treatment record(s). [Auto-compiled from South Seq. Eval. Area wellbore review; integrity score is rule-based screening judgment] [From 3D Reviewer: Medium 35/100 — subscores and Type derived; verify Classification, Access, Data]",
     "scores": {
-      "plug": 3,
-      "barriers": 1,
+      "plugQuality": 3,
       "cement": 3,
-      "prox": 3,
-      "depthR": 5,
-      "depthC": 5,
+      "barriers": 1,
+      "scvf": null,
       "age": 1,
-      "access": 1,
-      "data": 1
+      "complexity": null,
+      "data": 1,
+      "penetration": 5,
+      "plume": 3,
+      "usdw": null,
+      "access": 1
     },
-    "total": 23,
     "createdAt": "2026-07-24T16:17:13.481Z",
     "updatedAt": "2026-07-24T17:13:00.402Z",
-    "updatedBy": "Tahir Chisti (3D Reviewer)"
+    "updatedBy": "Tahir Chisti (3D Reviewer)",
+    "schema": 2,
+    "computed": {
+      "L": 2.36,
+      "C": 3.2,
+      "Lr": 2,
+      "Cr": 3,
+      "cell": 6,
+      "riskIndex": 7.55,
+      "rankLabel": "Moderate",
+      "integrity": 73
+    },
+    "scoredUnder": "1.0.0",
+    "needsReview": true,
+    "legacy": {
+      "scores": {
+        "plug": 3,
+        "barriers": 1,
+        "cement": 3,
+        "prox": 3,
+        "depthR": 5,
+        "depthC": 5,
+        "age": 1,
+        "access": 1,
+        "data": 1
+      },
+      "total": 23
+    }
   },
   {
     "id": "W-Y5JF2V",
@@ -709,20 +1381,48 @@
     "reviewer": "",
     "notes": "1978 Abandoned, abandoned 1978. 1 casing string(s), surface to 230.1 m. 21 formation tops on record, TD in Ireton @ 2030 m. No plug records — verify abandonment. [Auto-compiled from South Seq. Eval. Area wellbore review; integrity score is rule-based screening judgment] [From 3D Reviewer: Very High 100/100 — subscores and Type derived; verify Classification, Access, Data]",
     "scores": {
-      "plug": 5,
-      "barriers": 3,
+      "plugQuality": 5,
       "cement": 5,
-      "prox": 3,
-      "depthR": 5,
-      "depthC": 5,
+      "barriers": 3,
+      "scvf": null,
       "age": 3,
-      "access": 1,
-      "data": 5
+      "complexity": null,
+      "data": 5,
+      "penetration": 5,
+      "plume": 3,
+      "usdw": null,
+      "access": 1
     },
-    "total": 35,
     "createdAt": "2026-07-24T16:17:13.481Z",
     "updatedAt": "2026-07-24T17:13:00.402Z",
-    "updatedBy": "Tahir Chisti (3D Reviewer)"
+    "updatedBy": "Tahir Chisti (3D Reviewer)",
+    "schema": 2,
+    "computed": {
+      "L": 4.04,
+      "C": 3.2,
+      "Lr": 4,
+      "Cr": 3,
+      "cell": 12,
+      "riskIndex": 12.93,
+      "rankLabel": "High",
+      "integrity": 50
+    },
+    "scoredUnder": "1.0.0",
+    "needsReview": true,
+    "legacy": {
+      "scores": {
+        "plug": 5,
+        "barriers": 3,
+        "cement": 5,
+        "prox": 3,
+        "depthR": 5,
+        "depthC": 5,
+        "age": 3,
+        "access": 1,
+        "data": 5
+      },
+      "total": 35
+    }
   },
   {
     "id": "W-JC83C8",
@@ -738,20 +1438,48 @@
     "reviewer": "",
     "notes": "1978 Abandoned, abandoned 1978. 1 casing string(s), surface to 235.6 m. 22 formation tops on record, TD in Ireton @ 2006 m. No plug records — verify abandonment. [Auto-compiled from South Seq. Eval. Area wellbore review; integrity score is rule-based screening judgment] [From 3D Reviewer: Very High 100/100 — subscores and Type derived; verify Classification, Access, Data]",
     "scores": {
-      "plug": 5,
-      "barriers": 3,
+      "plugQuality": 5,
       "cement": 5,
-      "prox": 3,
-      "depthR": 5,
-      "depthC": 5,
+      "barriers": 3,
+      "scvf": null,
       "age": 3,
-      "access": 1,
-      "data": 5
+      "complexity": null,
+      "data": 5,
+      "penetration": 5,
+      "plume": 3,
+      "usdw": null,
+      "access": 1
     },
-    "total": 35,
     "createdAt": "2026-07-24T16:17:13.481Z",
     "updatedAt": "2026-07-24T17:13:00.402Z",
-    "updatedBy": "Tahir Chisti (3D Reviewer)"
+    "updatedBy": "Tahir Chisti (3D Reviewer)",
+    "schema": 2,
+    "computed": {
+      "L": 4.04,
+      "C": 3.2,
+      "Lr": 4,
+      "Cr": 3,
+      "cell": 12,
+      "riskIndex": 12.93,
+      "rankLabel": "High",
+      "integrity": 50
+    },
+    "scoredUnder": "1.0.0",
+    "needsReview": true,
+    "legacy": {
+      "scores": {
+        "plug": 5,
+        "barriers": 3,
+        "cement": 5,
+        "prox": 3,
+        "depthR": 5,
+        "depthC": 5,
+        "age": 3,
+        "access": 1,
+        "data": 5
+      },
+      "total": 35
+    }
   },
   {
     "id": "W-SD5D6V",
@@ -767,20 +1495,48 @@
     "reviewer": "",
     "notes": "2008 Abandoned, abandoned 2009. 2 casing string(s), surface to 610 m. 22 formation tops on record, TD in Ireton @ 1992 m. No plug records — verify abandonment. [Auto-compiled from South Seq. Eval. Area wellbore review; integrity score is rule-based screening judgment] [From 3D Reviewer: High 62/100 — subscores and Type derived; verify Classification, Access, Data]",
     "scores": {
-      "plug": 5,
-      "barriers": 1,
+      "plugQuality": 5,
       "cement": 3,
-      "prox": 3,
-      "depthR": 5,
-      "depthC": 5,
+      "barriers": 1,
+      "scvf": null,
       "age": 1,
-      "access": 1,
-      "data": 3
+      "complexity": null,
+      "data": 3,
+      "penetration": 5,
+      "plume": 3,
+      "usdw": null,
+      "access": 1
     },
-    "total": 27,
     "createdAt": "2026-07-24T16:17:13.481Z",
     "updatedAt": "2026-07-24T17:13:00.402Z",
-    "updatedBy": "Tahir Chisti (3D Reviewer)"
+    "updatedBy": "Tahir Chisti (3D Reviewer)",
+    "schema": 2,
+    "computed": {
+      "L": 3,
+      "C": 3.2,
+      "Lr": 3,
+      "Cr": 3,
+      "cell": 9,
+      "riskIndex": 9.6,
+      "rankLabel": "Moderate",
+      "integrity": 64
+    },
+    "scoredUnder": "1.0.0",
+    "needsReview": true,
+    "legacy": {
+      "scores": {
+        "plug": 5,
+        "barriers": 1,
+        "cement": 3,
+        "prox": 3,
+        "depthR": 5,
+        "depthC": 5,
+        "age": 1,
+        "access": 1,
+        "data": 3
+      },
+      "total": 27
+    }
   },
   {
     "id": "W-ZT3CF4",
@@ -796,20 +1552,48 @@
     "reviewer": "",
     "notes": "1978 Abandoned, abandoned 1978. 1 casing string(s), surface to 230 m. 19 formation tops on record, TD in Ireton @ 2013 m. No plug records — verify abandonment. [Auto-compiled from South Seq. Eval. Area wellbore review; integrity score is rule-based screening judgment] [From 3D Reviewer: Very High 100/100 — subscores and Type derived; verify Classification, Access, Data]",
     "scores": {
-      "plug": 5,
-      "barriers": 3,
+      "plugQuality": 5,
       "cement": 5,
-      "prox": 3,
-      "depthR": 5,
-      "depthC": 5,
+      "barriers": 3,
+      "scvf": null,
       "age": 3,
-      "access": 1,
-      "data": 5
+      "complexity": null,
+      "data": 5,
+      "penetration": 5,
+      "plume": 3,
+      "usdw": null,
+      "access": 1
     },
-    "total": 35,
     "createdAt": "2026-07-24T16:17:13.481Z",
     "updatedAt": "2026-07-24T17:13:00.402Z",
-    "updatedBy": "Tahir Chisti (3D Reviewer)"
+    "updatedBy": "Tahir Chisti (3D Reviewer)",
+    "schema": 2,
+    "computed": {
+      "L": 4.04,
+      "C": 3.2,
+      "Lr": 4,
+      "Cr": 3,
+      "cell": 12,
+      "riskIndex": 12.93,
+      "rankLabel": "High",
+      "integrity": 50
+    },
+    "scoredUnder": "1.0.0",
+    "needsReview": true,
+    "legacy": {
+      "scores": {
+        "plug": 5,
+        "barriers": 3,
+        "cement": 5,
+        "prox": 3,
+        "depthR": 5,
+        "depthC": 5,
+        "age": 3,
+        "access": 1,
+        "data": 5
+      },
+      "total": 35
+    }
   },
   {
     "id": "W-G5GGYC",
@@ -825,20 +1609,48 @@
     "reviewer": "",
     "notes": "1981 Abandoned, abandoned 1981. 1 casing string(s), surface to 351 m. 25 formation tops on record, TD in Muskeg @ 2052 m. No plug records — verify abandonment. [Auto-compiled from South Seq. Eval. Area wellbore review; integrity score is rule-based screening judgment] [From 3D Reviewer: Very High 96/100 — subscores and Type derived; verify Classification, Access, Data]",
     "scores": {
-      "plug": 5,
-      "barriers": 3,
+      "plugQuality": 5,
       "cement": 5,
-      "prox": 3,
-      "depthR": 5,
-      "depthC": 5,
+      "barriers": 3,
+      "scvf": null,
       "age": 3,
-      "access": 1,
-      "data": 5
+      "complexity": null,
+      "data": 5,
+      "penetration": 5,
+      "plume": 3,
+      "usdw": null,
+      "access": 1
     },
-    "total": 35,
     "createdAt": "2026-07-24T16:17:13.481Z",
     "updatedAt": "2026-07-24T17:13:00.402Z",
-    "updatedBy": "Tahir Chisti (3D Reviewer)"
+    "updatedBy": "Tahir Chisti (3D Reviewer)",
+    "schema": 2,
+    "computed": {
+      "L": 4.04,
+      "C": 3.2,
+      "Lr": 4,
+      "Cr": 3,
+      "cell": 12,
+      "riskIndex": 12.93,
+      "rankLabel": "High",
+      "integrity": 50
+    },
+    "scoredUnder": "1.0.0",
+    "needsReview": true,
+    "legacy": {
+      "scores": {
+        "plug": 5,
+        "barriers": 3,
+        "cement": 5,
+        "prox": 3,
+        "depthR": 5,
+        "depthC": 5,
+        "age": 3,
+        "access": 1,
+        "data": 5
+      },
+      "total": 35
+    }
   },
   {
     "id": "W-3HRMMU",
@@ -854,20 +1666,48 @@
     "reviewer": "",
     "notes": "1949 Abandoned Oil, abandoned 1949. 1 casing string(s), surface to 183.8 m. 19 formation tops on record, TD in Ireton @ 1676 m. No plug records — verify abandonment. [Auto-compiled from South Seq. Eval. Area wellbore review; integrity score is rule-based screening judgment] [From 3D Reviewer: Very High 100/100 — subscores and Type derived; verify Classification, Access, Data]",
     "scores": {
-      "plug": 5,
-      "barriers": 3,
+      "plugQuality": 5,
       "cement": 5,
-      "prox": 3,
-      "depthR": 5,
-      "depthC": 5,
+      "barriers": 3,
+      "scvf": null,
       "age": 5,
-      "access": 1,
-      "data": 5
+      "complexity": null,
+      "data": 5,
+      "penetration": 5,
+      "plume": 3,
+      "usdw": null,
+      "access": 1
     },
-    "total": 37,
     "createdAt": "2026-07-24T16:17:13.481Z",
     "updatedAt": "2026-07-24T17:13:00.402Z",
-    "updatedBy": "Tahir Chisti (3D Reviewer)"
+    "updatedBy": "Tahir Chisti (3D Reviewer)",
+    "schema": 2,
+    "computed": {
+      "L": 4.24,
+      "C": 3.2,
+      "Lr": 4,
+      "Cr": 3,
+      "cell": 12,
+      "riskIndex": 13.57,
+      "rankLabel": "High",
+      "integrity": 48
+    },
+    "scoredUnder": "1.0.0",
+    "needsReview": true,
+    "legacy": {
+      "scores": {
+        "plug": 5,
+        "barriers": 3,
+        "cement": 5,
+        "prox": 3,
+        "depthR": 5,
+        "depthC": 5,
+        "age": 5,
+        "access": 1,
+        "data": 5
+      },
+      "total": 37
+    }
   },
   {
     "id": "W-HJF12U",
@@ -883,20 +1723,48 @@
     "reviewer": "",
     "notes": "1967 Abandoned, abandoned 1968. 1 casing string(s), surface to 291.1 m. 27 formation tops on record, TD in Precambrian @ 2908 m. No plug records — verify abandonment. [Auto-compiled from South Seq. Eval. Area wellbore review; integrity score is rule-based screening judgment] [From 3D Reviewer: Very High 100/100 — subscores and Type derived; verify Classification, Access, Data]",
     "scores": {
-      "plug": 5,
-      "barriers": 3,
+      "plugQuality": 5,
       "cement": 5,
-      "prox": 3,
-      "depthR": 5,
-      "depthC": 5,
+      "barriers": 3,
+      "scvf": null,
       "age": 5,
-      "access": 1,
-      "data": 5
+      "complexity": null,
+      "data": 5,
+      "penetration": 5,
+      "plume": 3,
+      "usdw": null,
+      "access": 1
     },
-    "total": 37,
     "createdAt": "2026-07-24T16:17:13.481Z",
     "updatedAt": "2026-07-24T17:13:00.402Z",
-    "updatedBy": "Tahir Chisti (3D Reviewer)"
+    "updatedBy": "Tahir Chisti (3D Reviewer)",
+    "schema": 2,
+    "computed": {
+      "L": 4.24,
+      "C": 3.2,
+      "Lr": 4,
+      "Cr": 3,
+      "cell": 12,
+      "riskIndex": 13.57,
+      "rankLabel": "High",
+      "integrity": 48
+    },
+    "scoredUnder": "1.0.0",
+    "needsReview": true,
+    "legacy": {
+      "scores": {
+        "plug": 5,
+        "barriers": 3,
+        "cement": 5,
+        "prox": 3,
+        "depthR": 5,
+        "depthC": 5,
+        "age": 5,
+        "access": 1,
+        "data": 5
+      },
+      "total": 37
+    }
   },
   {
     "id": "W-EZTMCC",
@@ -912,20 +1780,48 @@
     "reviewer": "",
     "notes": "1949 Abandoned, abandoned 1953. 2 casing string(s), surface to 187.5 m. 21 formation tops on record, TD in Majeau Lake @ 1943 m. 9 plug/treatment record(s). [Auto-compiled from South Seq. Eval. Area wellbore review; integrity score is rule-based screening judgment] [From 3D Reviewer: Very High 80/100 — subscores and Type derived; verify Classification, Access, Data]",
     "scores": {
-      "plug": 3,
-      "barriers": 1,
+      "plugQuality": 3,
       "cement": 5,
-      "prox": 3,
-      "depthR": 5,
-      "depthC": 5,
+      "barriers": 1,
+      "scvf": null,
       "age": 5,
-      "access": 1,
-      "data": 3
+      "complexity": null,
+      "data": 3,
+      "penetration": 5,
+      "plume": 3,
+      "usdw": null,
+      "access": 1
     },
-    "total": 31,
     "createdAt": "2026-07-24T16:17:13.481Z",
     "updatedAt": "2026-07-24T17:13:00.402Z",
-    "updatedBy": "Tahir Chisti (3D Reviewer)"
+    "updatedBy": "Tahir Chisti (3D Reviewer)",
+    "schema": 2,
+    "computed": {
+      "L": 3.36,
+      "C": 3.2,
+      "Lr": 3,
+      "Cr": 3,
+      "cell": 9,
+      "riskIndex": 10.75,
+      "rankLabel": "Moderate",
+      "integrity": 59
+    },
+    "scoredUnder": "1.0.0",
+    "needsReview": true,
+    "legacy": {
+      "scores": {
+        "plug": 3,
+        "barriers": 1,
+        "cement": 5,
+        "prox": 3,
+        "depthR": 5,
+        "depthC": 5,
+        "age": 5,
+        "access": 1,
+        "data": 3
+      },
+      "total": 31
+    }
   },
   {
     "id": "W-BWU2R7",
@@ -941,20 +1837,48 @@
     "reviewer": "",
     "notes": "1950 Abandoned, abandoned 1950. 1 casing string(s), surface to 185.3 m. 20 formation tops on record, TD in Duvernay @ 1981 m. No plug records — verify abandonment. [Auto-compiled from South Seq. Eval. Area wellbore review; integrity score is rule-based screening judgment] [From 3D Reviewer: Very High 100/100 — subscores and Type derived; verify Classification, Access, Data]",
     "scores": {
-      "plug": 5,
-      "barriers": 3,
+      "plugQuality": 5,
       "cement": 5,
-      "prox": 3,
-      "depthR": 5,
-      "depthC": 5,
+      "barriers": 3,
+      "scvf": null,
       "age": 5,
-      "access": 1,
-      "data": 5
+      "complexity": null,
+      "data": 5,
+      "penetration": 5,
+      "plume": 3,
+      "usdw": null,
+      "access": 1
     },
-    "total": 37,
     "createdAt": "2026-07-24T16:17:13.481Z",
     "updatedAt": "2026-07-24T17:13:00.402Z",
-    "updatedBy": "Tahir Chisti (3D Reviewer)"
+    "updatedBy": "Tahir Chisti (3D Reviewer)",
+    "schema": 2,
+    "computed": {
+      "L": 4.24,
+      "C": 3.2,
+      "Lr": 4,
+      "Cr": 3,
+      "cell": 12,
+      "riskIndex": 13.57,
+      "rankLabel": "High",
+      "integrity": 48
+    },
+    "scoredUnder": "1.0.0",
+    "needsReview": true,
+    "legacy": {
+      "scores": {
+        "plug": 5,
+        "barriers": 3,
+        "cement": 5,
+        "prox": 3,
+        "depthR": 5,
+        "depthC": 5,
+        "age": 5,
+        "access": 1,
+        "data": 5
+      },
+      "total": 37
+    }
   },
   {
     "id": "W-RBYCFL",
@@ -970,20 +1894,48 @@
     "reviewer": "",
     "notes": "1997 Abandoned, abandoned 1997. 1 casing string(s), surface to 237 m. 14 formation tops on record, TD in Wabamun @ 1368 m. No plug records — verify abandonment. [Auto-compiled from South Seq. Eval. Area wellbore review; integrity score is rule-based screening judgment] [From 3D Reviewer: Very High 76/100 — subscores and Type derived; verify Classification, Access, Data]",
     "scores": {
-      "plug": 5,
-      "barriers": 3,
+      "plugQuality": 5,
       "cement": 5,
-      "prox": 3,
-      "depthR": 1,
-      "depthC": 1,
+      "barriers": 3,
+      "scvf": null,
       "age": 1,
-      "access": 1,
-      "data": 5
+      "complexity": null,
+      "data": 5,
+      "penetration": 1,
+      "plume": 3,
+      "usdw": null,
+      "access": 1
     },
-    "total": 25,
     "createdAt": "2026-07-24T16:17:13.481Z",
     "updatedAt": "2026-07-24T17:13:00.402Z",
-    "updatedBy": "Tahir Chisti (3D Reviewer)"
+    "updatedBy": "Tahir Chisti (3D Reviewer)",
+    "schema": 2,
+    "computed": {
+      "L": 3.84,
+      "C": 2,
+      "Lr": 4,
+      "Cr": 2,
+      "cell": 8,
+      "riskIndex": 7.68,
+      "rankLabel": "Moderate",
+      "integrity": 72
+    },
+    "scoredUnder": "1.0.0",
+    "needsReview": true,
+    "legacy": {
+      "scores": {
+        "plug": 5,
+        "barriers": 3,
+        "cement": 5,
+        "prox": 3,
+        "depthR": 1,
+        "depthC": 1,
+        "age": 1,
+        "access": 1,
+        "data": 5
+      },
+      "total": 25
+    }
   },
   {
     "id": "W-UII62Q",
@@ -999,20 +1951,48 @@
     "reviewer": "",
     "notes": "1978 Abandoned Gas Zone, abandoned 2017. 2 casing string(s), surface to 459.1 m. 18 formation tops on record, TD in Ireton @ 1737 m. 9 plug/treatment record(s). [Auto-compiled from South Seq. Eval. Area wellbore review; integrity score is rule-based screening judgment] [From 3D Reviewer: High 51/100 — subscores and Type derived; verify Classification, Access, Data]",
     "scores": {
-      "plug": 3,
-      "barriers": 1,
+      "plugQuality": 3,
       "cement": 3,
-      "prox": 3,
-      "depthR": 5,
-      "depthC": 5,
+      "barriers": 1,
+      "scvf": null,
       "age": 3,
-      "access": 1,
-      "data": 1
+      "complexity": null,
+      "data": 1,
+      "penetration": 5,
+      "plume": 3,
+      "usdw": null,
+      "access": 1
     },
-    "total": 25,
     "createdAt": "2026-07-24T16:17:13.481Z",
     "updatedAt": "2026-07-24T17:13:00.402Z",
-    "updatedBy": "Tahir Chisti (3D Reviewer)"
+    "updatedBy": "Tahir Chisti (3D Reviewer)",
+    "schema": 2,
+    "computed": {
+      "L": 2.56,
+      "C": 3.2,
+      "Lr": 3,
+      "Cr": 3,
+      "cell": 9,
+      "riskIndex": 8.19,
+      "rankLabel": "Moderate",
+      "integrity": 70
+    },
+    "scoredUnder": "1.0.0",
+    "needsReview": true,
+    "legacy": {
+      "scores": {
+        "plug": 3,
+        "barriers": 1,
+        "cement": 3,
+        "prox": 3,
+        "depthR": 5,
+        "depthC": 5,
+        "age": 3,
+        "access": 1,
+        "data": 1
+      },
+      "total": 25
+    }
   },
   {
     "id": "W-UPDZNP",
@@ -1028,20 +2008,48 @@
     "reviewer": "",
     "notes": "1978 Abandoned Gas Zone, abandoned 2017. 2 casing string(s), surface to 459.1 m. 18 formation tops on record, TD in Ireton @ 1737 m. 10 plug/treatment record(s). [Auto-compiled from South Seq. Eval. Area wellbore review; integrity score is rule-based screening judgment] [From 3D Reviewer: High 51/100 — subscores and Type derived; verify Classification, Access, Data]",
     "scores": {
-      "plug": 3,
-      "barriers": 1,
+      "plugQuality": 3,
       "cement": 3,
-      "prox": 3,
-      "depthR": 5,
-      "depthC": 5,
+      "barriers": 1,
+      "scvf": null,
       "age": 3,
-      "access": 1,
-      "data": 1
+      "complexity": null,
+      "data": 1,
+      "penetration": 5,
+      "plume": 3,
+      "usdw": null,
+      "access": 1
     },
-    "total": 25,
     "createdAt": "2026-07-24T16:17:13.481Z",
     "updatedAt": "2026-07-24T17:13:00.402Z",
-    "updatedBy": "Tahir Chisti (3D Reviewer)"
+    "updatedBy": "Tahir Chisti (3D Reviewer)",
+    "schema": 2,
+    "computed": {
+      "L": 2.56,
+      "C": 3.2,
+      "Lr": 3,
+      "Cr": 3,
+      "cell": 9,
+      "riskIndex": 8.19,
+      "rankLabel": "Moderate",
+      "integrity": 70
+    },
+    "scoredUnder": "1.0.0",
+    "needsReview": true,
+    "legacy": {
+      "scores": {
+        "plug": 3,
+        "barriers": 1,
+        "cement": 3,
+        "prox": 3,
+        "depthR": 5,
+        "depthC": 5,
+        "age": 3,
+        "access": 1,
+        "data": 1
+      },
+      "total": 25
+    }
   },
   {
     "id": "W-QUNF2S",
@@ -1057,19 +2065,47 @@
     "reviewer": "",
     "notes": "1978 Abandoned Gas, abandoned 2017. 2 casing string(s), surface to 459.1 m. 18 formation tops on record, TD in Ireton @ 1737 m. 10 plug/treatment record(s). [Auto-compiled from South Seq. Eval. Area wellbore review; integrity score is rule-based screening judgment] [From 3D Reviewer: High 51/100 — subscores and Type derived; verify Classification, Access, Data]",
     "scores": {
-      "plug": 3,
-      "barriers": 1,
+      "plugQuality": 3,
       "cement": 3,
-      "prox": 3,
-      "depthR": 5,
-      "depthC": 5,
+      "barriers": 1,
+      "scvf": null,
       "age": 3,
-      "access": 1,
-      "data": 1
+      "complexity": null,
+      "data": 1,
+      "penetration": 5,
+      "plume": 3,
+      "usdw": null,
+      "access": 1
     },
-    "total": 25,
     "createdAt": "2026-07-24T16:17:13.481Z",
     "updatedAt": "2026-07-24T17:13:00.402Z",
-    "updatedBy": "Tahir Chisti (3D Reviewer)"
+    "updatedBy": "Tahir Chisti (3D Reviewer)",
+    "schema": 2,
+    "computed": {
+      "L": 2.56,
+      "C": 3.2,
+      "Lr": 3,
+      "Cr": 3,
+      "cell": 9,
+      "riskIndex": 8.19,
+      "rankLabel": "Moderate",
+      "integrity": 70
+    },
+    "scoredUnder": "1.0.0",
+    "needsReview": true,
+    "legacy": {
+      "scores": {
+        "plug": 3,
+        "barriers": 1,
+        "cement": 3,
+        "prox": 3,
+        "depthR": 5,
+        "depthC": 5,
+        "age": 3,
+        "access": 1,
+        "data": 1
+      },
+      "total": 25
+    }
   }
 ]

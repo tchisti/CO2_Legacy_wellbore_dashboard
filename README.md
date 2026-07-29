@@ -1,6 +1,6 @@
 # CO₂ Legacy Wellbore Review Dashboard — Shared Team Register
 
-A single-page dashboard for legacy-well risk review (Appendix D / § 7.2 scoring), now with a
+A single-page dashboard for legacy-well risk review (unified AER D065/D020 + EPA Class VI §146.84 weighted L×C scoring (see methodology.json)), now with a
 **shared team register**: every well saved is stored centrally in this repository
 ([`wells.json`](wells.json)) and stays there — visible to the whole team — until someone deletes it.
 Every change is a Git commit, so there is a full audit trail of **who changed what, and when**.
@@ -17,6 +17,21 @@ Every change is a Git commit, so there is a full audit trail of **who changed wh
   detected via the file's SHA and retried automatically.
 - Each browser also keeps a local cache, so the page still opens with the last-seen data
   when offline.
+
+## Risk methodology (v2)
+
+- Wells are scored 1–5 on **11 parameters** (7 Likelihood, 4 Consequence); `?` = unknown, which scores
+  conservatively per parameter. Weighted sums give **L** and **C** (1.00–5.00); the well's official rank is
+  its **5×5 matrix cell** (round L × round C): Low 1–4 · Moderate 5–9 · High 10–16 · Very High 17–25.
+  The continuous **Risk Index = L × C** breaks ties.
+- The rulebook lives in [`methodology.json`](methodology.json) — weights, anchors, unknown policy, bands,
+  and a semver revision. Both the register and the 3D Reviewer load it; each well records the revision it
+  was scored under and is flagged **re-review** when the rulebook moves on.
+- **Editing the rulebook:** ⚖ Methodology in the dashboard toolbar (needs a save token). Every change is
+  a Git commit of `methodology.json` — the file's History is the audit trail.
+- Wells scored under the old 9–45 model were migrated mechanically (`tools/migrate-v1.js`) with their v1
+  scores archived per-well under `legacy`; every migrated well carries `needsReview` until a human
+  re-confirms its scores. Console `WellScoring.runSelfTest()` verifies the engine in either app.
 
 ## One-time setup (repo owner)
 
@@ -71,7 +86,7 @@ The **3D Well Reviewer** tab embeds a full interactive AOR / wellbore-risk appli
 
 - Orbitable 3D scene: DLS section/township fabric, per-injector 5 km AOR circles, formation slabs, wells colored by screening risk class
 - Two preloaded sites — a Wabamun demo set and **Nisku Enbridge POC AOR** (three proposed injectors, five real offset wells from the AccuMap wellbore review)
-- Transparent additive risk model with a built-in **Risk Model & Methodology** page (factors, thresholds, references incl. Watson & Bachu 2009, AER D065/D020, 40 CFR 146.84)
+- Scores on the same unified methodology as the register (shared scoring.js + methodology.json); the Risk Model & Methodology page renders the live rulebook
 - Add/edit/duplicate/import/export wells, scenario mode, undo/redo, per-site autosave
 
-**Bridge to the register:** the "Send register wells → 3D viewer" button pushes the shared register into the active 3D site. Wells with lat/lon are geolocated; wells without coordinates are parked on a flagged holding row; the register total (9–45, higher = worse) is translated to the reviewer's Integrity Score (100–0, higher = better). The bridge is **two-way**: when embedded, the reviewer's toolbar gains a "⇧ Push to Register" button that maps its wells back into the shared register — subscores are derived from reviewer fields using the register's own 1/3/5 anchors (verify Classification, Access and Data after a push), and existing register entries are matched by licence/UWI.
+**Bridge to the register:** the "Send register wells → 3D viewer" button pushes the shared register into the active 3D site. Wells with lat/lon are geolocated; wells without coordinates are parked on a flagged holding row. The bridge is **two-way**: when embedded, the reviewer's toolbar gains a "⇧ Push to Register" button that maps its wells back into the shared register — existing register entries are matched by licence/UWI. The bridge is lossless in both directions — the 11 parameter scores travel with each well; wells containing machine-derived (not human-scored) parameters arrive flagged for re-review. Machine-derived values are not written to the register — those parameters stay Unknown until human-scored.

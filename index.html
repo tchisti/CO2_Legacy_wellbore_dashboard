@@ -53,7 +53,8 @@ button.ghost{background:transparent}
 @media (max-width:1100px){.layout{grid-template-columns:1fr}}
 .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:18px}
 .panel h2{margin:0 0 12px 0;font-size:14px;letter-spacing:.4px;text-transform:uppercase;color:var(--muted)}
-.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+.kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:16px}
+@media (max-width:900px){.kpis{grid-template-columns:repeat(2,1fr)}}
 .kpi{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
 .kpi .label{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.6px}
 .kpi .val{font-size:28px;font-weight:800;margin-top:4px}
@@ -93,8 +94,9 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent)}
 .score-row{display:grid;grid-template-columns:1.5fr 2.2fr 60px;gap:8px;align-items:center;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--field)}
 .score-row .name{font-size:12px;font-weight:600}
 .score-row .name small{display:block;color:var(--muted);font-weight:400;font-size:10px;margin-top:2px}
-.seg{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px}
-.seg button{padding:6px 4px;font-size:11px;border-radius:6px;border:1px solid var(--line);background:var(--field);color:var(--text)}
+.seg{display:grid;grid-template-columns:repeat(6,1fr);gap:4px}
+.seg button{padding:6px 2px;font-size:11px;border-radius:6px;border:1px solid var(--line);background:var(--field);color:var(--text)}
+.seg button.active{border-color:var(--accent)}
 .seg button.active.low{background:#1fbf75;color:#0b1220;border-color:#1fbf75}
 .seg button.active.med{background:#f0a93b;color:#0b1220;border-color:#f0a93b}
 .seg button.active.high{background:#e85a4f;color:#fff;border-color:#e85a4f}
@@ -152,12 +154,13 @@ footer{padding:18px 24px;color:var(--muted);font-size:11px;border-top:1px solid 
     <div class="mark">CO₂</div>
     <div>
       <h1>Legacy Wellbore Risk Review — CCS</h1>
-      <small>Appendix D Calculator · § 7.2 Risk Scoring · CSA Z741 / EPA Class VI / AER D051</small>
+      <small>Unified Risk Methodology · AER D065/D020 + EPA Class VI §146.84 · Weighted L×C Matrix</small>
     </div>
   </div>
   <div class="actions">
     <button class="ghost" id="themeBtn" onclick="toggleTheme()" title="Switch color theme">☀️ Light</button>
     <button class="ghost" id="syncPill" onclick="openSyncModal()" title="Shared team register — click for settings"><span class="dot local"></span> Connecting…</button>
+    <button class="ghost" onclick="openMethodologyModal()" title="View or edit the scoring rulebook">⚖ Methodology</button>
     <button class="ghost" onclick="loadDemo()" title="Seed dashboard with six sample legacy wells">Load Demo</button>
     <button class="ghost" onclick="downloadCSVTemplate()" title="Download a CSV template prefilled with a sample legacy well — edit it, then re-upload via Import CSV">📄 CSV Template</button>
     <label class="btn primary" style="margin:0;cursor:pointer;background:linear-gradient(135deg,#1f7ad6,#3aa0ff);border:none" title="Bulk upload legacy wells from a CSV file">
@@ -174,11 +177,16 @@ footer{padding:18px 24px;color:var(--muted);font-size:11px;border-top:1px solid 
   </div>
 </header>
 
+<div id="methBanner" style="display:none;background:#5a3b12;border:1px solid #f0a93b;color:#ffe3b0;border-radius:8px;padding:8px 12px;margin:8px 24px 0 24px;font-size:12px">
+  ⚠ Live methodology unavailable — using the built-in fallback rulebook (rev <span id="methBannerRev"></span>). Scores shown are computed against the fallback.
+</div>
+
 <div class="kpis" style="padding:20px 24px 0 24px">
   <div class="kpi total"><div class="label">Wells in Review</div><div class="val" id="kTotal">0</div><div class="sub">within AoR</div></div>
-  <div class="kpi low"><div class="label">Low Risk</div><div class="val" id="kLow">0</div><div class="sub">Score 9 – 18</div></div>
-  <div class="kpi mod"><div class="label">Moderate Risk</div><div class="val" id="kMod">0</div><div class="sub">Score 19 – 30</div></div>
-  <div class="kpi high"><div class="label">High / Very High</div><div class="val" id="kHigh">0</div><div class="sub">Score 31 – 45</div></div>
+  <div class="kpi low"><div class="label">Low Risk</div><div class="val" id="kLow">0</div><div class="sub">Cell 1 – 4</div></div>
+  <div class="kpi mod"><div class="label">Moderate Risk</div><div class="val" id="kMod">0</div><div class="sub">Cell 5 – 9</div></div>
+  <div class="kpi high"><div class="label">High / Very High</div><div class="val" id="kHigh">0</div><div class="sub">Cell 10 – 25</div></div>
+  <div class="kpi"><div class="label">Needs Re-review</div><div class="val" id="kReview">0</div><div class="sub">Migrated / stale revision</div></div>
 </div>
 
 <div class="layout">
@@ -233,15 +241,15 @@ footer{padding:18px 24px;color:var(--muted);font-size:11px;border-top:1px solid 
 
       <div class="divider"></div>
       <h2 style="margin-bottom:4px">Risk Scoring — Appendix D</h2>
-      <div class="muted" style="margin-bottom:8px">Score each parameter: Low (1) · Medium (3) · High (5)</div>
+      <div class="muted" style="margin-bottom:8px">Score each parameter 1–5 (anchors at 1/3/5 · ? = unknown, scored conservatively per parameter)</div>
 
       <div class="scoring" id="scoringBlock"></div>
 
       <div class="divider"></div>
       <div class="row spread">
         <div>
-          <div class="muted" style="font-size:11px">Total Risk Score</div>
-          <div style="font-size:28px;font-weight:800" id="liveTotal">9</div>
+          <div class="muted" style="font-size:11px">L × C — Risk Index</div>
+          <div style="font-size:28px;font-weight:800" id="liveTotal">—</div>
           <div id="liveBadge"></div>
         </div>
         <div class="actions-row">
@@ -271,12 +279,12 @@ footer{padding:18px 24px;color:var(--muted);font-size:11px;border-top:1px solid 
           <div class="chart-wrap"><canvas id="distChart"></canvas></div>
         </div>
         <div class="panel">
-          <h2>Driver Heatmap — Avg score per parameter</h2>
+          <h2>Driver Heatmap — Avg weighted contribution (w × s)</h2>
           <div class="chart-wrap"><canvas id="driverChart"></canvas></div>
         </div>
       </div>
       <div class="panel" style="margin-top:16px">
-        <div class="row spread"><h2>Top Risk Wells</h2><span class="muted">Sorted by total score (desc)</span></div>
+        <div class="row spread"><h2>Top Risk Wells</h2><span class="muted">Sorted by Risk Index (desc)</span></div>
         <div id="topList"></div>
       </div>
     </section>
@@ -286,24 +294,27 @@ footer{padding:18px 24px;color:var(--muted);font-size:11px;border-top:1px solid 
       <div class="panel">
         <div class="row spread" style="margin-bottom:10px">
           <h2>Legacy Well Register</h2>
-          <div class="search">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-            <input id="search" placeholder="Filter by ID, operator, status…" oninput="render()"/>
+          <div class="row" style="gap:12px">
+            <label style="font-size:11px;display:inline-flex;align-items:center;gap:4px"><input type="checkbox" id="fltReview" onchange="render()"> needs re-review only</label>
+            <div class="search">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+              <input id="search" placeholder="Filter by ID, operator, status…" oninput="render()"/>
+            </div>
           </div>
         </div>
         <div style="max-height:540px;overflow:auto;border:1px solid var(--line);border-radius:10px">
           <table class="wells" id="wellsTable">
             <thead><tr>
-              <th>Well ID</th><th>Type</th><th>Status</th><th>Class</th><th>Age</th><th>Score</th><th>Category</th><th></th>
+              <th>Well ID</th><th>Type</th><th>Status</th><th>Class</th><th>Age</th><th>L × C</th><th>Index</th><th>Category</th><th></th>
             </tr></thead>
             <tbody id="wellsBody"></tbody>
           </table>
         </div>
         <div class="legend" style="margin-top:10px">
-          <span><span class="sw" style="background:var(--low)"></span>Low (9–18)</span>
-          <span><span class="sw" style="background:var(--mod)"></span>Moderate (19–30)</span>
-          <span><span class="sw" style="background:var(--high)"></span>High (31–40)</span>
-          <span><span class="sw" style="background:var(--crit)"></span>Very High (41–45)</span>
+          <span><span class="sw" style="background:var(--low)"></span>Low (cell 1–4)</span>
+          <span><span class="sw" style="background:var(--mod)"></span>Moderate (cell 5–9)</span>
+          <span><span class="sw" style="background:var(--high)"></span>High (cell 10–16)</span>
+          <span><span class="sw" style="background:var(--crit)"></span>Very High (cell 17–25)</span>
         </div>
       </div>
     </section>
@@ -312,7 +323,7 @@ footer{padding:18px 24px;color:var(--muted);font-size:11px;border-top:1px solid 
     <section id="tab-matrix" style="display:none">
       <div class="panel">
         <h2>5 × 5 Likelihood × Consequence Matrix</h2>
-        <p class="muted">Likelihood = barrier & data integrity factors (Plug Quality, Barriers, Cement, Age, Access, Data). Consequence = exposure factors (Proximity, Depth-vs-Reservoir, Depth-vs-Complex). § 7.1.</p>
+        <p class="muted">Likelihood = weighted sum of barrier &amp; data-integrity parameters (Plug Quality, Cement, Barriers, SCVF/GM, Age, Complexity, Data). Consequence = weighted sum of exposure parameters (Penetration, Plume Position, USDW Isolation, Access). Cell = round(L) × round(C).</p>
         <div class="matrix" id="matrix"></div>
         <div class="legend" style="margin-top:14px">
           <span><span class="sw" style="background:var(--low)"></span>Low</span>
@@ -336,11 +347,11 @@ footer{padding:18px 24px;color:var(--muted);font-size:11px;border-top:1px solid 
         <h2>Risk Scoring Reference — Appendix D & § 7.2</h2>
         <div style="overflow:auto">
         <table class="wells">
-          <thead><tr><th>Parameter</th><th>Low (1)</th><th>Medium (3)</th><th>High (5)</th></tr></thead>
+          <thead><tr><th>Parameter</th><th>Axis · Weight</th><th>Low (1)</th><th>Medium (3)</th><th>High (5)</th><th>Unknown</th><th>Basis</th></tr></thead>
           <tbody id="refBody"></tbody>
         </table>
         </div>
-        <div class="note" style="margin-top:14px"><b>Risk Ranking = Likelihood × Consequence</b> — per § 7.2. Total Risk Score = Σ(parameter scores). Range: 9 (best case) — 45 (worst case). Tiering tuned from Appendix D's 8/16/28/40 thresholds, normalized to a 9-parameter scale.</div>
+        <div class="note" style="margin-top:14px"><b>Risk Rank = matrix cell (round L × round C)</b> — L and C are weighted sums (Σ wᵢ·sᵢ, weights sum to 1.00 per axis). Continuous Risk Index = L × C (1–25) breaks ties. Bands: Low 1–4 · Moderate 5–9 · High 10–16 · Very High 17–25 (rev <span id="refRev"></span>).</div>
         <div class="note"><b>Cement carbonation note (Fig. A-2):</b> CO₂ ingress converts cement hydrates → CaCO₃ → soluble bicarbonate; vertical degradation typically &lt;few metres over geological timescales — but the barrier credit collapses if cement was never placed above caprock. Score "Cement Coverage" conservatively when CBL/VDL is absent.</div>
       </div>
 
@@ -433,7 +444,7 @@ footer{padding:18px 24px;color:var(--muted);font-size:11px;border-top:1px solid 
         </div>
         <iframe id="viewer3dFrame" src="3d-reviewer.html" loading="lazy" title="3D Legacy Well Reviewer"
           style="width:100%;height:78vh;border:1px solid var(--line);border-radius:12px;background:var(--panel2)"></iframe>
-        <div class="note" style="margin-top:10px">The 3D reviewer keeps its own per-site datasets (autosaved in your browser). "Send register wells" pushes the current shared register into the active 3D site: wells with lat/lon inside the site frame are geolocated; wells without coordinates are parked on a flagged holding row. The register total (9&ndash;45, higher&nbsp;=&nbsp;worse) is translated to the reviewer's Integrity Score (100&ndash;0, higher&nbsp;=&nbsp;better). One click of Ctrl+Z inside the viewer reverts a send. The bridge is two-way: the viewer\u2019s toolbar gains a &ldquo;&#8679; Push to Register&rdquo; button when embedded here, which maps its wells back into the shared register (subscores derived from reviewer fields using the register\u2019s own 1/3/5 anchors &mdash; verify Classification, Access and Data after a push).</div>
+        <div class="note" style="margin-top:10px">The 3D reviewer keeps its own per-site datasets (autosaved in your browser). "Send register wells" pushes the current shared register into the active 3D site: wells with lat/lon inside the site frame are geolocated; wells without coordinates are parked on a flagged holding row. Both apps score on the same methodology (methodology.json) &mdash; pushes in either direction carry the 11 parameter scores losslessly. One click of Ctrl+Z inside the viewer reverts a send. The bridge is two-way: the viewer\u2019s toolbar gains a &ldquo;&#8679; Push to Register&rdquo; button when embedded here, which maps its wells back into the shared register.</div>
       </div>
     </section>
   </main>
@@ -473,76 +484,97 @@ footer{padding:18px 24px;color:var(--muted);font-size:11px;border-top:1px solid 
   </div>
 </div>
 
+<!-- Methodology admin modal -->
+<div class="modal-back" id="methModal">
+  <div class="modal" style="width:min(900px,92vw)">
+    <div class="row spread" style="margin-bottom:8px">
+      <h2>Methodology — rev <span id="mmRev"></span></h2>
+      <button class="ghost" onclick="closeMethodologyModal()" style="padding:4px 10px">✕</button>
+    </div>
+    <p class="muted" style="margin:0 0 12px 0">
+      Edits commit <code>methodology.json</code> to the shared repo (needs the same token as well saves).
+      Weight/band/unknown changes bump the minor version; wording changes bump the patch.
+      Wells scored under older revisions are flagged for re-review — scores are never rewritten silently.
+    </p>
+    <div id="mmParams"></div>
+    <h2 style="margin-top:12px">Matrix bands (cell = round L × round C, 1–25)</h2>
+    <div id="mmBands"></div>
+    <div id="mmValidation" style="margin-top:10px;font-size:12px"></div>
+    <div class="actions-row" style="margin-top:14px">
+      <button class="ghost" onclick="closeMethodologyModal()">Cancel</button>
+      <button class="primary" id="mmSave" onclick="saveMethodologyEdits()" disabled>Save &amp; Commit</button>
+    </div>
+  </div>
+</div>
+
 <footer>
   Built on Enbridge NET <i>Legacy Well Review Guideline</i> GD-40-0B42-524E v1.0.0 (Khan & Christi, 2025) ·
   cross-checked against EPA UIC Class VI 40 CFR §146.84, AER Directive 051/020, CSA Z741, ISO 27914, API RP 65-3 ·
   Arbad et al., IJGGC vol. 133 (2024).
 </footer>
 
+<script src="scoring.js"></script>
 <script>
 /* ============ SCORING MODEL — Appendix D + § 7.2 ============ */
 
 /* Legacy well classifications — Table A-1 / Figure A-4, Enbridge "CO2 Underground
    Storage Legacy Well Review Guideline" GD-40-0B42-524E.1.0.0 (2025-10-03). */
-const KLASS_DEFS = {
-  'Type 1': {short:'No records — undocumented construction', desc:'No documentation available, minimal or no records; only drilling is known. Construction details are absent, so schematics cannot be produced.', prot:'Unknown'},
-  'Type 2': {short:'Thru seal + reservoir — nothing protected', desc:'Penetrates both the primary geologic seal and storage reservoir.', prot:'No protection for groundwater/USDWs, primary geologic seal, or storage reservoir.'},
-  'Type 3': {short:'Thru seal + reservoir — groundwater only', desc:'Penetrates both the primary geologic seal and storage reservoir.', prot:'Protection for groundwater/USDWs only; no protection for primary geologic seal or storage reservoir.'},
-  'Type 4': {short:'Thru seal + reservoir — groundwater + seal', desc:'Penetrates both the primary geologic seal and storage reservoir.', prot:'Protection for groundwater/USDWs and primary geologic seal; storage reservoir not protected.'},
-  'Type 5': {short:'Thru seal only — nothing protected', desc:'Penetrates only the primary geologic seal.', prot:'No protection for groundwater/USDWs or primary geologic seal.'},
-  'Type 6': {short:'Thru seal only — groundwater protected', desc:'Penetrates only the primary geologic seal.', prot:'Protection for groundwater/USDWs; primary geologic seal not protected.'},
-  'Type 7': {short:'Thru seal + reservoir — fully protected', desc:'Penetrates both the primary geologic seal and storage reservoir.', prot:'Protection for groundwater/USDWs, primary geologic seal, and storage reservoir.'},
-  'Type 8': {short:'Thru seal only — groundwater + seal', desc:'Penetrates only the primary geologic seal.', prot:'Protection for groundwater/USDWs and primary geologic seal.'},
-  'Type 9': {short:'Above seal & reservoir — lowest risk', desc:'Does not penetrate either the primary geologic seal or storage reservoir.', prot:'Dependent on confining-zone integrity; if the confining zone is intact, represents the lowest level of risk.'},
-};
+const KLASS_DEFS = WellScoring.FALLBACK_METHODOLOGY.wellTypes;
 function updateClassHint(){
   const v = document.getElementById('f_class').value;
   const d = KLASS_DEFS[v];
   const h = document.getElementById('classHint');
-  if(h) h.innerHTML = d ? `<b>${v}:</b> ${escapeHtml(d.desc)} <i>Protection: ${escapeHtml(d.prot)}</i>` : '';
+  if(h) h.innerHTML = d ? `<b>${v}:</b> ${escapeHtml(d.desc)} <i>Protection: ${escapeHtml(d.prot)}</i> · Types 8–9 suggest Penetration=1 · 4–7 → 3 · 1–3 → 5.` : '';
+  const sugg = {'Type 1':5,'Type 2':5,'Type 3':5,'Type 4':3,'Type 5':3,'Type 6':3,'Type 7':3,'Type 8':1,'Type 9':1}[v];
+  if (sugg !== undefined && state.currentForm.penetration === null) {
+    state.currentForm.penetration = sugg;
+    updateSeg('penetration'); updateLiveTotal();
+  }
 }
 
-const PARAMS = [
-  {key:'plug',   name:'Plug Quality',          group:'L', desc:'Verified modern plugs vs. missing/unverifiable',
-    levels:{1:'Verified, modern, ≥2 barriers',3:'Unknown / old but present',5:'Missing or unverifiable'}},
-  {key:'barriers',name:'Number of Barriers',   group:'L', desc:'Permanent barriers across all flow zones',
-    levels:{1:'≥2 barriers',3:'1 barrier',5:'None'}},
-  {key:'cement', name:'Cement Coverage',       group:'L', desc:'TOC vs. caprock / storage complex',
-    levels:{1:'Full to caprock (CBL verified)',3:'Below caprock',5:'No data / likely absent'}},
-  {key:'prox',   name:'Proximity to CO₂ Plume',group:'C', desc:'Lateral distance from modeled plume',
-    levels:{1:'> 3.2 km',3:'1.6 – 3.2 km',5:'< 1.6 km'}},
-  {key:'depthR', name:'Depth vs. Reservoir',   group:'C', desc:'Penetration relative to storage reservoir',
-    levels:{1:'Far above primary seal',3:'Penetrates primary caprock',5:'Intersects storage reservoir'}},
-  {key:'depthC', name:'Depth vs. Storage Complex', group:'C', desc:'Penetration relative to complex final seal',
-    levels:{1:'Above storage complex final seal',3:'Penetrates non-primary seal',5:'Penetrates secondary/final reservoir'}},
-  {key:'age',    name:'Well Age',              group:'L', desc:'Carbon-steel corrosion / standards vintage',
-    levels:{1:'< 30 years',3:'30 – 50 years',5:'> 50 years'}},
-  {key:'access', name:'Access & Ownership',    group:'L', desc:'Ability to re-enter / re-abandon',
-    levels:{1:'Owned, licensee active, accessible',3:'Suspended / no marker',5:'Orphaned / unknown location'}},
-  {key:'data',   name:'Data Availability',     group:'L', desc:'Drilling/completion/abandonment records',
-    levels:{1:'Complete with logs',3:'Partial / incomplete',5:'None or analog only'}},
-];
-
-const TIERS = [
-  {min:9, max:18, label:'Low',      cls:'low',  color:'#1fbf75'},
-  {min:19,max:30, label:'Moderate', cls:'mod',  color:'#f0a93b'},
-  {min:31,max:40, label:'High',     cls:'high', color:'#e85a4f'},
-  {min:41,max:45, label:'Very High', cls:'crit', color:'#a8324a'},
-];
-
-function tierFor(s){ return TIERS.find(t=>s>=t.min && s<=t.max) || TIERS[0]; }
+/* Unified methodology — single source of truth is methodology.json / WellScoring.FALLBACK_METHODOLOGY.
+   METHODOLOGY is swapped live when the remote rulebook loads or the admin panel saves. */
+let METHODOLOGY = WellScoring.FALLBACK_METHODOLOGY;
+let METHODOLOGY_SOURCE = 'fallback';
+Object.defineProperty(window, 'PARAMS', { get: () => METHODOLOGY.params });
+function computeFor(scores){ return WellScoring.computeWell(scores, METHODOLOGY); }
+/* ci() — safe accessor for w.computed. Wells normally always carry .computed (every state
+   mutation path normalizes), but a well that skipped normalization (e.g. pushed straight into
+   state.wells by a not-yet-updated bridge/import path) would otherwise crash every display read. */
+const ci = w => w.computed || WellScoring.normalizeWell(w, METHODOLOGY).computed;
+function rankOf(w){
+  const c = ci(w);
+  return WellScoring.bandFor(c.cell, METHODOLOGY);
+}
+function methodologyBanner(){
+  const el = document.getElementById('methBanner');
+  if (!el) return;
+  el.style.display = METHODOLOGY_SOURCE === 'fallback' ? 'block' : 'none';
+  const rev = document.getElementById('methBannerRev');
+  if (rev) rev.textContent = METHODOLOGY.revision;
+}
+function applyMethodology(m, source){
+  METHODOLOGY = m; METHODOLOGY_SOURCE = source;
+  state.wells = state.wells.map(w => WellScoring.normalizeWell(w, METHODOLOGY));
+  methodologyBanner();
+  if (document.getElementById('scoringBlock')) buildScoring();
+  render();
+}
 
 /* ============ STATE ============ */
 let state = { wells: [], editingId: null, currentForm: defaultScores(), selected: null };
 
-function defaultScores(){ const o={}; PARAMS.forEach(p=>o[p.key]=1); return o; }
+function defaultScores(){ const o={}; PARAMS.forEach(p=>o[p.key]=null); return o; }  // new wells start Unknown
 function uid(){ return 'W-'+Math.random().toString(36).slice(2,8).toUpperCase(); }
 
 function persistLocal(){ localStorage.setItem('co2_legacy_wells', JSON.stringify(state.wells)); }
 /* save() = keep a local copy (offline cache) AND queue a push to the shared team register */
 function save(msg){ persistLocal(); markDirty(msg); schedulePush(); }
+/* normalizeAll — the single choke-point wells pass through at every data boundary (local
+   storage, JSON import, and both sides of a sync merge) so v1 wells always migrate to v2. */
+function normalizeAll(list){ return (list||[]).map(w => WellScoring.normalizeWell(w, METHODOLOGY)); }
 function load(){
-  try{ const x=JSON.parse(localStorage.getItem('co2_legacy_wells')); if(Array.isArray(x)) state.wells=x; }catch(e){}
+  try{ const x=JSON.parse(localStorage.getItem('co2_legacy_wells')); if(Array.isArray(x)) state.wells=normalizeAll(x); }catch(e){}
 }
 
 /* ============ FORM ============ */
@@ -551,45 +583,45 @@ function buildScoring(){
   host.innerHTML = '';
   PARAMS.forEach(p=>{
     const row = document.createElement('div'); row.className='score-row';
+    const axisLabel = p.axis==='L' ? 'Likelihood' : 'Consequence';
     row.innerHTML = `
-      <div class="name">${p.name}<small>${p.desc}</small></div>
-      <div class="seg" data-key="${p.key}">
-        <button data-v="1" title="${p.levels[1]}">Low</button>
-        <button data-v="3" title="${p.levels[3]}">Med</button>
-        <button data-v="5" title="${p.levels[5]}">High</button>
+      <div class="name">${p.name} <span class="score-pill" style="font-size:9px">${axisLabel} · w ${p.weight.toFixed(2)}</span>
+        <small>${p.desc}</small></div>
+      <div class="seg" id="seg-${p.key}">
+        ${['?',1,2,3,4,5].map(v=>{
+          const val = v==='?' ? 'null' : v;
+          const tip = WellScoring.anchorText(p, v==='?' ? null : v);
+          return `<button type="button" data-v="${val}" title="${escapeHtml(tip)}" onclick="setScore('${p.key}', ${val})">${v}</button>`;
+        }).join('')}
       </div>
-      <div class="pts" id="pts-${p.key}">1</div>`;
+      <div class="pts" id="pts-${p.key}"></div>`;
     host.appendChild(row);
-    row.querySelectorAll('button').forEach(b=>{
-      b.addEventListener('click',()=>{
-        const v = +b.dataset.v;
-        state.currentForm[p.key] = v;
-        updateSeg(p.key);
-        updateLiveTotal();
-      });
-    });
   });
   updateAllSegs();
 }
+function setScore(key, v){ state.currentForm[key] = v; updateSeg(key); updateLiveTotal(); }
 function updateSeg(key){
-  const seg = document.querySelector(`.seg[data-key="${key}"]`);
-  if(!seg) return;
+  const p = PARAMS.find(x=>x.key===key); if(!p) return;
   const v = state.currentForm[key];
-  seg.querySelectorAll('button').forEach(b=>{
+  document.querySelectorAll(`#seg-${key} button`).forEach(b=>{
+    const bv = b.dataset.v==='null' ? null : +b.dataset.v;
     b.classList.remove('active','low','med','high');
-    if(+b.dataset.v===v){
+    if(bv===v){
       b.classList.add('active');
-      b.classList.add(v===1?'low':v===3?'med':'high');
+      if(bv!==null) b.classList.add(bv<=2?'low':bv===3?'med':'high');
     }
   });
-  document.getElementById('pts-'+key).textContent = v;
+  const eff = WellScoring.resolveScore(p, v);
+  const pts = document.getElementById('pts-'+key);
+  if (pts) pts.textContent = (v===null?'?':v) + ' → ' + (p.weight*eff).toFixed(2);
 }
 function updateAllSegs(){ PARAMS.forEach(p=>updateSeg(p.key)); }
 function updateLiveTotal(){
-  const t = PARAMS.reduce((a,p)=>a+state.currentForm[p.key],0);
-  document.getElementById('liveTotal').textContent = t;
-  const tier = tierFor(t);
-  document.getElementById('liveBadge').innerHTML = `<span class="tag ${tier.cls}">${tier.label} Risk</span>`;
+  const c = computeFor(state.currentForm);
+  document.getElementById('liveTotal').innerHTML =
+    `${c.L.toFixed(2)} × ${c.C.toFixed(2)} <span style="font-size:14px;color:var(--muted)">= ${c.riskIndex}</span>`;
+  document.getElementById('liveBadge').innerHTML =
+    `<span class="tag ${c.rank.cls}">${c.rank.label} · cell ${c.cell}</span>`;
 }
 
 function readForm(){
@@ -614,8 +646,13 @@ function readForm(){
     klass: document.getElementById('f_class').value,
     reviewer: document.getElementById('f_reviewer').value.trim() || '',
     notes: document.getElementById('f_notes').value.trim() || '',
+    schema: WellScoring.CURRENT_SCHEMA,
     scores: {...state.currentForm},
-    total: PARAMS.reduce((a,p)=>a+state.currentForm[p.key],0),
+    computed: (({L,C,Lr,Cr,cell,riskIndex,rank,integrity}) =>
+      ({L,C,Lr,Cr,cell,riskIndex,rankLabel:rank.label,integrity}))(computeFor(state.currentForm)),
+    scoredUnder: METHODOLOGY.revision,
+    needsReview: false,                       // a human just scored it
+    legacy: prev?.legacy,                     // preserve the v1 audit block across edits
     createdAt: prev?.createdAt || new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     updatedBy: syncName() || prev?.updatedBy || '',
@@ -671,7 +708,8 @@ function editWell(id){
   document.getElementById('f_traj').value=w.traj;
   document.getElementById('f_status').value=w.status;
   document.getElementById('f_class').value=w.klass; updateClassHint();
-  state.currentForm = {...w.scores};
+  const nw = WellScoring.normalizeWell(w, METHODOLOGY);
+  state.currentForm = {...nw.scores};
   updateAllSegs(); updateLiveTotal();
   window.scrollTo({top:0,behavior:'smooth'});
 }
@@ -690,36 +728,43 @@ function deleteWell(id){
 function render(){
   // KPIs
   document.getElementById('kTotal').textContent = state.wells.length;
-  let lo=0,mo=0,hi=0;
-  state.wells.forEach(w=>{
-    const t = tierFor(w.total);
-    if(t.cls==='low') lo++;
-    else if(t.cls==='mod') mo++;
-    else hi++;
-  });
-  document.getElementById('kLow').textContent=lo;
-  document.getElementById('kMod').textContent=mo;
-  document.getElementById('kHigh').textContent=hi;
+  const counts = { low:0, mod:0, highPlus:0, review:0 };
+  for (const w of state.wells) {
+    const cls = rankOf(w).cls;
+    if (cls==='low') counts.low++; else if (cls==='mod') counts.mod++; else counts.highPlus++;
+    if (w.needsReview || w.scoredUnder !== METHODOLOGY.revision) counts.review++;
+  }
+  document.getElementById('kLow').textContent = counts.low;
+  document.getElementById('kMod').textContent = counts.mod;
+  document.getElementById('kHigh').textContent = counts.highPlus;
+  document.getElementById('kReview').textContent = counts.review;
 
   // table
   const q = (document.getElementById('search')?.value||'').toLowerCase();
+  const reviewOnly = document.getElementById('fltReview')?.checked;
   const tbody = document.getElementById('wellsBody'); tbody.innerHTML='';
-  const filtered = state.wells.filter(w=>!q || [w.licence,w.operator,w.status,w.klass,w.type].join(' ').toLowerCase().includes(q));
+  const filtered = state.wells.filter(w=>{
+    if(q && ![w.licence,w.operator,w.status,w.klass,w.type].join(' ').toLowerCase().includes(q)) return false;
+    if(reviewOnly && !(w.needsReview || w.scoredUnder!==METHODOLOGY.revision)) return false;
+    return true;
+  });
   if(!filtered.length){
-    tbody.innerHTML = `<tr><td colspan="8" class="empty">No wells. Click "Load Demo" or add a well using the form.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9" class="empty">No wells. Click "Load Demo" or add a well using the form.</td></tr>`;
   } else {
-    filtered.sort((a,b)=>b.total-a.total).forEach(w=>{
-      const t = tierFor(w.total);
+    filtered.sort((a,b)=>ci(b).riskIndex-ci(a).riskIndex).forEach(w=>{
+      const t = rankOf(w);
+      const c = ci(w);
       const tr = document.createElement('tr');
-      const age = w.scores.age===1?'<30y':w.scores.age===3?'30–50y':'>50y';
+      const reviewBadge = (w.needsReview || w.scoredUnder !== METHODOLOGY.revision) ? '<span class="tag" style="background:#3a2f12;color:#f0c96b;margin-left:4px" title="Scored under rev '+escapeHtml(w.scoredUnder||'?')+' — current '+METHODOLOGY.revision+'">re-review</span>' : '';
       tr.innerHTML = `
         <td><span class="well-id">${escapeHtml(w.licence)}</span><br><small style="color:var(--muted)">${escapeHtml(w.operator)}</small></td>
         <td>${escapeHtml(w.type)}</td>
         <td>${escapeHtml(w.status)}</td>
         <td>${escapeHtml(w.klass)}</td>
-        <td>${age}</td>
-        <td><span class="score-pill">${w.total}</span></td>
-        <td><span class="tag ${t.cls}">${t.label}</span></td>
+        <td>${w.year || '—'}</td>
+        <td><span class="score-pill">${c.L.toFixed(1)}×${c.C.toFixed(1)}</span></td>
+        <td><span class="score-pill">${c.riskIndex}</span></td>
+        <td><span class="tag ${t.cls}">${t.label}</span>${reviewBadge}</td>
         <td style="text-align:right">
           <button class="ghost" style="padding:4px 8px;font-size:11px" onclick="event.stopPropagation();openDetail('${w.id}')">View</button>
           <button class="ghost" style="padding:4px 8px;font-size:11px" onclick="event.stopPropagation();editWell('${w.id}')">Edit</button>
@@ -731,14 +776,15 @@ function render(){
   }
 
   // top list
-  const top = [...state.wells].sort((a,b)=>b.total-a.total).slice(0,5);
+  const top = [...state.wells].sort((a,b)=>ci(b).riskIndex-ci(a).riskIndex).slice(0,5);
   const host = document.getElementById('topList');
   if(!top.length){ host.innerHTML = `<div class="empty">Add wells to see ranking.</div>`; }
   else host.innerHTML = top.map(w=>{
-    const t = tierFor(w.total);
-    const pct = ((w.total-9)/(45-9))*100;
+    const t = rankOf(w);
+    const c = ci(w);
+    const pct = ((c.riskIndex-1)/24)*100;
     return `<div onclick="openDetail('${w.id}')" style="cursor:pointer;padding:10px;border:1px solid var(--line);border-radius:10px;margin-bottom:8px;background:var(--field)">
-      <div class="row spread"><div><span class="well-id">${escapeHtml(w.licence)}</span> <span class="tag ${t.cls}">${t.label}</span></div><div style="font-weight:800">${w.total}/45</div></div>
+      <div class="row spread"><div><span class="well-id">${escapeHtml(w.licence)}</span> <span class="tag ${t.cls}">${t.label}</span></div><div style="font-weight:800">${c.riskIndex}/25</div></div>
       <div class="muted" style="font-size:11px;margin:4px 0">${escapeHtml(w.operator)} · ${escapeHtml(w.type)} · ${escapeHtml(w.status)} · ${escapeHtml(w.klass)}</div>
       <div class="bar"><div style="width:${pct}%"></div></div>
     </div>`;
@@ -755,34 +801,30 @@ function render(){
 let distChart, driverChart;
 function drawCharts(){
   if(typeof Chart==='undefined') return; // CDN unavailable — table/register still work
-  const lo = state.wells.filter(w=>tierFor(w.total).cls==='low').length;
-  const mo = state.wells.filter(w=>tierFor(w.total).cls==='mod').length;
-  const hi = state.wells.filter(w=>tierFor(w.total).cls==='high').length;
-  const cr = state.wells.filter(w=>tierFor(w.total).cls==='crit').length;
+  const bands = METHODOLOGY.matrix.bands;
+  const counts = bands.map(b => state.wells.filter(w=>rankOf(w).label===b.label).length);
 
   const ctx1 = document.getElementById('distChart').getContext('2d');
   if(distChart) distChart.destroy();
   distChart = new Chart(ctx1,{
     type:'doughnut',
-    data:{labels:['Low','Moderate','High','Very High'],datasets:[{data:[lo,mo,hi,cr],backgroundColor:['#1fbf75','#f0a93b','#e85a4f','#a8324a'],borderWidth:0}]},
+    data:{labels:bands.map(b=>b.label),datasets:[{data:counts,backgroundColor:bands.map(b=>b.color),borderWidth:0}]},
     options:{plugins:{legend:{position:'right',labels:{color:CHART_COLORS().text,font:{size:12}}}},cutout:'62%'}
   });
 
-  const avgs = PARAMS.map(p=>{
-    if(!state.wells.length) return 0;
-    return state.wells.reduce((a,w)=>a+w.scores[p.key],0)/state.wells.length;
-  });
+  const avgs = PARAMS.map(p =>
+    state.wells.reduce((a,w)=>a + p.weight * WellScoring.resolveScore(p, w.scores[p.key]), 0) / Math.max(1, state.wells.length));
   const ctx2 = document.getElementById('driverChart').getContext('2d');
   if(driverChart) driverChart.destroy();
   driverChart = new Chart(ctx2,{
     type:'bar',
     data:{labels:PARAMS.map(p=>p.name),
-      datasets:[{data:avgs, backgroundColor:avgs.map(v=>v<2?'#1fbf75':v<3.5?'#f0a93b':'#e85a4f'),borderRadius:4}]},
+      datasets:[{data:avgs, backgroundColor:avgs.map((v,i)=>{ const eff=v/PARAMS[i].weight; return eff<2?'#1fbf75':eff<3.5?'#f0a93b':'#e85a4f'; }),borderRadius:4}]},
     options:{
       indexAxis:'y',
-      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>'Avg score: '+c.parsed.x.toFixed(2)}}},
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>'Avg weighted contribution: '+c.parsed.x.toFixed(3)}}},
       scales:{
-        x:{min:0,max:5,grid:{color:CHART_COLORS().grid},ticks:{color:CHART_COLORS().muted}},
+        x:{min:0,grid:{color:CHART_COLORS().grid},ticks:{color:CHART_COLORS().muted}},
         y:{grid:{display:false},ticks:{color:CHART_COLORS().text,font:{size:11}}}
       }
     }
@@ -791,15 +833,10 @@ function drawCharts(){
 
 /* ============ MATRIX (L x C) ============ */
 function matrixGrid(list){
-  // Likelihood/Consequence bins (1-5) from group-averaged params
-  const bucket = avg => avg<=1.5?1:avg<=2.5?2:avg<=3.5?3:avg<=4.5?4:5;
   const grid = Array.from({length:5},()=>Array(5).fill(0));
-  const Lp = PARAMS.filter(p=>p.group==='L');
-  const Cp = PARAMS.filter(p=>p.group==='C');
   for(const w of list){
-    const L = bucket(Lp.reduce((a,p)=>a+w.scores[p.key],0)/Lp.length);
-    const C = bucket(Cp.reduce((a,p)=>a+w.scores[p.key],0)/Cp.length);
-    grid[5-L][C-1]++;
+    const c = w.computed; if(!c) continue;
+    grid[5-c.Lr][c.Cr-1]++;
   }
   return grid;
 }
@@ -813,7 +850,8 @@ function drawMatrix(){
     host.appendChild(makeCell('L'+(5-r),true,true));
     for(let c=0;c<5;c++){
       const score = (5-r)*(c+1); // L * C
-      const cls = score<=4?'lo':score<=9?'mo':score<=16?'hi':'cr';
+      const band = WellScoring.bandFor(score, METHODOLOGY);
+      const cls = band.cls==='low'?'lo':band.cls==='mod'?'mo':band.cls==='high'?'hi':'cr';
       const cell = document.createElement('div'); cell.className='cell '+cls;
       cell.textContent = score;
       if(grid[r][c]) cell.innerHTML += `<span class="count">${grid[r][c]}</span>`;
@@ -837,15 +875,17 @@ function openDetail(id){
   document.querySelectorAll('main > section').forEach(s=>s.style.display='none');
   document.getElementById('tab-detail').style.display='block';
 
-  const t = tierFor(w.total);
-  const rec = recommend(w);
+  const w2 = WellScoring.normalizeWell(w, METHODOLOGY);
+  const t = rankOf(w2);
+  const rec = recommend(w2);
   const scoresHtml = PARAMS.map(p=>{
-    const v = w.scores[p.key];
-    const col = v===1?'#1fbf75':v===3?'#f0a93b':'#e85a4f';
+    const v = w2.scores[p.key];
+    const col = v===null||v>=4?'#e85a4f':v>=3?'#f0a93b':'#1fbf75';
     return `<tr>
       <td style="padding:6px 8px">${p.name}</td>
-      <td style="padding:6px 8px;color:var(--muted)">${p.levels[v]}</td>
-      <td style="padding:6px 8px;text-align:right"><span class="score-pill" style="color:${col};border-color:${col}">${v}</span></td>
+      <td style="padding:6px 8px;color:var(--muted)">${escapeHtml(WellScoring.anchorText(p, v))}</td>
+      <td style="padding:6px 8px;text-align:right"><span class="score-pill" style="color:${col};border-color:${col}">${v===null?'?':v}</span></td>
+      <td style="padding:6px 8px;text-align:right">${(p.weight*WellScoring.resolveScore(p,v)).toFixed(2)}</td>
     </tr>`;
   }).join('');
 
@@ -853,35 +893,37 @@ function openDetail(id){
     <div class="detail-head">
       <div>
         <div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.5px">Legacy Well Dossier</div>
-        <h2 style="font-size:20px;color:var(--text);text-transform:none;margin:4px 0">${escapeHtml(w.licence)}</h2>
-        <div class="muted">${escapeHtml(w.operator)} · ${escapeHtml(w.type)} · ${escapeHtml(w.traj)} · ${escapeHtml(w.status)} · ${escapeHtml(w.klass)}</div>
+        <h2 style="font-size:20px;color:var(--text);text-transform:none;margin:4px 0">${escapeHtml(w2.licence)}</h2>
+        <div class="muted">${escapeHtml(w2.operator)} · ${escapeHtml(w2.type)} · ${escapeHtml(w2.traj)} · ${escapeHtml(w2.status)} · ${escapeHtml(w2.klass)}</div>
       </div>
       <div style="text-align:right">
-        <div style="font-size:34px;font-weight:800">${w.total}<span style="color:var(--muted);font-size:16px">/45</span></div>
+        <div style="font-size:34px;font-weight:800">${w2.computed.riskIndex}<span style="color:var(--muted);font-size:16px">/25</span></div>
+        <div class="muted" style="font-size:12px">L ${w2.computed.L} · C ${w2.computed.C} · cell ${w2.computed.cell} · rev ${escapeHtml(w2.scoredUnder||'—')}</div>
         <span class="tag ${t.cls}">${t.label} Risk</span>
+        ${w2.legacy ? '<div class="muted" style="font-size:11px">v1 archive: '+w2.legacy.total+'/45</div>' : ''}
       </div>
     </div>
 
     <div class="grid2" style="margin-top:10px">
       <div>
         <h2>Score Breakdown</h2>
-        <table class="wells"><tbody>${scoresHtml}</tbody></table>
+        <table class="wells"><thead><tr><th>Parameter</th><th>Basis</th><th style="text-align:right">Score</th><th style="text-align:right">w×s</th></tr></thead><tbody>${scoresHtml}</tbody></table>
       </div>
       <div>
         <h2>Spatial / Identification</h2>
         <table class="wells"><tbody>
-          <tr><td>Latitude</td><td>${(w.lat===null||w.lat===undefined)?'—':w.lat}</td></tr>
-          <tr><td>Longitude</td><td>${(w.lon===null||w.lon===undefined)?'—':w.lon}</td></tr>
-          <tr><td>Type</td><td>${w.type}</td></tr>
-          <tr><td>Trajectory</td><td>${w.traj}</td></tr>
-          <tr><td>Status</td><td>${w.status}</td></tr>
-          <tr><td>Classification</td><td>${w.klass} (Fig. A-4 / Table A-1)</td></tr>
-          <tr><td>Spud / Completion Year</td><td>${w.year || '—'}</td></tr>
-          <tr><td>Reviewer</td><td>${escapeHtml(w.reviewer)||'—'}</td></tr>
-          <tr><td>Assessed</td><td>${(w.updatedAt||w.createdAt||'').slice(0,10)||'—'}</td></tr>
-          <tr><td>Last Updated By</td><td>${escapeHtml(w.updatedBy)||'—'}</td></tr>
+          <tr><td>Latitude</td><td>${(w2.lat===null||w2.lat===undefined)?'—':w2.lat}</td></tr>
+          <tr><td>Longitude</td><td>${(w2.lon===null||w2.lon===undefined)?'—':w2.lon}</td></tr>
+          <tr><td>Type</td><td>${w2.type}</td></tr>
+          <tr><td>Trajectory</td><td>${w2.traj}</td></tr>
+          <tr><td>Status</td><td>${w2.status}</td></tr>
+          <tr><td>Classification</td><td>${w2.klass} (Fig. A-4 / Table A-1)</td></tr>
+          <tr><td>Spud / Completion Year</td><td>${w2.year || '—'}</td></tr>
+          <tr><td>Reviewer</td><td>${escapeHtml(w2.reviewer)||'—'}</td></tr>
+          <tr><td>Assessed</td><td>${(w2.updatedAt||w2.createdAt||'').slice(0,10)||'—'}</td></tr>
+          <tr><td>Last Updated By</td><td>${escapeHtml(w2.updatedBy)||'—'}</td></tr>
         </tbody></table>
-        ${w.notes?`<h2 style="margin-top:14px">Notes</h2><div class="rec-card" style="white-space:pre-wrap">${escapeHtml(w.notes)}</div>`:''}
+        ${w2.notes?`<h2 style="margin-top:14px">Notes</h2><div class="rec-card" style="white-space:pre-wrap">${escapeHtml(w2.notes)}</div>`:''}
         <h2 style="margin-top:14px">Recommended Action — § 8</h2>
         <div class="rec-card"><h4>${rec.title}</h4>${rec.body}</div>
         ${rec.warn?`<div class="warn" style="margin-top:8px">${rec.warn}</div>`:''}
@@ -889,26 +931,29 @@ function openDetail(id){
     </div>
 
     <div class="actions-row" style="margin-top:14px">
-      <button class="ghost" onclick="editWell('${w.id}')">Edit</button>
-      <button class="primary" onclick="exportPDF('${w.id}')">⬇ Download Well PDF</button>
+      <button class="ghost" onclick="editWell('${w2.id}')">Edit</button>
+      <button class="primary" onclick="exportPDF('${w2.id}')">⬇ Download Well PDF</button>
     </div>
   `;
 }
 
 /* Recommendation engine — first-principles wiring of Appendix D output into § 8 actions */
 function recommend(w){
-  const s = w.scores; const T = tierFor(w.total);
-  // critical drivers
-  const drivers = PARAMS.filter(p=>s[p.key]===5).map(p=>p.name);
+  const w2 = WellScoring.normalizeWell(w, METHODOLOGY);
+  const s = w2.scores; const T = rankOf(w2);
+  const eff = k => WellScoring.resolveScore(PARAMS.find(p=>p.key===k), s[k]);
+  const drivers = PARAMS.filter(p=>eff(p.key)>=4).map(p=>p.name);
   if(T.cls==='crit' || T.cls==='high'){
     let body = `<b>Tier ${T.label}</b> — re-entry diagnostics + mitigation candidate. Key drivers: ${drivers.join(', ')||'none flagged'}.<br>`;
     const actions = [];
-    if(s.plug===5 || s.barriers===5) actions.push('Pressure-test surface casing vent + annular buildup (§ 8.1); if leak confirmed → squeeze cement or full re-abandonment (§ 8.2).');
-    if(s.cement===5) actions.push('Run CBL/VDL or ultrasonic imaging across caprock interval; top-up annular cement via perforate-and-squeeze if TOC is below caprock.');
-    if(s.prox===5 || s.depthR===5 || s.depthC===5) actions.push('Stage dedicated monitoring well + soil-gas + satellite CO₂ surveillance — well is inside high-consequence corridor.');
-    if(s.access===5) actions.push('Engage Orphan Well Association / regulator (§ 9–10); if inaccessible, default to long-term flux + satellite monitoring (§ 8.3).');
-    if(s.age===5) actions.push('Treat all pre-1976 tubulars as analog to API 5L pre-NACE; assume corrosion-prone carbon steel and de-rate barrier credit.');
-    if(s.data===5) actions.push('Flag as "Undocumented / Unverified abandonment" (§ 6.6) and carry conservative analog assumptions until logged.');
+    if(eff('plugQuality')>=4 || eff('barriers')>=4) actions.push('Pressure-test surface casing vent + annular buildup (§ 8.1); if leak confirmed → squeeze cement or full re-abandonment (§ 8.2).');
+    if(eff('cement')>=4) actions.push('Run CBL/VDL or ultrasonic imaging across caprock interval; top-up annular cement via perforate-and-squeeze if TOC is below caprock.');
+    if(eff('scvf')>=4) actions.push('Active/unrepaired SCVF-GM: bubble test + vent-flow measurement per AER ID 2003-01; repair before injection start-up.');
+    if(eff('plume')>=4 || eff('penetration')>=4) actions.push('Stage dedicated monitoring well + soil-gas + satellite CO₂ surveillance — well is inside high-consequence corridor.');
+    if(eff('usdw')>=4) actions.push('Confirm BGWP/USDW isolation: surface-casing records + cement returns; if open pathway confirmed, prioritize corrective action per 40 CFR 146.84(d).');
+    if(eff('access')>=4) actions.push('Engage Orphan Well Association / regulator (§ 9–10); if inaccessible, default to long-term flux + satellite monitoring (§ 8.3).');
+    if(eff('age')>=4) actions.push('Treat all pre-1976 tubulars as analog to API 5L pre-NACE; assume corrosion-prone carbon steel and de-rate barrier credit.');
+    if(eff('data')>=4) actions.push('Flag as "Undocumented / Unverified abandonment" (§ 6.6) and carry conservative analog assumptions until logged.');
     body += '<ul style="margin:6px 0 0 18px;padding:0">'+actions.map(a=>`<li style="margin:4px 0">${a}</li>`).join('')+'</ul>';
     return {title:'Re-entry + Mitigation Required', body,
       warn:'Per CSA Z741 § 9 / EPA Class VI 40 CFR 146.84(d), high-risk wells inside AoR require corrective action plan before injection authorization.'};
@@ -926,7 +971,10 @@ function renderRef(){
   const body = document.getElementById('refBody');
   body.innerHTML = PARAMS.map(p=>`<tr>
     <td><b>${p.name}</b><br><small style="color:var(--muted)">${p.desc}</small></td>
-    <td>${p.levels[1]}</td><td>${p.levels[3]}</td><td>${p.levels[5]}</td>
+    <td style="white-space:nowrap">${p.axis==='L'?'Likelihood':'Consequence'} · ${p.weight.toFixed(2)}</td>
+    <td>${p.anchors[1]}</td><td>${p.anchors[3]}</td><td>${p.anchors[5]}</td>
+    <td style="text-align:center">${p.unknownScore}</td>
+    <td><small>${(p.refs||[]).join(' · ')}</small></td>
   </tr>`).join('');
   const kb = document.getElementById('klassBody');
   if(kb) kb.innerHTML = Object.entries(KLASS_DEFS).map(([t,d])=>`<tr>
@@ -934,6 +982,8 @@ function renderRef(){
     <td>${escapeHtml(d.desc)}</td>
     <td>${escapeHtml(d.prot)}</td>
   </tr>`).join('');
+  const rr = document.getElementById('refRev');
+  if(rr) rr.textContent = METHODOLOGY.revision;
 }
 
 
@@ -965,20 +1015,18 @@ function sendRegisterTo3D(){
     drillingYear: w.year || null,
     surfaceLat: w.lat, surfaceLon: w.lon,
     reviewer: w.reviewer || '',
-    // Register total is 9 (best) .. 45 (worst); reviewer Integrity Score is 100 (best) .. 0.
-    integrityScore: (typeof w.total === 'number' && w.total >= 9) ? Math.max(0, Math.min(100, Math.round(100 - (w.total - 9) * (100/36)))) : null,
-    notes: ((w.notes||'') + ' [From Dashboard register' + (w.klass ? ': ' + w.klass : '') + (typeof w.total === 'number' ? ', score ' + w.total + '/45' : '') + ']').trim()
+    // Both apps score on the same methodology now — push native scores + Integrity, no lossy translation.
+    integrityScore: w.computed ? w.computed.integrity : null,
+    scores: w.scores || null,
+    scoredUnder: w.scoredUnder || null,
+    notes: ((w.notes||'') + ' [From Dashboard register' + (w.klass ? ': ' + w.klass : '') + (w.computed ? ', index ' + w.computed.riskIndex + '/25 (' + w.computed.rankLabel + ')' : '') + ']').trim()
   }));
   frame.contentWindow.postMessage({ type: 'lwms:importWells', rows }, '*');
 }
 
-/* Receive wells pushed back from the 3D Reviewer ("Push to Register" inside the iframe).
-   Subscores are derived from reviewer fields using the register's own 1/3/5 anchors;
-   Classification (Type 1-9), Access and Data need human verification after import. */
-
-/* Derive a GD-40 Table A-1 classification from 3D Reviewer evidence (heuristic —
-   flag for human verification). Penetration from caprock/reservoir booleans;
-   "protection" inferred from cement quality + plugging status; groundwater
+/* Derive a GD-40 Table A-1 classification from 3D Reviewer evidence when no native
+   klass exists (heuristic — auto-suggest only). Penetration from caprock/reservoir
+   booleans; "protection" inferred from cement quality + plugging status; groundwater
    protection assumed present when any casing string is recorded. */
 function deriveKlass(r){
   const noRecords = r.cementQuality==='Unknown' && r.pluggingStatus==='Unknown' && !(r.casingStrings>0);
@@ -1000,19 +1048,15 @@ function deriveKlass(r){
 
 function mapFrom3D(r, prev){
   const now = new Date().toISOString();
-  const yr = new Date().getFullYear();
-  const plugMap = {'Plugged & Verified':1,'Plugged':3,'Partially Plugged':4};
-  const scores = {
-    plug: plugMap[r.pluggingStatus] ?? 5,
-    barriers: (r.casingStrings>=2) ? 1 : (r.casingStrings===1 ? 3 : 5),
-    cement: r.cementQuality==='Excellent' ? 1 : (r.cementQuality==='Good'||r.cementQuality==='Fair') ? 3 : 5,
-    prox: (typeof r.distToInjector==='number') ? (r.distToInjector<1600 ? 5 : (r.distToInjector<=3200 ? 3 : 1)) : 3,
-    depthR: r.reservoirPenetrated ? 5 : (r.caprockPenetrated ? 3 : 1),
-    depthC: r.reservoirPenetrated ? 5 : (r.caprockPenetrated ? 3 : 1),
-    age: (typeof r.drillingYear==='number') ? ((yr-r.drillingYear)>50 ? 5 : ((yr-r.drillingYear)>=30 ? 3 : 1)) : 3,
-    access: /orphan/i.test(r.status||'') ? 5 : (/suspend|unknown/i.test(r.status||'') ? 3 : 1),
-    data: (r.cementQuality==='Unknown' && r.pluggingStatus==='Unknown') ? 5 : ((r.cementQuality==='Unknown'||r.pluggingStatus==='Unknown') ? 3 : 1),
-  };
+  const native = r.scores && typeof r.scores === 'object' && 'plugQuality' in r.scores;
+  const derivedAny = !!(r.scoreSources && Object.values(r.scoreSources).some(s => s === 'derived'));
+  const raw = native ? r.scores : WellScoring.deriveScoresFromReviewer(r);
+  const scores = {}; PARAMS.forEach(p => {
+    let v = (typeof raw[p.key]==='number' ? raw[p.key] : null);
+    if (native && r.scoreSources && r.scoreSources[p.key] === 'derived') v = null; // machine guesses never enter the register
+    scores[p.key] = v;
+  });
+  const c = computeFor(scores);
   const typeMap = t => t==='Oil' ? 'Oil Producer' : t==='Gas' ? 'Gas Producer' : t==='Injector' ? 'Injection' : t==='Water Disposal' ? 'Disposal' : t==='Observation' ? 'Observation' : 'Unknown';
   return {
     id: prev?.id || uid(),
@@ -1026,8 +1070,13 @@ function mapFrom3D(r, prev){
     status: r.status || 'Unknown',
     klass: prev?.klass || deriveKlass(r),
     reviewer: r.reviewer || '',
-    notes: ((r.notes||'') + ' [From 3D Reviewer' + (r.riskClass ? (': ' + r.riskClass + ' ' + r.riskScore + '/100') : '') + ' — subscores and Type derived; verify Classification, Access, Data]').trim(),
-    scores, total: Object.values(scores).reduce((a,b)=>a+b,0),
+    notes: ((r.notes||'') + ' [From 3D Reviewer' + (native ? (derivedAny ? ' — native push; machine-derived parameters kept as Unknown; flagged for re-review' : ' — native scores') : ' — scores derived from well data; verify') + ']').trim(),
+    schema: WellScoring.CURRENT_SCHEMA,
+    scores,
+    computed: {L:c.L,C:c.C,Lr:c.Lr,Cr:c.Cr,cell:c.cell,riskIndex:c.riskIndex,rankLabel:c.rank.label,integrity:c.integrity},
+    scoredUnder: native ? (r.scoredUnder || METHODOLOGY.revision) : METHODOLOGY.revision,
+    needsReview: !native || derivedAny,          // native pushes are already scored on the same rulebook, unless some params are machine-derived
+    legacy: prev?.legacy,
     createdAt: prev?.createdAt || now, updatedAt: now,
     updatedBy: (syncName() ? syncName() + ' ' : '') + '(3D Reviewer)',
   };
@@ -1044,7 +1093,7 @@ window.addEventListener('message', ev => {
     return { prev, rec: mapFrom3D(r, prev) };
   });
   const added = mapped.filter(m => !m.prev).length, updated = mapped.length - added;
-  if (!confirm('Receive ' + mapped.length + ' well(s) from the 3D Reviewer' + (msg.site ? ' (' + msg.site + ')' : '') + ' into the shared register? ' + added + ' new, ' + updated + ' existing will be updated. Subscores are derived — verify Classification/Access/Data after import.')) { reply({cancelled:true}); return; }
+  if (!confirm('Receive ' + mapped.length + ' well(s) from the 3D Reviewer' + (msg.site ? ' (' + msg.site + ')' : '') + ' into the shared register? ' + added + ' new, ' + updated + ' existing will be updated. Wells with native scores import losslessly; derived wells are flagged for re-review.')) { reply({cancelled:true}); return; }
   for (const m of mapped) {
     if (m.prev) { const i = state.wells.findIndex(x => x.id === m.prev.id); state.wells[i] = m.rec; }
     else state.wells.push(m.rec);
@@ -1066,25 +1115,29 @@ function loadDemo(){
   if(state.wells.length && !confirm('Load Demo replaces the current register with 6 sample wells'+(syncToken()?' — including the SHARED register everyone sees.':'.')+' Continue?')) return;
   const now = new Date().toISOString();
   const mk = (o)=>({id:uid(), reviewer:'T. Khan', createdAt:now, updatedAt:now, updatedBy:syncName()||'', ...o});
+  const V = (o)=>{ const scores = { plugQuality:null,cement:null,barriers:null,scvf:null,age:null,complexity:null,data:null,penetration:null,plume:null,usdw:null,access:null, ...o };
+    const c = computeFor(scores);
+    return { schema:2, scores, computed:{L:c.L,C:c.C,Lr:c.Lr,Cr:c.Cr,cell:c.cell,riskIndex:c.riskIndex,rankLabel:c.rank.label,integrity:c.integrity},
+             scoredUnder:METHODOLOGY.revision, needsReview:false }; };
   state.wells = [
     mk({licence:'100/04-20-046-25W4',operator:'Orphan Well Assoc.',lat:53.4123,lon:-113.5421,year:1958,type:'Oil Producer',traj:'Vertical',status:'Orphaned',klass:'Type 2',
-     notes:'Worst-case orphan: no surface marker, no records, no licensee. Inside modeled AoR (< 1.6 km).',
-     scores:{plug:5,barriers:5,cement:5,prox:5,depthR:5,depthC:5,age:5,access:5,data:5},total:45}),
+     notes:'Worst-case orphan: no surface marker, no records, no licensee. Inside modeled plume.',
+     ...V({plugQuality:5,cement:5,barriers:5,scvf:3,age:5,complexity:3,data:5,penetration:5,plume:5,usdw:5,access:5})}),
     mk({licence:'102/11-08-046-26W4',operator:'Cenovus Energy',lat:53.4501,lon:-113.6011,year:1998,type:'Gas Producer',traj:'Vertical',status:'Abandoned (P&A)',klass:'Type 7',
-     notes:'Modern P&A, CBL verified to top of caprock, two cement plugs. Within plume buffer but barriers sound.',
-     scores:{plug:1,barriers:1,cement:1,prox:3,depthR:5,depthC:1,age:3,access:1,data:1},total:17}),
+     notes:'Modern P&A, CBL verified to top of caprock, two cement plugs, SCVF tested clear.',
+     ...V({plugQuality:1,cement:1,barriers:1,scvf:1,age:1,complexity:1,data:1,penetration:5,plume:3,usdw:1,access:1})}),
     mk({licence:'07-22-045-25W4',operator:'CNRL',lat:53.3811,lon:-113.5200,year:1985,type:'Disposal',traj:'Deviated',status:'Suspended',klass:'Type 4',
-     notes:'Suspended disposal well; partial cement data; pressure test pending under MMV cycle.',
-     scores:{plug:3,barriers:3,cement:3,prox:3,depthR:5,depthC:3,age:3,access:3,data:3},total:29}),
+     notes:'Suspended disposal well; partial cement data; SCVF repair verified 2019; pressure test pending under MMV cycle.',
+     ...V({plugQuality:3,cement:3,barriers:3,scvf:3,age:3,complexity:3,data:3,penetration:5,plume:3,usdw:3,access:3})}),
     mk({licence:'14-31-047-25W4',operator:'Unknown',lat:53.4921,lon:-113.4805,year:null,type:'Unknown',traj:'Unknown',status:'Unknown',klass:'Type 1',
      notes:'Undocumented well discovered via legacy aerial survey; default to analog assumptions until logged.',
-     scores:{plug:5,barriers:5,cement:5,prox:3,depthR:3,depthC:3,age:5,access:5,data:5},total:39}),
+     ...V({})}),
     mk({licence:'06-15-046-25W4',operator:'Imperial Oil',lat:53.4250,lon:-113.5108,year:2010,type:'Strat Test',traj:'Vertical',status:'Abandoned (P&A)',klass:'Type 9',
      notes:'Strat test with full log suite, modern materials, far above caprock — background population.',
-     scores:{plug:1,barriers:1,cement:1,prox:1,depthR:1,depthC:1,age:1,access:1,data:1},total:9}),
+     ...V({plugQuality:1,cement:1,barriers:1,scvf:1,age:1,complexity:1,data:1,penetration:1,plume:1,usdw:1,access:1})}),
     mk({licence:'09-27-046-25W4',operator:'Husky / Cenovus',lat:53.4402,lon:-113.5320,year:1972,type:'Injection',traj:'Vertical',status:'Suspended',klass:'Type 5',
      notes:'Pre-NACE carbon steel tubulars; cement coverage absent above caprock; re-entry diagnostics scheduled.',
-     scores:{plug:3,barriers:3,cement:5,prox:5,depthR:5,depthC:3,age:5,access:3,data:3},total:35}),
+     ...V({plugQuality:3,cement:5,barriers:3,scvf:3,age:3,complexity:1,data:3,penetration:5,plume:5,usdw:3,access:3})}),
   ];
   SYNC.replaceNext = true;
   save('Load demo data'); render();
@@ -1097,7 +1150,7 @@ function exportJSON(){
 function importJSON(e){
   const f=e.target.files[0]; if(!f) return;
   const r=new FileReader(); r.onload=()=>{
-    try{ const d=JSON.parse(r.result); if(Array.isArray(d)){state.wells=d;SYNC.replaceNext=true;save('Import JSON ('+d.length+' wells)');render();}}catch(err){alert('Invalid JSON');}
+    try{ const d=JSON.parse(r.result); if(Array.isArray(d)){state.wells=normalizeAll(d);SYNC.replaceNext=true;save('Import JSON ('+d.length+' wells)');render();}}catch(err){alert('Invalid JSON');}
     e.target.value='';
   }; r.readAsText(f);
 }
@@ -1131,16 +1184,18 @@ const CSV_COLS = [
   {key:'klass',    hdr:'Classification (Type 1-9)',  sample:'Type 2',
     enum:['Type 1','Type 2','Type 3','Type 4','Type 5','Type 6','Type 7','Type 8','Type 9']},
   {key:'reviewer', hdr:'Reviewer',                   sample:'T. Khan'},
-  // 9 scoring parameters — Low/Med/High or 1/3/5
-  {key:'sc_plug',     hdr:'Plug Quality (Low/Med/High)',           sample:'High',  score:'plug'},
-  {key:'sc_barriers', hdr:'Number of Barriers (Low/Med/High)',     sample:'High',  score:'barriers'},
-  {key:'sc_cement',   hdr:'Cement Coverage (Low/Med/High)',        sample:'High',  score:'cement'},
-  {key:'sc_prox',     hdr:'Proximity to CO2 Plume (Low/Med/High)', sample:'High',  score:'prox'},
-  {key:'sc_depthR',   hdr:'Depth vs Reservoir (Low/Med/High)',     sample:'High',  score:'depthR'},
-  {key:'sc_depthC',   hdr:'Depth vs Storage Complex (Low/Med/High)', sample:'High',score:'depthC'},
-  {key:'sc_age',      hdr:'Well Age (Low/Med/High)',               sample:'High',  score:'age'},
-  {key:'sc_access',   hdr:'Access & Ownership (Low/Med/High)',     sample:'High',  score:'access'},
-  {key:'sc_data',     hdr:'Data Availability (Low/Med/High)',      sample:'High',  score:'data'},
+  // 11 scoring parameters — 1-5, ? = unknown (Low/Med/High still accepted for v1 files)
+  {key:'sc_plugQuality', hdr:'Abandonment & Plug Quality (1-5 or ?)',     sample:'5', score:'plugQuality', aliases:['Plug Quality (Low/Med/High)']},
+  {key:'sc_cement',      hdr:'Cement Coverage & Quality (1-5 or ?)',      sample:'5', score:'cement',      aliases:['Cement Coverage (Low/Med/High)']},
+  {key:'sc_barriers',    hdr:'Barriers Across Flow Zones (1-5 or ?)',     sample:'3', score:'barriers',    aliases:['Number of Barriers (Low/Med/High)']},
+  {key:'sc_scvf',        hdr:'SCVF / GM History (1-5 or ?)',              sample:'?', score:'scvf',        aliases:[]},
+  {key:'sc_age',         hdr:'Well Age & Regulatory Era (1-5 or ?)',      sample:'5', score:'age',         aliases:['Well Age (Low/Med/High)']},
+  {key:'sc_complexity',  hdr:'Wellbore Complexity (1-5 or ?)',            sample:'?', score:'complexity',  aliases:[]},
+  {key:'sc_data',        hdr:'Data Confidence (1-5 or ?)',                sample:'5', score:'data',        aliases:['Data Availability (Low/Med/High)']},
+  {key:'sc_penetration', hdr:'Penetration vs Storage Complex (1-5 or ?)', sample:'5', score:'penetration', aliases:['Depth vs Reservoir (Low/Med/High)','Depth vs Storage Complex (Low/Med/High)']},
+  {key:'sc_plume',       hdr:'Position vs Plume / AoR (1-5 or ?)',        sample:'1', score:'plume',       aliases:['Proximity to CO2 Plume (Low/Med/High)']},
+  {key:'sc_usdw',        hdr:'USDW-BGWP Isolation (1-5 or ?)',            sample:'?', score:'usdw',        aliases:[]},
+  {key:'sc_access',      hdr:'Corrective-Action Accessibility (1-5 or ?)', sample:'1', score:'access',     aliases:['Access & Ownership (Low/Med/High)']},
   {key:'notes',       hdr:'Notes / Justification',                 sample:'Orphan well, no surface marker, no abandonment records on file.'},
 ];
 
@@ -1177,17 +1232,7 @@ function csvParse(text){
 }
 
 function parseScoreCell(v){
-  if(v===null||v===undefined) return null;
-  const s = String(v).trim().toLowerCase();
-  if(!s) return null;
-  if(s==='1' || s==='low' || s==='l') return 1;
-  if(s==='3' || s==='med' || s==='medium' || s==='moderate' || s==='m') return 3;
-  if(s==='5' || s==='high' || s==='h' || s==='critical') return 5;
-  // tolerate "1 (low)" or similar
-  if(s.startsWith('1')) return 1;
-  if(s.startsWith('3')) return 3;
-  if(s.startsWith('5')) return 5;
-  return null;
+  return WellScoring.scoreLabelToValue(v);
 }
 
 function downloadCSVTemplate(){
@@ -1206,15 +1251,17 @@ function downloadCSVTemplate(){
       case 'status': return 'Abandoned (P&A)';
       case 'klass': return 'Type 7';
       case 'reviewer': return 'T. Khan';
-      case 'sc_plug': return 'Low';
-      case 'sc_barriers': return 'Low';
-      case 'sc_cement': return 'Low';
-      case 'sc_prox': return 'Medium';
-      case 'sc_depthR': return 'High';
-      case 'sc_depthC': return 'Low';
-      case 'sc_age': return 'Medium';
-      case 'sc_access': return 'Low';
-      case 'sc_data': return 'Low';
+      case 'sc_plugQuality': return '1';
+      case 'sc_cement': return '1';
+      case 'sc_barriers': return '1';
+      case 'sc_scvf': return '?';
+      case 'sc_age': return '3';
+      case 'sc_complexity': return '?';
+      case 'sc_data': return '1';
+      case 'sc_penetration': return '5';
+      case 'sc_plume': return '3';
+      case 'sc_usdw': return '?';
+      case 'sc_access': return '1';
       case 'notes': return 'Modern P&A (2018), CBL verified to caprock, full records on file.';
       default: return '';
     }
@@ -1229,7 +1276,7 @@ function downloadCSVTemplate(){
 function exportCSV(){
   if(!state.wells.length){ alert('No wells to export. Add wells or click "Load Demo" first.'); return; }
   const header = CSV_COLS.map(c=>c.hdr);
-  const scoreLabel = v=> v===1?'Low':v===3?'Medium':v===5?'High':'';
+  const scoreLabel = v => v===null||v===undefined ? '?' : String(v);
   const rows = state.wells.map(w => CSV_COLS.map(c=>{
     if(c.score) return scoreLabel(w.scores[c.score]);
     switch(c.key){
@@ -1265,10 +1312,18 @@ function importCSV(e){
       // Map header → column key by case/space-insensitive match
       const norm = s => String(s).toLowerCase().replace(/[^a-z0-9]+/g,'');
       const colIdx = {};
+      let v1Detected = false;
       CSV_COLS.forEach(c => {
-        const target = norm(c.hdr);
-        const idx = headerRow.findIndex(h => norm(h)===target);
-        if(idx>=0) colIdx[c.key] = idx;
+        const names = [c.hdr, ...(c.aliases||[])].map(norm);
+        // Collect ALL matching header indices (not just the first) — a v1 CSV can carry both
+        // "Depth vs Reservoir" and "Depth vs Storage Complex" as separate columns that both
+        // alias onto sc_penetration, and the worst of the two must be imported.
+        const matches = [];
+        headerRow.forEach((h, hi) => { if(names.includes(norm(h))) matches.push(hi); });
+        if(matches.length){
+          colIdx[c.key] = matches;
+          if(c.aliases && c.aliases.length && matches.some(hi => norm(headerRow[hi])!==norm(c.hdr))) v1Detected = true;
+        }
       });
       // Require licence column
       if(colIdx.licence===undefined){
@@ -1288,7 +1343,7 @@ function importCSV(e){
         // skip fully empty rows
         if(row.every(c=>!String(c||'').trim())) continue;
         try {
-          const get = k => colIdx[k]!==undefined ? (row[colIdx[k]]||'').trim() : '';
+          const get = k => colIdx[k]!==undefined ? (row[colIdx[k][0]]||'').trim() : '';
           const licence = get('licence') || 'UNNAMED';
           const operator = get('operator') || 'Unknown';
           const latRaw = get('lat'); const lonRaw = get('lon'); const yearRaw = get('year');
@@ -1303,12 +1358,14 @@ function importCSV(e){
           const statCol  = CSV_COLS.find(c=>c.key==='status');
           const klassCol = CSV_COLS.find(c=>c.key==='klass');
           const scores = {};
-          PARAMS.forEach(p=>scores[p.key]=1);
           CSV_COLS.filter(c=>c.score).forEach(c=>{
-            const v = parseScoreCell(get(c.key));
-            if(v!==null) scores[c.score] = v;
+            (colIdx[c.key]||[]).forEach(hi => {
+              const v = parseScoreCell((row[hi]||'').trim());
+              if(v!==null) scores[c.score] = Math.max(scores[c.score] ?? 0, v);
+            });
           });
-          const total = PARAMS.reduce((a,p)=>a+scores[p.key],0);
+          const fullScores = {}; PARAMS.forEach(p => fullScores[p.key] = (p.key in scores) ? scores[p.key] : null);
+          const c2 = computeFor(fullScores);
           const well = {
             id: uid(),
             licence, operator, lat, lon, year,
@@ -1318,7 +1375,10 @@ function importCSV(e){
             klass: enumNormalize(get('klass'), klassCol.enum),
             reviewer: get('reviewer'),
             notes: get('notes'),
-            scores, total,
+            schema:2, scores: fullScores,
+            computed:{L:c2.L,C:c2.C,Lr:c2.Lr,Cr:c2.Cr,cell:c2.cell,riskIndex:c2.riskIndex,rankLabel:c2.rank.label,integrity:c2.integrity},
+            scoredUnder: METHODOLOGY.revision,
+            needsReview: v1Detected,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
             updatedBy: syncName()||'',
@@ -1331,7 +1391,7 @@ function importCSV(e){
       if(!imported.length){
         alert('No wells could be imported.\n\n'+(errors.join('\n')||'CSV had no data rows.'));
       } else {
-        const append = confirm(`Parsed ${imported.length} well(s) from CSV.\n\nOK = append to existing ${state.wells.length} well(s)\nCancel = replace existing register with the CSV contents.${errors.length?'\n\nSkipped '+errors.length+' row(s):\n'+errors.slice(0,5).join('\n'):''}`);
+        const append = confirm(`Parsed ${imported.length} well(s) from CSV.${v1Detected?'\n\nv1-format CSV detected — imported wells flagged for re-review.':''}\n\nOK = append to existing ${state.wells.length} well(s)\nCancel = replace existing register with the CSV contents.${errors.length?'\n\nSkipped '+errors.length+' row(s):\n'+errors.slice(0,5).join('\n'):''}`);
         state.wells = append ? state.wells.concat(imported) : imported;
         if(!append) SYNC.replaceNext = true;
         save('Import CSV ('+imported.length+' wells)'); render();
@@ -1431,10 +1491,10 @@ async function exportPDF(singleId){
     doc.setFont('helvetica','bold'); doc.setFontSize(14);
     doc.text('Portfolio Summary', M, y); y+=18;
     doc.setFont('helvetica','normal'); doc.setFontSize(10);
-    const lo=wells.filter(w=>tierFor(w.total).cls==='low').length;
-    const mo=wells.filter(w=>tierFor(w.total).cls==='mod').length;
-    const hi=wells.filter(w=>tierFor(w.total).cls==='high').length;
-    const cr=wells.filter(w=>tierFor(w.total).cls==='crit').length;
+    const lo=wells.filter(w=>rankOf(w).cls==='low').length;
+    const mo=wells.filter(w=>rankOf(w).cls==='mod').length;
+    const hi=wells.filter(w=>rankOf(w).cls==='high').length;
+    const cr=wells.filter(w=>rankOf(w).cls==='crit').length;
     doc.text(`Total wells reviewed: ${wells.length}`, M, y); y+=14;
     doc.text(`Low: ${lo}    Moderate: ${mo}    High: ${hi}    Very High: ${cr}`, M, y); y+=22;
 
@@ -1517,10 +1577,10 @@ async function exportPDF(singleId){
     doc.text('Well Register', M, y); y+=8;
     doc.autoTable({
       startY: y, margin:{left:M,right:M},
-      head:[['Well ID','Operator','Type','Status','Class','Score','Tier']],
-      body: [...wells].sort((a,b)=>b.total-a.total).map(w=>[
+      head:[['Well ID','Operator','Type','Status','Class','Index','Tier']],
+      body: [...wells].sort((a,b)=>ci(b).riskIndex-ci(a).riskIndex).map(w=>[
         pdfSafe(w.licence), pdfSafe(w.operator), pdfSafe(w.type),
-        pdfSafe(w.status), pdfSafe(w.klass), String(w.total), tierFor(w.total).label
+        pdfSafe(w.status), pdfSafe(w.klass), String(ci(w).riskIndex), rankOf(w).label
       ]),
       styles:{font:'helvetica',fontSize:9,cellPadding:5,overflow:'linebreak',valign:'middle'},
       headStyles:{fillColor:[23,34,56],textColor:255,fontStyle:'bold'},
@@ -1545,7 +1605,7 @@ async function exportPDF(singleId){
     doc.autoTable({
       startY: y+8, margin:{left:M,right:M},
       head:[['Parameter','Low (1)','Medium (3)','High (5)']],
-      body: PARAMS.map(p=>[pdfSafe(p.name), pdfSafe(p.levels[1]), pdfSafe(p.levels[3]), pdfSafe(p.levels[5])]),
+      body: PARAMS.map(p=>[pdfSafe(p.name+' ('+p.axis+' w'+p.weight.toFixed(2)+')'), pdfSafe(p.anchors[1]), pdfSafe(p.anchors[3]), pdfSafe(p.anchors[5])]),
       styles:{font:'helvetica',fontSize:8.5,cellPadding:5,overflow:'linebreak',valign:'top'},
       headStyles:{fillColor:[23,34,56],textColor:255,fontStyle:'bold',halign:'left'},
       columnStyles:{0:{cellWidth:120,fontStyle:'bold'}}
@@ -1555,22 +1615,23 @@ async function exportPDF(singleId){
 
   // Per-well dossiers
   wells.forEach((w)=>{
+    const w2 = WellScoring.normalizeWell(w, METHODOLOGY);
     doc.addPage(); y = M;
-    const t = tierFor(w.total);
+    const t = rankOf(w2);
     doc.setFillColor(...hexToRgb(t.color));
     doc.rect(0,0,W,10,'F');
 
     doc.setFont('helvetica','bold'); doc.setFontSize(16);
-    doc.text(pdfSafe('Well Dossier: '+w.licence), M, y); y+=22;
+    doc.text(pdfSafe('Well Dossier: '+w2.licence), M, y); y+=22;
 
     doc.setFont('helvetica','normal'); doc.setFontSize(10);
-    doc.text(pdfSafe('Operator: '+w.operator), M, y); y+=14;
-    doc.text(pdfSafe(`Type: ${w.type}    Trajectory: ${w.traj}    Status: ${w.status}    Class: ${w.klass}`), M, y); y+=14;
-    const coord = (w.lat===null||w.lat===undefined?'-':w.lat) + ', ' + (w.lon===null||w.lon===undefined?'-':w.lon);
+    doc.text(pdfSafe('Operator: '+w2.operator), M, y); y+=14;
+    doc.text(pdfSafe(`Type: ${w2.type}    Trajectory: ${w2.traj}    Status: ${w2.status}    Class: ${w2.klass}`), M, y); y+=14;
+    const coord = (w2.lat===null||w2.lat===undefined?'-':w2.lat) + ', ' + (w2.lon===null||w2.lon===undefined?'-':w2.lon);
     doc.text(pdfSafe('Coordinates: '+coord), M, y); y+=14;
-    if(w.year){ doc.text(pdfSafe('Spud / Completion Year: '+w.year), M, y); y+=14; }
-    if(w.reviewer){ doc.text(pdfSafe('Reviewer: '+w.reviewer), M, y); y+=14; }
-    const assessed = (w.updatedAt||w.createdAt||'').slice(0,10);
+    if(w2.year){ doc.text(pdfSafe('Spud / Completion Year: '+w2.year), M, y); y+=14; }
+    if(w2.reviewer){ doc.text(pdfSafe('Reviewer: '+w2.reviewer), M, y); y+=14; }
+    const assessed = (w2.updatedAt||w2.createdAt||'').slice(0,10);
     if(assessed){ doc.text('Assessed: '+assessed, M, y); y+=14; }
 
     y+=4;
@@ -1578,7 +1639,7 @@ async function exportPDF(singleId){
     doc.setFillColor(...hexToRgb(t.color));
     doc.roundedRect(M, y, 200, 22, 4, 4, 'F');
     doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(12);
-    doc.text(pdfSafe(`Risk Score ${w.total}/45  -  ${t.label}`), M+10, y+15);
+    doc.text(pdfSafe(`Risk Index ${w2.computed.riskIndex}/25  -  ${t.label}`), M+10, y+15);
     doc.setTextColor(0,0,0);
     y += 32;
 
@@ -1586,7 +1647,7 @@ async function exportPDF(singleId){
     doc.autoTable({
       startY:y, margin:{left:M,right:M},
       head:[['Parameter','Justification (Appendix D)','Score']],
-      body: PARAMS.map(p=>[pdfSafe(p.name), pdfSafe(p.levels[w.scores[p.key]]), String(w.scores[p.key])]),
+      body: PARAMS.map(p=>[pdfSafe(p.name), pdfSafe(WellScoring.anchorText(p, w2.scores[p.key])), w2.scores[p.key]===null?'?':String(w2.scores[p.key])]),
       styles:{font:'helvetica',fontSize:9,cellPadding:5,overflow:'linebreak',valign:'middle',lineColor:[210,215,225],lineWidth:0.3},
       headStyles:{fillColor:[23,34,56],textColor:255,fontStyle:'bold'},
       columnStyles:{
@@ -1605,19 +1666,19 @@ async function exportPDF(singleId){
     y = doc.lastAutoTable.finalY + 18;
 
     // Notes block
-    if(w.notes){
+    if(w2.notes){
       ensure(60);
       doc.setFont('helvetica','bold'); doc.setFontSize(12);
       doc.text('Notes', M, y); y+=14;
       doc.setFont('helvetica','normal'); doc.setFontSize(10);
-      const noteLines = doc.splitTextToSize(pdfSafe(w.notes), CONTENT_W);
+      const noteLines = doc.splitTextToSize(pdfSafe(w2.notes), CONTENT_W);
       ensure(noteLines.length*12 + 8);
       doc.text(noteLines, M, y);
       y += noteLines.length*12 + 10;
     }
 
     // Recommended action
-    const rec = recommend(w);
+    const rec = recommend(w2);
     ensure(80);
     doc.setFont('helvetica','bold'); doc.setFontSize(12);
     doc.text(pdfSafe('Recommended Action (Sec. 8)'), M, y); y+=16;
@@ -1681,6 +1742,7 @@ const SYNC = {
   sha:null, etag:null, mode:'local', dirty:false, pushing:false, queued:false,
   replaceNext:false, pendingMsg:'', pendingDeletes:new Set(),
   pushTimer:null, pollTimer:null, lastSync:null,
+  methodologyPath:'methodology.json', methodologySha:null,
 };
 function syncToken(){ return localStorage.getItem('co2_sync_token')||''; }
 function syncName(){ return localStorage.getItem('co2_sync_name')||''; }
@@ -1721,6 +1783,7 @@ function setSyncStatus(mode, detail){
   }
 }
 function mergeWells(local, remote){
+  local = normalizeAll(local); remote = normalizeAll(remote);
   const byId = new Map();
   (remote||[]).forEach(w=>{ if(w && w.id && !SYNC.pendingDeletes.has(w.id)) byId.set(w.id, w); });
   (local||[]).forEach(w=>{
@@ -1747,6 +1810,34 @@ async function fetchRemote(useEtag){
   try{ const arr = JSON.parse(b64decode(j.content||'')); if(Array.isArray(arr)) wells = arr; }catch(e){}
   return {sha:j.sha, wells, etag};
 }
+/* ---- methodology.json remote tracking (mirrors the wells.json fetch/push conventions above) ---- */
+function apiMethUrl(){ return `https://api.github.com/repos/${SYNC.owner}/${SYNC.repo}/contents/${SYNC.methodologyPath}`; }
+async function fetchMethodologyRemote(){
+  try{
+    const res = await fetch(apiMethUrl()+'?ref='+encodeURIComponent(SYNC.branch), {headers: apiHeaders(), cache:'no-store'});
+    if(!res.ok) return null;
+    const j = await res.json();
+    SYNC.methodologySha = j.sha;
+    const m = JSON.parse(b64decode(j.content||''));
+    if(!WellScoring.validateMethodology(m).ok) return null;
+    return { m, sha: j.sha };
+  }catch(e){ return null; }
+}
+async function pushMethodologyRemote(newM){
+  for(let attempt=0; attempt<2; attempt++){
+    const body = {
+      message: 'Methodology '+newM.revision+' — '+(syncName()||'unknown'),
+      content: b64encode(JSON.stringify(newM,null,2)+'\n'),
+      branch: SYNC.branch,
+    };
+    if(SYNC.methodologySha) body.sha = SYNC.methodologySha;
+    const res = await fetch(apiMethUrl(), {method:'PUT', headers:{...apiHeaders(),'Content-Type':'application/json'}, body:JSON.stringify(body)});
+    if(res.ok){ const j = await res.json(); SYNC.methodologySha = j.content && j.content.sha; return true; }
+    if(res.status===409 || res.status===422){ await fetchMethodologyRemote(); continue; } // SHA collision → refetch, retry
+    return false;
+  }
+  return false;
+}
 async function pullRemote(initial){
   if(SYNC.pushing || SYNC.dirty) return; // never clobber unsaved local edits; push() merges instead
   try{
@@ -1758,7 +1849,7 @@ async function pullRemote(initial){
       return;
     }
     SYNC.sha=r.sha; SYNC.etag=r.etag; SYNC.lastSync=Date.now();
-    if(r.wells){ state.wells = r.wells; persistLocal(); render(); }
+    if(r.wells){ state.wells = normalizeAll(r.wells); persistLocal(); render(); }
     setSyncStatus(syncToken()?'live':'view');
   }catch(e){
     setSyncStatus(syncToken()?'error':'local', e.message);
@@ -1837,7 +1928,7 @@ async function connectSync(){
     SYNC.etag = null;
     const r = await fetchRemote(false);
     if(r.wells){
-      state.wells = SYNC.dirty ? mergeWells(state.wells, r.wells) : r.wells;
+      state.wells = SYNC.dirty ? mergeWells(state.wells, r.wells) : normalizeAll(r.wells);
       SYNC.sha=r.sha; SYNC.etag=r.etag;
       persistLocal(); render();
     }
@@ -1859,19 +1950,86 @@ function disconnectSync(){
   const msg = document.getElementById('syncMsg');
   if(msg) msg.innerHTML = '<div class="note" style="margin-top:10px">Disconnected. The shared register is untouched; this browser is now local-only.</div>';
 }
+/* ---- methodology admin modal ---- */
+let mmDraft = null;
+function openMethodologyModal(){
+  mmDraft = JSON.parse(JSON.stringify(METHODOLOGY));
+  document.getElementById('mmRev').textContent = METHODOLOGY.revision;
+  const host = document.getElementById('mmParams');
+  host.innerHTML = ['L','C'].map(axis => `
+    <h2 style="margin-top:10px">${axis==='L'?'Likelihood':'Consequence'} <span class="score-pill" id="mmSum${axis}"></span></h2>
+    ${mmDraft.params.map((p,i)=>({p,i})).filter(x=>x.p.axis===axis).map(({p,i})=>`
+      <div class="score-row" style="grid-template-columns:1.2fr 90px 70px 2.4fr">
+        <div class="name">${escapeHtml(p.name)}<small>${escapeHtml(p.desc)}</small></div>
+        <div><input type="number" step="0.01" min="0" max="1" value="${p.weight}" style="width:70px"
+             onchange="mmSet(${i},'weight',parseFloat(this.value))"> w</div>
+        <div><select onchange="mmSet(${i},'unknownScore',parseInt(this.value,10))">
+          ${[1,2,3,4,5].map(v=>`<option ${v===p.unknownScore?'selected':''}>${v}</option>`).join('')}
+        </select> ?</div>
+        <div>${[1,3,5].map(a=>`<textarea rows="1" style="width:100%;font-size:11px;margin:1px 0"
+             onchange="mmSetAnchor(${i},${a},this.value)">${escapeHtml(p.anchors[a])}</textarea>`).join('')}</div>
+      </div>`).join('')}`).join('');
+  const bh = document.getElementById('mmBands');
+  bh.innerHTML = mmDraft.matrix.bands.map((b,i)=>`
+    <span class="tag ${b.cls}" style="margin-right:8px">${escapeHtml(b.label)}
+      <input type="number" min="1" max="25" value="${b.min}" style="width:48px" onchange="mmSetBand(${i},'min',parseInt(this.value,10))"> –
+      <input type="number" min="1" max="25" value="${b.max}" style="width:48px" onchange="mmSetBand(${i},'max',parseInt(this.value,10))">
+    </span>`).join('');
+  mmValidate();
+  document.getElementById('methModal').classList.add('open');
+}
+function closeMethodologyModal(){ document.getElementById('methModal').classList.remove('open'); mmDraft=null; }
+function mmSet(i,k,v){ mmDraft.params[i][k]=v; mmValidate(); }
+function mmSetAnchor(i,a,v){ mmDraft.params[i].anchors[a]=v; mmValidate(); }
+function mmSetBand(i,k,v){ mmDraft.matrix.bands[i][k]=v; mmValidate(); }
+function mmValidate(){
+  const val = WellScoring.validateMethodology(mmDraft);
+  for (const axis of ['L','C']) {
+    const sum = WellScoring.paramsOf(mmDraft, axis).reduce((a,p)=>a+(+p.weight||0),0);
+    const el = document.getElementById('mmSum'+axis);
+    if (el){ el.textContent = 'Σw = '+sum.toFixed(2); el.style.color = Math.abs(sum-1)>0.001 ? '#e85a4f' : '#1fbf75'; }
+  }
+  document.getElementById('mmValidation').innerHTML =
+    val.ok ? '<span style="color:#1fbf75">Valid — next revision: '+WellScoring.bumpRevision(METHODOLOGY, mmDraft)+'</span>'
+           : '<span style="color:#e85a4f">'+val.errors.map(escapeHtml).join('<br>')+'</span>';
+  document.getElementById('mmSave').disabled = !val.ok || !syncToken();
+  if (!syncToken() && val.ok) document.getElementById('mmValidation').innerHTML += '<br><span class="muted">Connect a token (sync pill) to commit changes.</span>';
+}
+async function saveMethodologyEdits(){
+  if (JSON.stringify(mmDraft) === JSON.stringify(METHODOLOGY)) { closeMethodologyModal(); return; }  // no-op Save must never bump the revision
+  const rev = WellScoring.bumpRevision(METHODOLOGY, mmDraft);
+  mmDraft.revision = rev;
+  mmDraft.updatedBy = syncName() || 'unknown';
+  mmDraft.updatedAt = new Date().toISOString();
+  document.getElementById('mmSave').disabled = true;
+  const ok = await pushMethodologyRemote(mmDraft);
+  if (ok) { applyMethodology(mmDraft, 'remote'); closeMethodologyModal(); setSyncStatus('live', 'Methodology '+rev+' committed'); }
+  else { document.getElementById('mmValidation').innerHTML = '<span style="color:#e85a4f">Commit failed — check token permissions / rate limit, then retry.</span>'; document.getElementById('mmSave').disabled = false; }
+}
+/* pollMethodology — refetches methodology.json (also keeps SYNC.methodologySha current for
+   the admin panel's commit path) and applies it live only when the revision actually changed,
+   so wells never get silently re-normalized against a rulebook nobody asked for. */
+function pollMethodology(){
+  fetchMethodologyRemote().then(r => {
+    if (r && r.m.revision !== METHODOLOGY.revision) applyMethodology(r.m, 'remote');
+  });
+}
 function startPolling(){
   clearInterval(SYNC.pollTimer);
-  SYNC.pollTimer = setInterval(()=>pullRemote(false), syncToken()?45000:120000);
+  SYNC.pollTimer = setInterval(()=>{ pullRemote(false); if(syncToken()) pollMethodology(); }, syncToken()?45000:120000);
 }
 function initSync(){
+  WellScoring.loadMethodology('methodology.json').then(r => applyMethodology(r.methodology, r.source));
   setSyncStatus('local');
   pullRemote(true);
+  if(syncToken()) pollMethodology();
   startPolling();
-  window.addEventListener('focus', ()=>pullRemote(false));
+  window.addEventListener('focus', ()=>{ pullRemote(false); if(syncToken()) pollMethodology(); });
   window.addEventListener('beforeunload', (e)=>{
     if(SYNC.dirty && syncToken()){ e.preventDefault(); e.returnValue=''; }
   });
   document.getElementById('syncModal').addEventListener('click',(e)=>{ if(e.target.id==='syncModal') closeSyncModal(); });
+  document.getElementById('methModal').addEventListener('click',(e)=>{ if(e.target.id==='methModal') closeMethodologyModal(); });
 }
 
 /* ============ INIT ============ */
@@ -1879,7 +2037,7 @@ load();           // local cache first (instant paint, offline fallback)
 buildScoring();
 updateLiveTotal();
 render();
-initSync();       // then pull the shared team register and start auto-refresh
+initSync();       // then pull the shared team register and start auto-refresh; must run even if render() above failed
 </script>
 </body>
 </html>

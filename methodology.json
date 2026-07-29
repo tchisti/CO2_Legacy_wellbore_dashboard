@@ -1,0 +1,276 @@
+{
+  "revision": "2.0.0",
+  "updatedBy": "Tahir Chisti",
+  "updatedAt": "2026-07-28T00:00:00Z",
+  "params": [
+    {
+      "key": "plugQuality",
+      "name": "Abandonment & Plug Quality",
+      "axis": "L",
+      "weight": 0.22,
+      "desc": "Verified modern plugs vs. missing/unverifiable",
+      "anchors": {
+        "1": "Abandoned to current D020 / Class VI standard; verified plugs across storage complex",
+        "3": "Era-standard abandonment; plugs present but unverified (no tag/log)",
+        "5": "Improper abandonment; bridge-plug-only / welded-cap era; plugs missing"
+      },
+      "unknownScore": 5,
+      "refs": [
+        "AER D020 §3",
+        "40 CFR 146.84(c)",
+        "Arbad et al. 2024"
+      ]
+    },
+    {
+      "key": "cement",
+      "name": "Cement Coverage & Quality",
+      "axis": "L",
+      "weight": 0.2,
+      "desc": "TOC and cement quality vs. seals and BGWP/USDW base",
+      "anchors": {
+        "1": "Returns/CBL confirm coverage across primary seal and to surface-casing shoe",
+        "3": "TOC below a required seal, or quality unverified (no CBL/VDL)",
+        "5": "Known uncemented interval across a seal or across BGWP/USDW base; no cement records"
+      },
+      "unknownScore": 5,
+      "refs": [
+        "AER D020",
+        "40 CFR 146.84(c)",
+        "Watson & Bachu 2009"
+      ]
+    },
+    {
+      "key": "barriers",
+      "name": "Barriers Across Flow Zones",
+      "axis": "L",
+      "weight": 0.12,
+      "desc": "Independent permanent barriers per flow zone",
+      "anchors": {
+        "1": "≥2 independent verified barriers per flow zone",
+        "3": "Single barrier somewhere",
+        "5": "No barrier across ≥1 flow zone"
+      },
+      "unknownScore": 3,
+      "refs": [
+        "AER D020",
+        "CSA Z741"
+      ]
+    },
+    {
+      "key": "scvf",
+      "name": "SCVF / Gas Migration History",
+      "axis": "L",
+      "weight": 0.16,
+      "desc": "Surface casing vent flow / gas migration test history",
+      "anchors": {
+        "1": "Tested; none reported",
+        "3": "Historical SCVF/GM repaired & verified, or never tested",
+        "5": "Active or unrepaired SCVF/GM"
+      },
+      "unknownScore": 3,
+      "refs": [
+        "Watson & Bachu 2009 (top predictor)",
+        "AER ID 2003-01"
+      ]
+    },
+    {
+      "key": "age",
+      "name": "Well Age & Regulatory Era",
+      "axis": "L",
+      "weight": 0.1,
+      "desc": "Drilling year as a proxy for cementing/abandonment practice vintage",
+      "anchors": {
+        "1": "Post-1995",
+        "3": "1965–1995",
+        "5": "Pre-1965 or unknown spud date"
+      },
+      "unknownScore": 5,
+      "refs": [
+        "Watson & Bachu 2009 era analysis",
+        "Arbad et al. 2024"
+      ]
+    },
+    {
+      "key": "complexity",
+      "name": "Wellbore Complexity & Condition",
+      "axis": "L",
+      "weight": 0.1,
+      "desc": "Deviation, sour/oil service history, casing condition",
+      "anchors": {
+        "1": "Vertical, sweet, simple completion",
+        "3": "Deviated, or sour/oil-producer history, or suspected casing issues",
+        "5": "Multiple factors, or known casing failure/corrosion"
+      },
+      "unknownScore": 3,
+      "refs": [
+        "Watson & Bachu 2009",
+        "AER D065 wellbore review"
+      ]
+    },
+    {
+      "key": "data",
+      "name": "Data Confidence",
+      "axis": "L",
+      "weight": 0.1,
+      "desc": "Completeness of drilling/completion/abandonment records",
+      "anchors": {
+        "1": "Complete records incl. logs",
+        "3": "Partial / incomplete",
+        "5": "None or analog only"
+      },
+      "unknownScore": 5,
+      "refs": [
+        "40 CFR 146.84(c)",
+        "Arbad public-data method"
+      ]
+    },
+    {
+      "key": "penetration",
+      "name": "Penetration vs Storage Complex",
+      "axis": "C",
+      "weight": 0.3,
+      "desc": "Deepest penetration relative to primary seal and storage reservoir",
+      "anchors": {
+        "1": "Does not reach primary seal (Types 8–9)",
+        "3": "Penetrates primary seal, not reservoir (Types 4–7)",
+        "5": "Intersects storage reservoir (Types 1–3)"
+      },
+      "unknownScore": 5,
+      "refs": [
+        "Type classification (GD-40 / Arbad)",
+        "40 CFR 146.84",
+        "AER D065 AOR"
+      ]
+    },
+    {
+      "key": "plume",
+      "name": "Position vs Plume & Pressure Front",
+      "axis": "C",
+      "weight": 0.25,
+      "desc": "Position relative to the modeled CO₂ plume and pressure front (AoR)",
+      "anchors": {
+        "1": "Outside modeled pressure front (AoR). No model yet: > 3.2 km from injector",
+        "3": "Inside pressure front, outside plume. No model yet: 1.6 – 3.2 km",
+        "5": "Inside modeled CO₂ plume extent. No model yet: < 1.6 km"
+      },
+      "unknownScore": 3,
+      "refs": [
+        "40 CFR 146.84(a) AoR modeling",
+        "AER D065"
+      ]
+    },
+    {
+      "key": "usdw",
+      "name": "Groundwater (USDW/BGWP) Isolation",
+      "axis": "C",
+      "weight": 0.25,
+      "desc": "Barrier status across the protected groundwater interval",
+      "anchors": {
+        "1": "Verified isolation across BGWP/USDW base (surface casing + cement, or plugs)",
+        "3": "Unverified",
+        "5": "Known open pathway at the groundwater interval"
+      },
+      "unknownScore": 3,
+      "refs": [
+        "AER D020 non-saline protection",
+        "EPA USDW mandate"
+      ]
+    },
+    {
+      "key": "access",
+      "name": "Corrective-Action Accessibility",
+      "axis": "C",
+      "weight": 0.2,
+      "desc": "Feasibility of re-entry / re-abandonment if intervention is needed",
+      "anchors": {
+        "1": "Licensee active; surface access; re-entry feasible",
+        "3": "Suspended / no marker / constrained access",
+        "5": "Orphaned, unknown location, or re-entry infeasible"
+      },
+      "unknownScore": 3,
+      "refs": [
+        "40 CFR 146.84(d) corrective action",
+        "AER orphan registry"
+      ]
+    }
+  ],
+  "matrix": {
+    "bands": [
+      {
+        "min": 1,
+        "max": 4,
+        "label": "Low",
+        "cls": "low",
+        "color": "#1fbf75"
+      },
+      {
+        "min": 5,
+        "max": 9,
+        "label": "Moderate",
+        "cls": "mod",
+        "color": "#f0a93b"
+      },
+      {
+        "min": 10,
+        "max": 16,
+        "label": "High",
+        "cls": "high",
+        "color": "#e85a4f"
+      },
+      {
+        "min": 17,
+        "max": 25,
+        "label": "Very High",
+        "cls": "crit",
+        "color": "#a8324a"
+      }
+    ]
+  },
+  "wellTypes": {
+    "Type 1": {
+      "short": "No records — undocumented construction",
+      "desc": "No documentation available, minimal or no records; only drilling is known. Construction details are absent, so schematics cannot be produced.",
+      "prot": "Unknown"
+    },
+    "Type 2": {
+      "short": "Thru seal + reservoir — nothing protected",
+      "desc": "Penetrates both the primary geologic seal and storage reservoir.",
+      "prot": "No protection for groundwater/USDWs, primary geologic seal, or storage reservoir."
+    },
+    "Type 3": {
+      "short": "Thru seal + reservoir — groundwater only",
+      "desc": "Penetrates both the primary geologic seal and storage reservoir.",
+      "prot": "Protection for groundwater/USDWs only; no protection for primary geologic seal or storage reservoir."
+    },
+    "Type 4": {
+      "short": "Thru seal + reservoir — groundwater + seal",
+      "desc": "Penetrates both the primary geologic seal and storage reservoir.",
+      "prot": "Protection for groundwater/USDWs and primary geologic seal; storage reservoir not protected."
+    },
+    "Type 5": {
+      "short": "Thru seal only — nothing protected",
+      "desc": "Penetrates only the primary geologic seal.",
+      "prot": "No protection for groundwater/USDWs or primary geologic seal."
+    },
+    "Type 6": {
+      "short": "Thru seal only — groundwater protected",
+      "desc": "Penetrates only the primary geologic seal.",
+      "prot": "Protection for groundwater/USDWs; primary geologic seal not protected."
+    },
+    "Type 7": {
+      "short": "Thru seal + reservoir — fully protected",
+      "desc": "Penetrates both the primary geologic seal and storage reservoir.",
+      "prot": "Protection for groundwater/USDWs, primary geologic seal, and storage reservoir."
+    },
+    "Type 8": {
+      "short": "Thru seal only — groundwater + seal",
+      "desc": "Penetrates only the primary geologic seal.",
+      "prot": "Protection for groundwater/USDWs and primary geologic seal."
+    },
+    "Type 9": {
+      "short": "Above seal & reservoir — lowest risk",
+      "desc": "Does not penetrate either the primary geologic seal or storage reservoir.",
+      "prot": "Dependent on confining-zone integrity; if the confining zone is intact, represents the lowest level of risk."
+    }
+  }
+}
