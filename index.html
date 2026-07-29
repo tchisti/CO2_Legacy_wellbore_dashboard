@@ -53,7 +53,8 @@ button.ghost{background:transparent}
 @media (max-width:1100px){.layout{grid-template-columns:1fr}}
 .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:18px}
 .panel h2{margin:0 0 12px 0;font-size:14px;letter-spacing:.4px;text-transform:uppercase;color:var(--muted)}
-.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+.kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:16px}
+@media (max-width:900px){.kpis{grid-template-columns:repeat(2,1fr)}}
 .kpi{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px}
 .kpi .label{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.6px}
 .kpi .val{font-size:28px;font-weight:800;margin-top:4px}
@@ -153,7 +154,7 @@ footer{padding:18px 24px;color:var(--muted);font-size:11px;border-top:1px solid 
     <div class="mark">CO₂</div>
     <div>
       <h1>Legacy Wellbore Risk Review — CCS</h1>
-      <small>Appendix D Calculator · § 7.2 Risk Scoring · CSA Z741 / EPA Class VI / AER D051</small>
+      <small>Unified Risk Methodology · AER D065/D020 + EPA Class VI §146.84 · Weighted L×C Matrix</small>
     </div>
   </div>
   <div class="actions">
@@ -181,9 +182,10 @@ footer{padding:18px 24px;color:var(--muted);font-size:11px;border-top:1px solid 
 
 <div class="kpis" style="padding:20px 24px 0 24px">
   <div class="kpi total"><div class="label">Wells in Review</div><div class="val" id="kTotal">0</div><div class="sub">within AoR</div></div>
-  <div class="kpi low"><div class="label">Low Risk</div><div class="val" id="kLow">0</div><div class="sub">Score 9 – 18</div></div>
-  <div class="kpi mod"><div class="label">Moderate Risk</div><div class="val" id="kMod">0</div><div class="sub">Score 19 – 30</div></div>
-  <div class="kpi high"><div class="label">High / Very High</div><div class="val" id="kHigh">0</div><div class="sub">Score 31 – 45</div></div>
+  <div class="kpi low"><div class="label">Low Risk</div><div class="val" id="kLow">0</div><div class="sub">Cell 1 – 4</div></div>
+  <div class="kpi mod"><div class="label">Moderate Risk</div><div class="val" id="kMod">0</div><div class="sub">Cell 5 – 9</div></div>
+  <div class="kpi high"><div class="label">High / Very High</div><div class="val" id="kHigh">0</div><div class="sub">Cell 10 – 25</div></div>
+  <div class="kpi"><div class="label">Needs Re-review</div><div class="val" id="kReview">0</div><div class="sub">Migrated / stale revision</div></div>
 </div>
 
 <div class="layout">
@@ -276,12 +278,12 @@ footer{padding:18px 24px;color:var(--muted);font-size:11px;border-top:1px solid 
           <div class="chart-wrap"><canvas id="distChart"></canvas></div>
         </div>
         <div class="panel">
-          <h2>Driver Heatmap — Avg score per parameter</h2>
+          <h2>Driver Heatmap — Avg weighted contribution (w × s)</h2>
           <div class="chart-wrap"><canvas id="driverChart"></canvas></div>
         </div>
       </div>
       <div class="panel" style="margin-top:16px">
-        <div class="row spread"><h2>Top Risk Wells</h2><span class="muted">Sorted by total score (desc)</span></div>
+        <div class="row spread"><h2>Top Risk Wells</h2><span class="muted">Sorted by Risk Index (desc)</span></div>
         <div id="topList"></div>
       </div>
     </section>
@@ -291,24 +293,27 @@ footer{padding:18px 24px;color:var(--muted);font-size:11px;border-top:1px solid 
       <div class="panel">
         <div class="row spread" style="margin-bottom:10px">
           <h2>Legacy Well Register</h2>
-          <div class="search">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-            <input id="search" placeholder="Filter by ID, operator, status…" oninput="render()"/>
+          <div class="row" style="gap:12px">
+            <label style="font-size:11px;display:inline-flex;align-items:center;gap:4px"><input type="checkbox" id="fltReview" onchange="render()"> needs re-review only</label>
+            <div class="search">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+              <input id="search" placeholder="Filter by ID, operator, status…" oninput="render()"/>
+            </div>
           </div>
         </div>
         <div style="max-height:540px;overflow:auto;border:1px solid var(--line);border-radius:10px">
           <table class="wells" id="wellsTable">
             <thead><tr>
-              <th>Well ID</th><th>Type</th><th>Status</th><th>Class</th><th>Age</th><th>Score</th><th>Category</th><th></th>
+              <th>Well ID</th><th>Type</th><th>Status</th><th>Class</th><th>Age</th><th>L × C</th><th>Index</th><th>Category</th><th></th>
             </tr></thead>
             <tbody id="wellsBody"></tbody>
           </table>
         </div>
         <div class="legend" style="margin-top:10px">
-          <span><span class="sw" style="background:var(--low)"></span>Low (9–18)</span>
-          <span><span class="sw" style="background:var(--mod)"></span>Moderate (19–30)</span>
-          <span><span class="sw" style="background:var(--high)"></span>High (31–40)</span>
-          <span><span class="sw" style="background:var(--crit)"></span>Very High (41–45)</span>
+          <span><span class="sw" style="background:var(--low)"></span>Low (cell 1–4)</span>
+          <span><span class="sw" style="background:var(--mod)"></span>Moderate (cell 5–9)</span>
+          <span><span class="sw" style="background:var(--high)"></span>High (cell 10–16)</span>
+          <span><span class="sw" style="background:var(--crit)"></span>Very High (cell 17–25)</span>
         </div>
       </div>
     </section>
@@ -317,7 +322,7 @@ footer{padding:18px 24px;color:var(--muted);font-size:11px;border-top:1px solid 
     <section id="tab-matrix" style="display:none">
       <div class="panel">
         <h2>5 × 5 Likelihood × Consequence Matrix</h2>
-        <p class="muted">Likelihood = barrier & data integrity factors (Plug Quality, Barriers, Cement, Age, Access, Data). Consequence = exposure factors (Proximity, Depth-vs-Reservoir, Depth-vs-Complex). § 7.1.</p>
+        <p class="muted">Likelihood = weighted sum of barrier &amp; data-integrity parameters (Plug Quality, Cement, Barriers, SCVF/GM, Age, Complexity, Data). Consequence = weighted sum of exposure parameters (Penetration, Plume Position, USDW Isolation, Access). Cell = round(L) × round(C).</p>
         <div class="matrix" id="matrix"></div>
         <div class="legend" style="margin-top:14px">
           <span><span class="sw" style="background:var(--low)"></span>Low</span>
@@ -341,11 +346,11 @@ footer{padding:18px 24px;color:var(--muted);font-size:11px;border-top:1px solid 
         <h2>Risk Scoring Reference — Appendix D & § 7.2</h2>
         <div style="overflow:auto">
         <table class="wells">
-          <thead><tr><th>Parameter</th><th>Low (1)</th><th>Medium (3)</th><th>High (5)</th></tr></thead>
+          <thead><tr><th>Parameter</th><th>Axis · Weight</th><th>Low (1)</th><th>Medium (3)</th><th>High (5)</th><th>Unknown</th><th>Basis</th></tr></thead>
           <tbody id="refBody"></tbody>
         </table>
         </div>
-        <div class="note" style="margin-top:14px"><b>Risk Ranking = Likelihood × Consequence</b> — per § 7.2. Total Risk Score = Σ(parameter scores). Range: 9 (best case) — 45 (worst case). Tiering tuned from Appendix D's 8/16/28/40 thresholds, normalized to a 9-parameter scale.</div>
+        <div class="note" style="margin-top:14px"><b>Risk Rank = matrix cell (round L × round C)</b> — L and C are weighted sums (Σ wᵢ·sᵢ, weights sum to 1.00 per axis). Continuous Risk Index = L × C (1–25) breaks ties. Bands: Low 1–4 · Moderate 5–9 · High 10–16 · Very High 17–25 (rev <span id="refRev"></span>).</div>
         <div class="note"><b>Cement carbonation note (Fig. A-2):</b> CO₂ ingress converts cement hydrates → CaCO₃ → soluble bicarbonate; vertical degradation typically &lt;few metres over geological timescales — but the barrier credit collapses if cement was never placed above caprock. Score "Cement Coverage" conservatively when CBL/VDL is absent.</div>
       </div>
 
@@ -495,7 +500,12 @@ function updateClassHint(){
   const v = document.getElementById('f_class').value;
   const d = KLASS_DEFS[v];
   const h = document.getElementById('classHint');
-  if(h) h.innerHTML = d ? `<b>${v}:</b> ${escapeHtml(d.desc)} <i>Protection: ${escapeHtml(d.prot)}</i>` : '';
+  if(h) h.innerHTML = d ? `<b>${v}:</b> ${escapeHtml(d.desc)} <i>Protection: ${escapeHtml(d.prot)}</i> · Types 8–9 suggest Penetration=1 · 4–7 → 3 · 1–3 → 5.` : '';
+  const sugg = {'Type 1':5,'Type 2':5,'Type 3':5,'Type 4':3,'Type 5':3,'Type 6':3,'Type 7':3,'Type 8':1,'Type 9':1}[v];
+  if (sugg !== undefined && state.currentForm.penetration === null) {
+    state.currentForm.penetration = sugg;
+    updateSeg('penetration'); updateLiveTotal();
+  }
 }
 
 /* Unified methodology — single source of truth is methodology.json / WellScoring.FALLBACK_METHODOLOGY.
@@ -690,36 +700,42 @@ function deleteWell(id){
 function render(){
   // KPIs
   document.getElementById('kTotal').textContent = state.wells.length;
-  let lo=0,mo=0,hi=0;
-  state.wells.forEach(w=>{
-    const t = tierFor(w.total);
-    if(t.cls==='low') lo++;
-    else if(t.cls==='mod') mo++;
-    else hi++;
-  });
-  document.getElementById('kLow').textContent=lo;
-  document.getElementById('kMod').textContent=mo;
-  document.getElementById('kHigh').textContent=hi;
+  const counts = { low:0, mod:0, highPlus:0, review:0 };
+  for (const w of state.wells) {
+    const cls = rankOf(w).cls;
+    if (cls==='low') counts.low++; else if (cls==='mod') counts.mod++; else counts.highPlus++;
+    if (w.needsReview || w.scoredUnder !== METHODOLOGY.revision) counts.review++;
+  }
+  document.getElementById('kLow').textContent = counts.low;
+  document.getElementById('kMod').textContent = counts.mod;
+  document.getElementById('kHigh').textContent = counts.highPlus;
+  document.getElementById('kReview').textContent = counts.review;
 
   // table
   const q = (document.getElementById('search')?.value||'').toLowerCase();
+  const reviewOnly = document.getElementById('fltReview')?.checked;
   const tbody = document.getElementById('wellsBody'); tbody.innerHTML='';
-  const filtered = state.wells.filter(w=>!q || [w.licence,w.operator,w.status,w.klass,w.type].join(' ').toLowerCase().includes(q));
+  const filtered = state.wells.filter(w=>{
+    if(q && ![w.licence,w.operator,w.status,w.klass,w.type].join(' ').toLowerCase().includes(q)) return false;
+    if(reviewOnly && !(w.needsReview || w.scoredUnder!==METHODOLOGY.revision)) return false;
+    return true;
+  });
   if(!filtered.length){
-    tbody.innerHTML = `<tr><td colspan="8" class="empty">No wells. Click "Load Demo" or add a well using the form.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9" class="empty">No wells. Click "Load Demo" or add a well using the form.</td></tr>`;
   } else {
-    filtered.sort((a,b)=>b.total-a.total).forEach(w=>{
-      const t = tierFor(w.total);
+    filtered.sort((a,b)=>b.computed.riskIndex-a.computed.riskIndex).forEach(w=>{
+      const t = rankOf(w);
       const tr = document.createElement('tr');
-      const age = w.scores.age===1?'<30y':w.scores.age===3?'30–50y':'>50y';
+      const reviewBadge = (w.needsReview || w.scoredUnder !== METHODOLOGY.revision) ? '<span class="tag" style="background:#3a2f12;color:#f0c96b;margin-left:4px" title="Scored under rev '+escapeHtml(w.scoredUnder||'?')+' — current '+METHODOLOGY.revision+'">re-review</span>' : '';
       tr.innerHTML = `
         <td><span class="well-id">${escapeHtml(w.licence)}</span><br><small style="color:var(--muted)">${escapeHtml(w.operator)}</small></td>
         <td>${escapeHtml(w.type)}</td>
         <td>${escapeHtml(w.status)}</td>
         <td>${escapeHtml(w.klass)}</td>
-        <td>${age}</td>
-        <td><span class="score-pill">${w.total}</span></td>
-        <td><span class="tag ${t.cls}">${t.label}</span></td>
+        <td>${w.year || '—'}</td>
+        <td><span class="score-pill">${w.computed.L.toFixed(1)}×${w.computed.C.toFixed(1)}</span></td>
+        <td><span class="score-pill">${w.computed.riskIndex}</span></td>
+        <td><span class="tag ${t.cls}">${t.label}</span>${reviewBadge}</td>
         <td style="text-align:right">
           <button class="ghost" style="padding:4px 8px;font-size:11px" onclick="event.stopPropagation();openDetail('${w.id}')">View</button>
           <button class="ghost" style="padding:4px 8px;font-size:11px" onclick="event.stopPropagation();editWell('${w.id}')">Edit</button>
@@ -731,14 +747,14 @@ function render(){
   }
 
   // top list
-  const top = [...state.wells].sort((a,b)=>b.total-a.total).slice(0,5);
+  const top = [...state.wells].sort((a,b)=>b.computed.riskIndex-a.computed.riskIndex).slice(0,5);
   const host = document.getElementById('topList');
   if(!top.length){ host.innerHTML = `<div class="empty">Add wells to see ranking.</div>`; }
   else host.innerHTML = top.map(w=>{
-    const t = tierFor(w.total);
-    const pct = ((w.total-9)/(45-9))*100;
+    const t = rankOf(w);
+    const pct = ((w.computed.riskIndex-1)/24)*100;
     return `<div onclick="openDetail('${w.id}')" style="cursor:pointer;padding:10px;border:1px solid var(--line);border-radius:10px;margin-bottom:8px;background:var(--field)">
-      <div class="row spread"><div><span class="well-id">${escapeHtml(w.licence)}</span> <span class="tag ${t.cls}">${t.label}</span></div><div style="font-weight:800">${w.total}/45</div></div>
+      <div class="row spread"><div><span class="well-id">${escapeHtml(w.licence)}</span> <span class="tag ${t.cls}">${t.label}</span></div><div style="font-weight:800">${w.computed.riskIndex}/25</div></div>
       <div class="muted" style="font-size:11px;margin:4px 0">${escapeHtml(w.operator)} · ${escapeHtml(w.type)} · ${escapeHtml(w.status)} · ${escapeHtml(w.klass)}</div>
       <div class="bar"><div style="width:${pct}%"></div></div>
     </div>`;
@@ -755,34 +771,30 @@ function render(){
 let distChart, driverChart;
 function drawCharts(){
   if(typeof Chart==='undefined') return; // CDN unavailable — table/register still work
-  const lo = state.wells.filter(w=>tierFor(w.total).cls==='low').length;
-  const mo = state.wells.filter(w=>tierFor(w.total).cls==='mod').length;
-  const hi = state.wells.filter(w=>tierFor(w.total).cls==='high').length;
-  const cr = state.wells.filter(w=>tierFor(w.total).cls==='crit').length;
+  const bands = METHODOLOGY.matrix.bands;
+  const counts = bands.map(b => state.wells.filter(w=>rankOf(w).label===b.label).length);
 
   const ctx1 = document.getElementById('distChart').getContext('2d');
   if(distChart) distChart.destroy();
   distChart = new Chart(ctx1,{
     type:'doughnut',
-    data:{labels:['Low','Moderate','High','Very High'],datasets:[{data:[lo,mo,hi,cr],backgroundColor:['#1fbf75','#f0a93b','#e85a4f','#a8324a'],borderWidth:0}]},
+    data:{labels:bands.map(b=>b.label),datasets:[{data:counts,backgroundColor:bands.map(b=>b.color),borderWidth:0}]},
     options:{plugins:{legend:{position:'right',labels:{color:CHART_COLORS().text,font:{size:12}}}},cutout:'62%'}
   });
 
-  const avgs = PARAMS.map(p=>{
-    if(!state.wells.length) return 0;
-    return state.wells.reduce((a,w)=>a+w.scores[p.key],0)/state.wells.length;
-  });
+  const avgs = PARAMS.map(p =>
+    state.wells.reduce((a,w)=>a + p.weight * WellScoring.resolveScore(p, w.scores[p.key]), 0) / Math.max(1, state.wells.length));
   const ctx2 = document.getElementById('driverChart').getContext('2d');
   if(driverChart) driverChart.destroy();
   driverChart = new Chart(ctx2,{
     type:'bar',
     data:{labels:PARAMS.map(p=>p.name),
-      datasets:[{data:avgs, backgroundColor:avgs.map(v=>v<2?'#1fbf75':v<3.5?'#f0a93b':'#e85a4f'),borderRadius:4}]},
+      datasets:[{data:avgs, backgroundColor:avgs.map((v,i)=>{ const eff=v/PARAMS[i].weight; return eff<2?'#1fbf75':eff<3.5?'#f0a93b':'#e85a4f'; }),borderRadius:4}]},
     options:{
       indexAxis:'y',
-      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>'Avg score: '+c.parsed.x.toFixed(2)}}},
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>'Avg weighted contribution: '+c.parsed.x.toFixed(3)}}},
       scales:{
-        x:{min:0,max:5,grid:{color:CHART_COLORS().grid},ticks:{color:CHART_COLORS().muted}},
+        x:{min:0,grid:{color:CHART_COLORS().grid},ticks:{color:CHART_COLORS().muted}},
         y:{grid:{display:false},ticks:{color:CHART_COLORS().text,font:{size:11}}}
       }
     }
@@ -791,15 +803,10 @@ function drawCharts(){
 
 /* ============ MATRIX (L x C) ============ */
 function matrixGrid(list){
-  // Likelihood/Consequence bins (1-5) from group-averaged params
-  const bucket = avg => avg<=1.5?1:avg<=2.5?2:avg<=3.5?3:avg<=4.5?4:5;
   const grid = Array.from({length:5},()=>Array(5).fill(0));
-  const Lp = PARAMS.filter(p=>p.group==='L');
-  const Cp = PARAMS.filter(p=>p.group==='C');
   for(const w of list){
-    const L = bucket(Lp.reduce((a,p)=>a+w.scores[p.key],0)/Lp.length);
-    const C = bucket(Cp.reduce((a,p)=>a+w.scores[p.key],0)/Cp.length);
-    grid[5-L][C-1]++;
+    const c = w.computed; if(!c) continue;
+    grid[5-c.Lr][c.Cr-1]++;
   }
   return grid;
 }
@@ -813,7 +820,8 @@ function drawMatrix(){
     host.appendChild(makeCell('L'+(5-r),true,true));
     for(let c=0;c<5;c++){
       const score = (5-r)*(c+1); // L * C
-      const cls = score<=4?'lo':score<=9?'mo':score<=16?'hi':'cr';
+      const band = WellScoring.bandFor(score, METHODOLOGY);
+      const cls = band.cls==='low'?'lo':band.cls==='mod'?'mo':band.cls==='high'?'hi':'cr';
       const cell = document.createElement('div'); cell.className='cell '+cls;
       cell.textContent = score;
       if(grid[r][c]) cell.innerHTML += `<span class="count">${grid[r][c]}</span>`;
@@ -837,15 +845,17 @@ function openDetail(id){
   document.querySelectorAll('main > section').forEach(s=>s.style.display='none');
   document.getElementById('tab-detail').style.display='block';
 
-  const t = tierFor(w.total);
-  const rec = recommend(w);
+  const w2 = WellScoring.normalizeWell(w, METHODOLOGY);
+  const t = rankOf(w2);
+  const rec = recommend(w2);
   const scoresHtml = PARAMS.map(p=>{
-    const v = w.scores[p.key];
-    const col = v===1?'#1fbf75':v===3?'#f0a93b':'#e85a4f';
+    const v = w2.scores[p.key];
+    const col = v===null||v>=4?'#e85a4f':v>=3?'#f0a93b':'#1fbf75';
     return `<tr>
       <td style="padding:6px 8px">${p.name}</td>
-      <td style="padding:6px 8px;color:var(--muted)">${p.levels[v]}</td>
-      <td style="padding:6px 8px;text-align:right"><span class="score-pill" style="color:${col};border-color:${col}">${v}</span></td>
+      <td style="padding:6px 8px;color:var(--muted)">${escapeHtml(WellScoring.anchorText(p, v))}</td>
+      <td style="padding:6px 8px;text-align:right"><span class="score-pill" style="color:${col};border-color:${col}">${v===null?'?':v}</span></td>
+      <td style="padding:6px 8px;text-align:right">${(p.weight*WellScoring.resolveScore(p,v)).toFixed(2)}</td>
     </tr>`;
   }).join('');
 
@@ -853,35 +863,37 @@ function openDetail(id){
     <div class="detail-head">
       <div>
         <div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.5px">Legacy Well Dossier</div>
-        <h2 style="font-size:20px;color:var(--text);text-transform:none;margin:4px 0">${escapeHtml(w.licence)}</h2>
-        <div class="muted">${escapeHtml(w.operator)} · ${escapeHtml(w.type)} · ${escapeHtml(w.traj)} · ${escapeHtml(w.status)} · ${escapeHtml(w.klass)}</div>
+        <h2 style="font-size:20px;color:var(--text);text-transform:none;margin:4px 0">${escapeHtml(w2.licence)}</h2>
+        <div class="muted">${escapeHtml(w2.operator)} · ${escapeHtml(w2.type)} · ${escapeHtml(w2.traj)} · ${escapeHtml(w2.status)} · ${escapeHtml(w2.klass)}</div>
       </div>
       <div style="text-align:right">
-        <div style="font-size:34px;font-weight:800">${w.total}<span style="color:var(--muted);font-size:16px">/45</span></div>
+        <div style="font-size:34px;font-weight:800">${w2.computed.riskIndex}<span style="color:var(--muted);font-size:16px">/25</span></div>
+        <div class="muted" style="font-size:12px">L ${w2.computed.L} · C ${w2.computed.C} · cell ${w2.computed.cell} · rev ${escapeHtml(w2.scoredUnder||'—')}</div>
         <span class="tag ${t.cls}">${t.label} Risk</span>
+        ${w2.legacy ? '<div class="muted" style="font-size:11px">v1 archive: '+w2.legacy.total+'/45</div>' : ''}
       </div>
     </div>
 
     <div class="grid2" style="margin-top:10px">
       <div>
         <h2>Score Breakdown</h2>
-        <table class="wells"><tbody>${scoresHtml}</tbody></table>
+        <table class="wells"><thead><tr><th>Parameter</th><th>Basis</th><th style="text-align:right">Score</th><th style="text-align:right">w×s</th></tr></thead><tbody>${scoresHtml}</tbody></table>
       </div>
       <div>
         <h2>Spatial / Identification</h2>
         <table class="wells"><tbody>
-          <tr><td>Latitude</td><td>${(w.lat===null||w.lat===undefined)?'—':w.lat}</td></tr>
-          <tr><td>Longitude</td><td>${(w.lon===null||w.lon===undefined)?'—':w.lon}</td></tr>
-          <tr><td>Type</td><td>${w.type}</td></tr>
-          <tr><td>Trajectory</td><td>${w.traj}</td></tr>
-          <tr><td>Status</td><td>${w.status}</td></tr>
-          <tr><td>Classification</td><td>${w.klass} (Fig. A-4 / Table A-1)</td></tr>
-          <tr><td>Spud / Completion Year</td><td>${w.year || '—'}</td></tr>
-          <tr><td>Reviewer</td><td>${escapeHtml(w.reviewer)||'—'}</td></tr>
-          <tr><td>Assessed</td><td>${(w.updatedAt||w.createdAt||'').slice(0,10)||'—'}</td></tr>
-          <tr><td>Last Updated By</td><td>${escapeHtml(w.updatedBy)||'—'}</td></tr>
+          <tr><td>Latitude</td><td>${(w2.lat===null||w2.lat===undefined)?'—':w2.lat}</td></tr>
+          <tr><td>Longitude</td><td>${(w2.lon===null||w2.lon===undefined)?'—':w2.lon}</td></tr>
+          <tr><td>Type</td><td>${w2.type}</td></tr>
+          <tr><td>Trajectory</td><td>${w2.traj}</td></tr>
+          <tr><td>Status</td><td>${w2.status}</td></tr>
+          <tr><td>Classification</td><td>${w2.klass} (Fig. A-4 / Table A-1)</td></tr>
+          <tr><td>Spud / Completion Year</td><td>${w2.year || '—'}</td></tr>
+          <tr><td>Reviewer</td><td>${escapeHtml(w2.reviewer)||'—'}</td></tr>
+          <tr><td>Assessed</td><td>${(w2.updatedAt||w2.createdAt||'').slice(0,10)||'—'}</td></tr>
+          <tr><td>Last Updated By</td><td>${escapeHtml(w2.updatedBy)||'—'}</td></tr>
         </tbody></table>
-        ${w.notes?`<h2 style="margin-top:14px">Notes</h2><div class="rec-card" style="white-space:pre-wrap">${escapeHtml(w.notes)}</div>`:''}
+        ${w2.notes?`<h2 style="margin-top:14px">Notes</h2><div class="rec-card" style="white-space:pre-wrap">${escapeHtml(w2.notes)}</div>`:''}
         <h2 style="margin-top:14px">Recommended Action — § 8</h2>
         <div class="rec-card"><h4>${rec.title}</h4>${rec.body}</div>
         ${rec.warn?`<div class="warn" style="margin-top:8px">${rec.warn}</div>`:''}
@@ -889,26 +901,29 @@ function openDetail(id){
     </div>
 
     <div class="actions-row" style="margin-top:14px">
-      <button class="ghost" onclick="editWell('${w.id}')">Edit</button>
-      <button class="primary" onclick="exportPDF('${w.id}')">⬇ Download Well PDF</button>
+      <button class="ghost" onclick="editWell('${w2.id}')">Edit</button>
+      <button class="primary" onclick="exportPDF('${w2.id}')">⬇ Download Well PDF</button>
     </div>
   `;
 }
 
 /* Recommendation engine — first-principles wiring of Appendix D output into § 8 actions */
 function recommend(w){
-  const s = w.scores; const T = tierFor(w.total);
-  // critical drivers
-  const drivers = PARAMS.filter(p=>s[p.key]===5).map(p=>p.name);
+  const w2 = WellScoring.normalizeWell(w, METHODOLOGY);
+  const s = w2.scores; const T = rankOf(w2);
+  const eff = k => WellScoring.resolveScore(PARAMS.find(p=>p.key===k), s[k]);
+  const drivers = PARAMS.filter(p=>eff(p.key)>=4).map(p=>p.name);
   if(T.cls==='crit' || T.cls==='high'){
     let body = `<b>Tier ${T.label}</b> — re-entry diagnostics + mitigation candidate. Key drivers: ${drivers.join(', ')||'none flagged'}.<br>`;
     const actions = [];
-    if(s.plug===5 || s.barriers===5) actions.push('Pressure-test surface casing vent + annular buildup (§ 8.1); if leak confirmed → squeeze cement or full re-abandonment (§ 8.2).');
-    if(s.cement===5) actions.push('Run CBL/VDL or ultrasonic imaging across caprock interval; top-up annular cement via perforate-and-squeeze if TOC is below caprock.');
-    if(s.prox===5 || s.depthR===5 || s.depthC===5) actions.push('Stage dedicated monitoring well + soil-gas + satellite CO₂ surveillance — well is inside high-consequence corridor.');
-    if(s.access===5) actions.push('Engage Orphan Well Association / regulator (§ 9–10); if inaccessible, default to long-term flux + satellite monitoring (§ 8.3).');
-    if(s.age===5) actions.push('Treat all pre-1976 tubulars as analog to API 5L pre-NACE; assume corrosion-prone carbon steel and de-rate barrier credit.');
-    if(s.data===5) actions.push('Flag as "Undocumented / Unverified abandonment" (§ 6.6) and carry conservative analog assumptions until logged.');
+    if(eff('plugQuality')>=4 || eff('barriers')>=4) actions.push('Pressure-test surface casing vent + annular buildup (§ 8.1); if leak confirmed → squeeze cement or full re-abandonment (§ 8.2).');
+    if(eff('cement')>=4) actions.push('Run CBL/VDL or ultrasonic imaging across caprock interval; top-up annular cement via perforate-and-squeeze if TOC is below caprock.');
+    if(eff('scvf')>=4) actions.push('Active/unrepaired SCVF-GM: bubble test + vent-flow measurement per AER ID 2003-01; repair before injection start-up.');
+    if(eff('plume')>=4 || eff('penetration')>=4) actions.push('Stage dedicated monitoring well + soil-gas + satellite CO₂ surveillance — well is inside high-consequence corridor.');
+    if(eff('usdw')>=4) actions.push('Confirm BGWP/USDW isolation: surface-casing records + cement returns; if open pathway confirmed, prioritize corrective action per 40 CFR 146.84(d).');
+    if(eff('access')>=4) actions.push('Engage Orphan Well Association / regulator (§ 9–10); if inaccessible, default to long-term flux + satellite monitoring (§ 8.3).');
+    if(eff('age')>=4) actions.push('Treat all pre-1976 tubulars as analog to API 5L pre-NACE; assume corrosion-prone carbon steel and de-rate barrier credit.');
+    if(eff('data')>=4) actions.push('Flag as "Undocumented / Unverified abandonment" (§ 6.6) and carry conservative analog assumptions until logged.');
     body += '<ul style="margin:6px 0 0 18px;padding:0">'+actions.map(a=>`<li style="margin:4px 0">${a}</li>`).join('')+'</ul>';
     return {title:'Re-entry + Mitigation Required', body,
       warn:'Per CSA Z741 § 9 / EPA Class VI 40 CFR 146.84(d), high-risk wells inside AoR require corrective action plan before injection authorization.'};
@@ -926,7 +941,10 @@ function renderRef(){
   const body = document.getElementById('refBody');
   body.innerHTML = PARAMS.map(p=>`<tr>
     <td><b>${p.name}</b><br><small style="color:var(--muted)">${p.desc}</small></td>
-    <td>${p.levels[1]}</td><td>${p.levels[3]}</td><td>${p.levels[5]}</td>
+    <td style="white-space:nowrap">${p.axis==='L'?'Likelihood':'Consequence'} · ${p.weight.toFixed(2)}</td>
+    <td>${p.anchors[1]}</td><td>${p.anchors[3]}</td><td>${p.anchors[5]}</td>
+    <td style="text-align:center">${p.unknownScore}</td>
+    <td><small>${(p.refs||[]).join(' · ')}</small></td>
   </tr>`).join('');
   const kb = document.getElementById('klassBody');
   if(kb) kb.innerHTML = Object.entries(KLASS_DEFS).map(([t,d])=>`<tr>
@@ -934,6 +952,8 @@ function renderRef(){
     <td>${escapeHtml(d.desc)}</td>
     <td>${escapeHtml(d.prot)}</td>
   </tr>`).join('');
+  const rr = document.getElementById('refRev');
+  if(rr) rr.textContent = METHODOLOGY.revision;
 }
 
 
@@ -1066,25 +1086,29 @@ function loadDemo(){
   if(state.wells.length && !confirm('Load Demo replaces the current register with 6 sample wells'+(syncToken()?' — including the SHARED register everyone sees.':'.')+' Continue?')) return;
   const now = new Date().toISOString();
   const mk = (o)=>({id:uid(), reviewer:'T. Khan', createdAt:now, updatedAt:now, updatedBy:syncName()||'', ...o});
+  const V = (o)=>{ const scores = { plugQuality:null,cement:null,barriers:null,scvf:null,age:null,complexity:null,data:null,penetration:null,plume:null,usdw:null,access:null, ...o };
+    const c = computeFor(scores);
+    return { schema:2, scores, computed:{L:c.L,C:c.C,Lr:c.Lr,Cr:c.Cr,cell:c.cell,riskIndex:c.riskIndex,rankLabel:c.rank.label,integrity:c.integrity},
+             scoredUnder:METHODOLOGY.revision, needsReview:false }; };
   state.wells = [
     mk({licence:'100/04-20-046-25W4',operator:'Orphan Well Assoc.',lat:53.4123,lon:-113.5421,year:1958,type:'Oil Producer',traj:'Vertical',status:'Orphaned',klass:'Type 2',
-     notes:'Worst-case orphan: no surface marker, no records, no licensee. Inside modeled AoR (< 1.6 km).',
-     scores:{plug:5,barriers:5,cement:5,prox:5,depthR:5,depthC:5,age:5,access:5,data:5},total:45}),
+     notes:'Worst-case orphan: no surface marker, no records, no licensee. Inside modeled plume.',
+     ...V({plugQuality:5,cement:5,barriers:5,scvf:3,age:5,complexity:3,data:5,penetration:5,plume:5,usdw:5,access:5})}),
     mk({licence:'102/11-08-046-26W4',operator:'Cenovus Energy',lat:53.4501,lon:-113.6011,year:1998,type:'Gas Producer',traj:'Vertical',status:'Abandoned (P&A)',klass:'Type 7',
-     notes:'Modern P&A, CBL verified to top of caprock, two cement plugs. Within plume buffer but barriers sound.',
-     scores:{plug:1,barriers:1,cement:1,prox:3,depthR:5,depthC:1,age:3,access:1,data:1},total:17}),
+     notes:'Modern P&A, CBL verified to top of caprock, two cement plugs, SCVF tested clear.',
+     ...V({plugQuality:1,cement:1,barriers:1,scvf:1,age:1,complexity:1,data:1,penetration:5,plume:3,usdw:1,access:1})}),
     mk({licence:'07-22-045-25W4',operator:'CNRL',lat:53.3811,lon:-113.5200,year:1985,type:'Disposal',traj:'Deviated',status:'Suspended',klass:'Type 4',
-     notes:'Suspended disposal well; partial cement data; pressure test pending under MMV cycle.',
-     scores:{plug:3,barriers:3,cement:3,prox:3,depthR:5,depthC:3,age:3,access:3,data:3},total:29}),
+     notes:'Suspended disposal well; partial cement data; SCVF repair verified 2019; pressure test pending under MMV cycle.',
+     ...V({plugQuality:3,cement:3,barriers:3,scvf:3,age:3,complexity:3,data:3,penetration:5,plume:3,usdw:3,access:3})}),
     mk({licence:'14-31-047-25W4',operator:'Unknown',lat:53.4921,lon:-113.4805,year:null,type:'Unknown',traj:'Unknown',status:'Unknown',klass:'Type 1',
      notes:'Undocumented well discovered via legacy aerial survey; default to analog assumptions until logged.',
-     scores:{plug:5,barriers:5,cement:5,prox:3,depthR:3,depthC:3,age:5,access:5,data:5},total:39}),
+     ...V({})}),
     mk({licence:'06-15-046-25W4',operator:'Imperial Oil',lat:53.4250,lon:-113.5108,year:2010,type:'Strat Test',traj:'Vertical',status:'Abandoned (P&A)',klass:'Type 9',
      notes:'Strat test with full log suite, modern materials, far above caprock — background population.',
-     scores:{plug:1,barriers:1,cement:1,prox:1,depthR:1,depthC:1,age:1,access:1,data:1},total:9}),
+     ...V({plugQuality:1,cement:1,barriers:1,scvf:1,age:1,complexity:1,data:1,penetration:1,plume:1,usdw:1,access:1})}),
     mk({licence:'09-27-046-25W4',operator:'Husky / Cenovus',lat:53.4402,lon:-113.5320,year:1972,type:'Injection',traj:'Vertical',status:'Suspended',klass:'Type 5',
      notes:'Pre-NACE carbon steel tubulars; cement coverage absent above caprock; re-entry diagnostics scheduled.',
-     scores:{plug:3,barriers:3,cement:5,prox:5,depthR:5,depthC:3,age:5,access:3,data:3},total:35}),
+     ...V({plugQuality:3,cement:5,barriers:3,scvf:3,age:3,complexity:1,data:3,penetration:5,plume:5,usdw:3,access:3})}),
   ];
   SYNC.replaceNext = true;
   save('Load demo data'); render();
@@ -1431,10 +1455,10 @@ async function exportPDF(singleId){
     doc.setFont('helvetica','bold'); doc.setFontSize(14);
     doc.text('Portfolio Summary', M, y); y+=18;
     doc.setFont('helvetica','normal'); doc.setFontSize(10);
-    const lo=wells.filter(w=>tierFor(w.total).cls==='low').length;
-    const mo=wells.filter(w=>tierFor(w.total).cls==='mod').length;
-    const hi=wells.filter(w=>tierFor(w.total).cls==='high').length;
-    const cr=wells.filter(w=>tierFor(w.total).cls==='crit').length;
+    const lo=wells.filter(w=>rankOf(w).cls==='low').length;
+    const mo=wells.filter(w=>rankOf(w).cls==='mod').length;
+    const hi=wells.filter(w=>rankOf(w).cls==='high').length;
+    const cr=wells.filter(w=>rankOf(w).cls==='crit').length;
     doc.text(`Total wells reviewed: ${wells.length}`, M, y); y+=14;
     doc.text(`Low: ${lo}    Moderate: ${mo}    High: ${hi}    Very High: ${cr}`, M, y); y+=22;
 
@@ -1517,10 +1541,10 @@ async function exportPDF(singleId){
     doc.text('Well Register', M, y); y+=8;
     doc.autoTable({
       startY: y, margin:{left:M,right:M},
-      head:[['Well ID','Operator','Type','Status','Class','Score','Tier']],
-      body: [...wells].sort((a,b)=>b.total-a.total).map(w=>[
+      head:[['Well ID','Operator','Type','Status','Class','Index','Tier']],
+      body: [...wells].sort((a,b)=>b.computed.riskIndex-a.computed.riskIndex).map(w=>[
         pdfSafe(w.licence), pdfSafe(w.operator), pdfSafe(w.type),
-        pdfSafe(w.status), pdfSafe(w.klass), String(w.total), tierFor(w.total).label
+        pdfSafe(w.status), pdfSafe(w.klass), String(w.computed.riskIndex), rankOf(w).label
       ]),
       styles:{font:'helvetica',fontSize:9,cellPadding:5,overflow:'linebreak',valign:'middle'},
       headStyles:{fillColor:[23,34,56],textColor:255,fontStyle:'bold'},
@@ -1545,7 +1569,7 @@ async function exportPDF(singleId){
     doc.autoTable({
       startY: y+8, margin:{left:M,right:M},
       head:[['Parameter','Low (1)','Medium (3)','High (5)']],
-      body: PARAMS.map(p=>[pdfSafe(p.name), pdfSafe(p.levels[1]), pdfSafe(p.levels[3]), pdfSafe(p.levels[5])]),
+      body: PARAMS.map(p=>[pdfSafe(p.name+' ('+p.axis+' w'+p.weight.toFixed(2)+')'), pdfSafe(p.anchors[1]), pdfSafe(p.anchors[3]), pdfSafe(p.anchors[5])]),
       styles:{font:'helvetica',fontSize:8.5,cellPadding:5,overflow:'linebreak',valign:'top'},
       headStyles:{fillColor:[23,34,56],textColor:255,fontStyle:'bold',halign:'left'},
       columnStyles:{0:{cellWidth:120,fontStyle:'bold'}}
@@ -1555,22 +1579,23 @@ async function exportPDF(singleId){
 
   // Per-well dossiers
   wells.forEach((w)=>{
+    const w2 = WellScoring.normalizeWell(w, METHODOLOGY);
     doc.addPage(); y = M;
-    const t = tierFor(w.total);
+    const t = rankOf(w2);
     doc.setFillColor(...hexToRgb(t.color));
     doc.rect(0,0,W,10,'F');
 
     doc.setFont('helvetica','bold'); doc.setFontSize(16);
-    doc.text(pdfSafe('Well Dossier: '+w.licence), M, y); y+=22;
+    doc.text(pdfSafe('Well Dossier: '+w2.licence), M, y); y+=22;
 
     doc.setFont('helvetica','normal'); doc.setFontSize(10);
-    doc.text(pdfSafe('Operator: '+w.operator), M, y); y+=14;
-    doc.text(pdfSafe(`Type: ${w.type}    Trajectory: ${w.traj}    Status: ${w.status}    Class: ${w.klass}`), M, y); y+=14;
-    const coord = (w.lat===null||w.lat===undefined?'-':w.lat) + ', ' + (w.lon===null||w.lon===undefined?'-':w.lon);
+    doc.text(pdfSafe('Operator: '+w2.operator), M, y); y+=14;
+    doc.text(pdfSafe(`Type: ${w2.type}    Trajectory: ${w2.traj}    Status: ${w2.status}    Class: ${w2.klass}`), M, y); y+=14;
+    const coord = (w2.lat===null||w2.lat===undefined?'-':w2.lat) + ', ' + (w2.lon===null||w2.lon===undefined?'-':w2.lon);
     doc.text(pdfSafe('Coordinates: '+coord), M, y); y+=14;
-    if(w.year){ doc.text(pdfSafe('Spud / Completion Year: '+w.year), M, y); y+=14; }
-    if(w.reviewer){ doc.text(pdfSafe('Reviewer: '+w.reviewer), M, y); y+=14; }
-    const assessed = (w.updatedAt||w.createdAt||'').slice(0,10);
+    if(w2.year){ doc.text(pdfSafe('Spud / Completion Year: '+w2.year), M, y); y+=14; }
+    if(w2.reviewer){ doc.text(pdfSafe('Reviewer: '+w2.reviewer), M, y); y+=14; }
+    const assessed = (w2.updatedAt||w2.createdAt||'').slice(0,10);
     if(assessed){ doc.text('Assessed: '+assessed, M, y); y+=14; }
 
     y+=4;
@@ -1578,7 +1603,7 @@ async function exportPDF(singleId){
     doc.setFillColor(...hexToRgb(t.color));
     doc.roundedRect(M, y, 200, 22, 4, 4, 'F');
     doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(12);
-    doc.text(pdfSafe(`Risk Score ${w.total}/45  -  ${t.label}`), M+10, y+15);
+    doc.text(pdfSafe(`Risk Index ${w2.computed.riskIndex}/25  -  ${t.label}`), M+10, y+15);
     doc.setTextColor(0,0,0);
     y += 32;
 
@@ -1586,7 +1611,7 @@ async function exportPDF(singleId){
     doc.autoTable({
       startY:y, margin:{left:M,right:M},
       head:[['Parameter','Justification (Appendix D)','Score']],
-      body: PARAMS.map(p=>[pdfSafe(p.name), pdfSafe(p.levels[w.scores[p.key]]), String(w.scores[p.key])]),
+      body: PARAMS.map(p=>[pdfSafe(p.name), pdfSafe(WellScoring.anchorText(p, w2.scores[p.key])), w2.scores[p.key]===null?'?':String(w2.scores[p.key])]),
       styles:{font:'helvetica',fontSize:9,cellPadding:5,overflow:'linebreak',valign:'middle',lineColor:[210,215,225],lineWidth:0.3},
       headStyles:{fillColor:[23,34,56],textColor:255,fontStyle:'bold'},
       columnStyles:{
@@ -1605,19 +1630,19 @@ async function exportPDF(singleId){
     y = doc.lastAutoTable.finalY + 18;
 
     // Notes block
-    if(w.notes){
+    if(w2.notes){
       ensure(60);
       doc.setFont('helvetica','bold'); doc.setFontSize(12);
       doc.text('Notes', M, y); y+=14;
       doc.setFont('helvetica','normal'); doc.setFontSize(10);
-      const noteLines = doc.splitTextToSize(pdfSafe(w.notes), CONTENT_W);
+      const noteLines = doc.splitTextToSize(pdfSafe(w2.notes), CONTENT_W);
       ensure(noteLines.length*12 + 8);
       doc.text(noteLines, M, y);
       y += noteLines.length*12 + 10;
     }
 
     // Recommended action
-    const rec = recommend(w);
+    const rec = recommend(w2);
     ensure(80);
     doc.setFont('helvetica','bold'); doc.setFontSize(12);
     doc.text(pdfSafe('Recommended Action (Sec. 8)'), M, y); y+=16;
@@ -1880,7 +1905,7 @@ function initSync(){
 load();           // local cache first (instant paint, offline fallback)
 buildScoring();
 updateLiveTotal();
-try { render(); } catch(e) { console.error('render() failed — pending Task 5 table/chart rework:', e); }
+render();
 initSync();       // then pull the shared team register and start auto-refresh; must run even if render() above failed
 </script>
 </body>
