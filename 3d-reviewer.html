@@ -1106,7 +1106,7 @@ dialog.confirm { max-width: 420px; }
     const ovKey = ov === "very high" ? "critical" : ov;
     if (ovKey !== "auto" && RISK_ORDER.includes(ovKey)) { cls = ovKey; overridden = true; }
     return { score: c.riskScore, class: cls, factors, overridden,
-             L: c.L, C: c.C, cell: c.cell, riskIndex: c.riskIndex, rankLabel: c.rank.label, integrity: c.integrity, scores };
+             L: c.L, C: c.C, cell: c.cell, riskIndex: c.riskIndex, rankLabel: c.rank.label, integrity: c.integrity, scores, sources: source };
   }
   function computeKpis(wells, { includeScenario = false } = {}) {
     const set = wells.filter((w) => includeScenario || !w.isScenario);
@@ -24754,7 +24754,7 @@ dialog.confirm { max-width: 420px; }
       }
       const rows = wells.map(({ _risk, ...w }) => ({ ...w,
         riskScore: _risk?.score, riskClass: RISK_LABELS[_risk?.class] ?? _risk?.class,
-        scores: _risk?.scores ?? null, scoredUnder: UNIFIED_METH.revision }));
+        scores: _risk?.scores ?? null, scoredUnder: UNIFIED_METH.revision, scoreSources: _risk?.sources ?? null }));
       window.parent.postMessage({ type: "lwms:exportWells", site: site.name, rows }, "*");
     });
     $("#toolbar").append(pushBtn);

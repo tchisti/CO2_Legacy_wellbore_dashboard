@@ -1053,6 +1053,7 @@ function deriveKlass(r){
 function mapFrom3D(r, prev){
   const now = new Date().toISOString();
   const native = r.scores && typeof r.scores === 'object' && 'plugQuality' in r.scores;
+  const derivedAny = !!(r.scoreSources && Object.values(r.scoreSources).some(s => s === 'derived'));
   const raw = native ? r.scores : WellScoring.deriveScoresFromReviewer(r);
   const scores = {}; PARAMS.forEach(p => scores[p.key] = (typeof raw[p.key]==='number' ? raw[p.key] : null));
   const c = computeFor(scores);
@@ -1074,7 +1075,7 @@ function mapFrom3D(r, prev){
     scores,
     computed: {L:c.L,C:c.C,Lr:c.Lr,Cr:c.Cr,cell:c.cell,riskIndex:c.riskIndex,rankLabel:c.rank.label,integrity:c.integrity},
     scoredUnder: METHODOLOGY.revision,
-    needsReview: !native,                       // native pushes are already scored on the same rulebook
+    needsReview: !native || derivedAny,          // native pushes are already scored on the same rulebook, unless some params are machine-derived
     legacy: prev?.legacy,
     createdAt: prev?.createdAt || now, updatedAt: now,
     updatedBy: (syncName() ? syncName() + ' ' : '') + '(3D Reviewer)',
