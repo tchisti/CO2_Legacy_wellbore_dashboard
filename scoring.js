@@ -194,7 +194,6 @@ function migrateV1(w, m){
   const dr = typeof s.depthR === 'number' ? s.depthR : null;
   const dc = typeof s.depthC === 'number' ? s.depthC : null;
   if (dr !== null || dc !== null) scores.penetration = Math.max(dr ?? 1, dc ?? 1);
-  if (scores.complexity === null) scores.complexity = 3;  // v1 wells without explicit complexity default to moderate
   const out = { ...w, schema:CURRENT_SCHEMA, scores,
     computed: computedBlock(scores, meth),
     scoredUnder: V1_REVISION, needsReview: true,
