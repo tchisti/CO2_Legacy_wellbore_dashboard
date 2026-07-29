@@ -1161,16 +1161,18 @@ const CSV_COLS = [
   {key:'klass',    hdr:'Classification (Type 1-9)',  sample:'Type 2',
     enum:['Type 1','Type 2','Type 3','Type 4','Type 5','Type 6','Type 7','Type 8','Type 9']},
   {key:'reviewer', hdr:'Reviewer',                   sample:'T. Khan'},
-  // 9 scoring parameters — Low/Med/High or 1/3/5
-  {key:'sc_plug',     hdr:'Plug Quality (Low/Med/High)',           sample:'High',  score:'plug'},
-  {key:'sc_barriers', hdr:'Number of Barriers (Low/Med/High)',     sample:'High',  score:'barriers'},
-  {key:'sc_cement',   hdr:'Cement Coverage (Low/Med/High)',        sample:'High',  score:'cement'},
-  {key:'sc_prox',     hdr:'Proximity to CO2 Plume (Low/Med/High)', sample:'High',  score:'prox'},
-  {key:'sc_depthR',   hdr:'Depth vs Reservoir (Low/Med/High)',     sample:'High',  score:'depthR'},
-  {key:'sc_depthC',   hdr:'Depth vs Storage Complex (Low/Med/High)', sample:'High',score:'depthC'},
-  {key:'sc_age',      hdr:'Well Age (Low/Med/High)',               sample:'High',  score:'age'},
-  {key:'sc_access',   hdr:'Access & Ownership (Low/Med/High)',     sample:'High',  score:'access'},
-  {key:'sc_data',     hdr:'Data Availability (Low/Med/High)',      sample:'High',  score:'data'},
+  // 11 scoring parameters — 1-5, ? = unknown (Low/Med/High still accepted for v1 files)
+  {key:'sc_plugQuality', hdr:'Abandonment & Plug Quality (1-5 or ?)',     sample:'5', score:'plugQuality', aliases:['Plug Quality (Low/Med/High)']},
+  {key:'sc_cement',      hdr:'Cement Coverage & Quality (1-5 or ?)',      sample:'5', score:'cement',      aliases:['Cement Coverage (Low/Med/High)']},
+  {key:'sc_barriers',    hdr:'Barriers Across Flow Zones (1-5 or ?)',     sample:'3', score:'barriers',    aliases:['Number of Barriers (Low/Med/High)']},
+  {key:'sc_scvf',        hdr:'SCVF / GM History (1-5 or ?)',              sample:'?', score:'scvf',        aliases:[]},
+  {key:'sc_age',         hdr:'Well Age & Regulatory Era (1-5 or ?)',      sample:'5', score:'age',         aliases:['Well Age (Low/Med/High)']},
+  {key:'sc_complexity',  hdr:'Wellbore Complexity (1-5 or ?)',            sample:'?', score:'complexity',  aliases:[]},
+  {key:'sc_data',        hdr:'Data Confidence (1-5 or ?)',                sample:'5', score:'data',        aliases:['Data Availability (Low/Med/High)']},
+  {key:'sc_penetration', hdr:'Penetration vs Storage Complex (1-5 or ?)', sample:'5', score:'penetration', aliases:['Depth vs Reservoir (Low/Med/High)','Depth vs Storage Complex (Low/Med/High)']},
+  {key:'sc_plume',       hdr:'Position vs Plume / AoR (1-5 or ?)',        sample:'1', score:'plume',       aliases:['Proximity to CO2 Plume (Low/Med/High)']},
+  {key:'sc_usdw',        hdr:'USDW-BGWP Isolation (1-5 or ?)',            sample:'?', score:'usdw',        aliases:[]},
+  {key:'sc_access',      hdr:'Corrective-Action Accessibility (1-5 or ?)', sample:'1', score:'access',     aliases:['Access & Ownership (Low/Med/High)']},
   {key:'notes',       hdr:'Notes / Justification',                 sample:'Orphan well, no surface marker, no abandonment records on file.'},
 ];
 
@@ -1207,17 +1209,7 @@ function csvParse(text){
 }
 
 function parseScoreCell(v){
-  if(v===null||v===undefined) return null;
-  const s = String(v).trim().toLowerCase();
-  if(!s) return null;
-  if(s==='1' || s==='low' || s==='l') return 1;
-  if(s==='3' || s==='med' || s==='medium' || s==='moderate' || s==='m') return 3;
-  if(s==='5' || s==='high' || s==='h' || s==='critical') return 5;
-  // tolerate "1 (low)" or similar
-  if(s.startsWith('1')) return 1;
-  if(s.startsWith('3')) return 3;
-  if(s.startsWith('5')) return 5;
-  return null;
+  return WellScoring.scoreLabelToValue(v);
 }
 
 function downloadCSVTemplate(){
@@ -1236,15 +1228,17 @@ function downloadCSVTemplate(){
       case 'status': return 'Abandoned (P&A)';
       case 'klass': return 'Type 7';
       case 'reviewer': return 'T. Khan';
-      case 'sc_plug': return 'Low';
-      case 'sc_barriers': return 'Low';
-      case 'sc_cement': return 'Low';
-      case 'sc_prox': return 'Medium';
-      case 'sc_depthR': return 'High';
-      case 'sc_depthC': return 'Low';
-      case 'sc_age': return 'Medium';
-      case 'sc_access': return 'Low';
-      case 'sc_data': return 'Low';
+      case 'sc_plugQuality': return '1';
+      case 'sc_cement': return '1';
+      case 'sc_barriers': return '1';
+      case 'sc_scvf': return '?';
+      case 'sc_age': return '3';
+      case 'sc_complexity': return '?';
+      case 'sc_data': return '1';
+      case 'sc_penetration': return '5';
+      case 'sc_plume': return '3';
+      case 'sc_usdw': return '?';
+      case 'sc_access': return '1';
       case 'notes': return 'Modern P&A (2018), CBL verified to caprock, full records on file.';
       default: return '';
     }
@@ -1259,7 +1253,7 @@ function downloadCSVTemplate(){
 function exportCSV(){
   if(!state.wells.length){ alert('No wells to export. Add wells or click "Load Demo" first.'); return; }
   const header = CSV_COLS.map(c=>c.hdr);
-  const scoreLabel = v=> v===1?'Low':v===3?'Medium':v===5?'High':'';
+  const scoreLabel = v => v===null||v===undefined ? '?' : String(v);
   const rows = state.wells.map(w => CSV_COLS.map(c=>{
     if(c.score) return scoreLabel(w.scores[c.score]);
     switch(c.key){
@@ -1295,10 +1289,18 @@ function importCSV(e){
       // Map header → column key by case/space-insensitive match
       const norm = s => String(s).toLowerCase().replace(/[^a-z0-9]+/g,'');
       const colIdx = {};
+      let v1Detected = false;
       CSV_COLS.forEach(c => {
-        const target = norm(c.hdr);
-        const idx = headerRow.findIndex(h => norm(h)===target);
-        if(idx>=0) colIdx[c.key] = idx;
+        const names = [c.hdr, ...(c.aliases||[])].map(norm);
+        // Collect ALL matching header indices (not just the first) — a v1 CSV can carry both
+        // "Depth vs Reservoir" and "Depth vs Storage Complex" as separate columns that both
+        // alias onto sc_penetration, and the worst of the two must be imported.
+        const matches = [];
+        headerRow.forEach((h, hi) => { if(names.includes(norm(h))) matches.push(hi); });
+        if(matches.length){
+          colIdx[c.key] = matches;
+          if(c.aliases && c.aliases.length && matches.some(hi => norm(headerRow[hi])!==norm(c.hdr))) v1Detected = true;
+        }
       });
       // Require licence column
       if(colIdx.licence===undefined){
@@ -1318,7 +1320,7 @@ function importCSV(e){
         // skip fully empty rows
         if(row.every(c=>!String(c||'').trim())) continue;
         try {
-          const get = k => colIdx[k]!==undefined ? (row[colIdx[k]]||'').trim() : '';
+          const get = k => colIdx[k]!==undefined ? (row[colIdx[k][0]]||'').trim() : '';
           const licence = get('licence') || 'UNNAMED';
           const operator = get('operator') || 'Unknown';
           const latRaw = get('lat'); const lonRaw = get('lon'); const yearRaw = get('year');
@@ -1333,12 +1335,14 @@ function importCSV(e){
           const statCol  = CSV_COLS.find(c=>c.key==='status');
           const klassCol = CSV_COLS.find(c=>c.key==='klass');
           const scores = {};
-          PARAMS.forEach(p=>scores[p.key]=1);
           CSV_COLS.filter(c=>c.score).forEach(c=>{
-            const v = parseScoreCell(get(c.key));
-            if(v!==null) scores[c.score] = v;
+            (colIdx[c.key]||[]).forEach(hi => {
+              const v = parseScoreCell((row[hi]||'').trim());
+              if(v!==null) scores[c.score] = Math.max(scores[c.score] ?? 0, v);
+            });
           });
-          const total = PARAMS.reduce((a,p)=>a+scores[p.key],0);
+          const fullScores = {}; PARAMS.forEach(p => fullScores[p.key] = (p.key in scores) ? scores[p.key] : null);
+          const c2 = computeFor(fullScores);
           const well = {
             id: uid(),
             licence, operator, lat, lon, year,
@@ -1348,7 +1352,10 @@ function importCSV(e){
             klass: enumNormalize(get('klass'), klassCol.enum),
             reviewer: get('reviewer'),
             notes: get('notes'),
-            scores, total,
+            schema:2, scores: fullScores,
+            computed:{L:c2.L,C:c2.C,Lr:c2.Lr,Cr:c2.Cr,cell:c2.cell,riskIndex:c2.riskIndex,rankLabel:c2.rank.label,integrity:c2.integrity},
+            scoredUnder: METHODOLOGY.revision,
+            needsReview: v1Detected,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
             updatedBy: syncName()||'',
@@ -1361,7 +1368,7 @@ function importCSV(e){
       if(!imported.length){
         alert('No wells could be imported.\n\n'+(errors.join('\n')||'CSV had no data rows.'));
       } else {
-        const append = confirm(`Parsed ${imported.length} well(s) from CSV.\n\nOK = append to existing ${state.wells.length} well(s)\nCancel = replace existing register with the CSV contents.${errors.length?'\n\nSkipped '+errors.length+' row(s):\n'+errors.slice(0,5).join('\n'):''}`);
+        const append = confirm(`Parsed ${imported.length} well(s) from CSV.${v1Detected?'\n\nv1-format CSV detected — imported wells flagged for re-review.':''}\n\nOK = append to existing ${state.wells.length} well(s)\nCancel = replace existing register with the CSV contents.${errors.length?'\n\nSkipped '+errors.length+' row(s):\n'+errors.slice(0,5).join('\n'):''}`);
         state.wells = append ? state.wells.concat(imported) : imported;
         if(!append) SYNC.replaceNext = true;
         save('Import CSV ('+imported.length+' wells)'); render();
