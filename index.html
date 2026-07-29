@@ -1051,7 +1051,11 @@ function mapFrom3D(r, prev){
   const native = r.scores && typeof r.scores === 'object' && 'plugQuality' in r.scores;
   const derivedAny = !!(r.scoreSources && Object.values(r.scoreSources).some(s => s === 'derived'));
   const raw = native ? r.scores : WellScoring.deriveScoresFromReviewer(r);
-  const scores = {}; PARAMS.forEach(p => scores[p.key] = (typeof raw[p.key]==='number' ? raw[p.key] : null));
+  const scores = {}; PARAMS.forEach(p => {
+    let v = (typeof raw[p.key]==='number' ? raw[p.key] : null);
+    if (native && r.scoreSources && r.scoreSources[p.key] === 'derived') v = null; // machine guesses never enter the register
+    scores[p.key] = v;
+  });
   const c = computeFor(scores);
   const typeMap = t => t==='Oil' ? 'Oil Producer' : t==='Gas' ? 'Gas Producer' : t==='Injector' ? 'Injection' : t==='Water Disposal' ? 'Disposal' : t==='Observation' ? 'Observation' : 'Unknown';
   return {
@@ -1066,7 +1070,7 @@ function mapFrom3D(r, prev){
     status: r.status || 'Unknown',
     klass: prev?.klass || deriveKlass(r),
     reviewer: r.reviewer || '',
-    notes: ((r.notes||'') + ' [From 3D Reviewer' + (native ? (derivedAny ? ' — native push, some parameters machine-derived; flagged for re-review' : ' — native scores') : ' — scores derived from well data; verify') + ']').trim(),
+    notes: ((r.notes||'') + ' [From 3D Reviewer' + (native ? (derivedAny ? ' — native push; machine-derived parameters kept as Unknown; flagged for re-review' : ' — native scores') : ' — scores derived from well data; verify') + ']').trim(),
     schema: WellScoring.CURRENT_SCHEMA,
     scores,
     computed: {L:c.L,C:c.C,Lr:c.Lr,Cr:c.Cr,cell:c.cell,riskIndex:c.riskIndex,rankLabel:c.rank.label,integrity:c.integrity},
