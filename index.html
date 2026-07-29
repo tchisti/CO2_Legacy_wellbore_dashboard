@@ -514,8 +514,12 @@ let METHODOLOGY = WellScoring.FALLBACK_METHODOLOGY;
 let METHODOLOGY_SOURCE = 'fallback';
 Object.defineProperty(window, 'PARAMS', { get: () => METHODOLOGY.params });
 function computeFor(scores){ return WellScoring.computeWell(scores, METHODOLOGY); }
+/* ci() — safe accessor for w.computed. Wells normally always carry .computed (every state
+   mutation path normalizes), but a well that skipped normalization (e.g. pushed straight into
+   state.wells by a not-yet-updated bridge/import path) would otherwise crash every display read. */
+const ci = w => w.computed || WellScoring.normalizeWell(w, METHODOLOGY).computed;
 function rankOf(w){
-  const c = w.computed || WellScoring.normalizeWell(w, METHODOLOGY).computed;
+  const c = ci(w);
   return WellScoring.bandFor(c.cell, METHODOLOGY);
 }
 function methodologyBanner(){
@@ -723,8 +727,9 @@ function render(){
   if(!filtered.length){
     tbody.innerHTML = `<tr><td colspan="9" class="empty">No wells. Click "Load Demo" or add a well using the form.</td></tr>`;
   } else {
-    filtered.sort((a,b)=>b.computed.riskIndex-a.computed.riskIndex).forEach(w=>{
+    filtered.sort((a,b)=>ci(b).riskIndex-ci(a).riskIndex).forEach(w=>{
       const t = rankOf(w);
+      const c = ci(w);
       const tr = document.createElement('tr');
       const reviewBadge = (w.needsReview || w.scoredUnder !== METHODOLOGY.revision) ? '<span class="tag" style="background:#3a2f12;color:#f0c96b;margin-left:4px" title="Scored under rev '+escapeHtml(w.scoredUnder||'?')+' — current '+METHODOLOGY.revision+'">re-review</span>' : '';
       tr.innerHTML = `
@@ -733,8 +738,8 @@ function render(){
         <td>${escapeHtml(w.status)}</td>
         <td>${escapeHtml(w.klass)}</td>
         <td>${w.year || '—'}</td>
-        <td><span class="score-pill">${w.computed.L.toFixed(1)}×${w.computed.C.toFixed(1)}</span></td>
-        <td><span class="score-pill">${w.computed.riskIndex}</span></td>
+        <td><span class="score-pill">${c.L.toFixed(1)}×${c.C.toFixed(1)}</span></td>
+        <td><span class="score-pill">${c.riskIndex}</span></td>
         <td><span class="tag ${t.cls}">${t.label}</span>${reviewBadge}</td>
         <td style="text-align:right">
           <button class="ghost" style="padding:4px 8px;font-size:11px" onclick="event.stopPropagation();openDetail('${w.id}')">View</button>
@@ -747,14 +752,15 @@ function render(){
   }
 
   // top list
-  const top = [...state.wells].sort((a,b)=>b.computed.riskIndex-a.computed.riskIndex).slice(0,5);
+  const top = [...state.wells].sort((a,b)=>ci(b).riskIndex-ci(a).riskIndex).slice(0,5);
   const host = document.getElementById('topList');
   if(!top.length){ host.innerHTML = `<div class="empty">Add wells to see ranking.</div>`; }
   else host.innerHTML = top.map(w=>{
     const t = rankOf(w);
-    const pct = ((w.computed.riskIndex-1)/24)*100;
+    const c = ci(w);
+    const pct = ((c.riskIndex-1)/24)*100;
     return `<div onclick="openDetail('${w.id}')" style="cursor:pointer;padding:10px;border:1px solid var(--line);border-radius:10px;margin-bottom:8px;background:var(--field)">
-      <div class="row spread"><div><span class="well-id">${escapeHtml(w.licence)}</span> <span class="tag ${t.cls}">${t.label}</span></div><div style="font-weight:800">${w.computed.riskIndex}/25</div></div>
+      <div class="row spread"><div><span class="well-id">${escapeHtml(w.licence)}</span> <span class="tag ${t.cls}">${t.label}</span></div><div style="font-weight:800">${c.riskIndex}/25</div></div>
       <div class="muted" style="font-size:11px;margin:4px 0">${escapeHtml(w.operator)} · ${escapeHtml(w.type)} · ${escapeHtml(w.status)} · ${escapeHtml(w.klass)}</div>
       <div class="bar"><div style="width:${pct}%"></div></div>
     </div>`;
@@ -1542,9 +1548,9 @@ async function exportPDF(singleId){
     doc.autoTable({
       startY: y, margin:{left:M,right:M},
       head:[['Well ID','Operator','Type','Status','Class','Index','Tier']],
-      body: [...wells].sort((a,b)=>b.computed.riskIndex-a.computed.riskIndex).map(w=>[
+      body: [...wells].sort((a,b)=>ci(b).riskIndex-ci(a).riskIndex).map(w=>[
         pdfSafe(w.licence), pdfSafe(w.operator), pdfSafe(w.type),
-        pdfSafe(w.status), pdfSafe(w.klass), String(w.computed.riskIndex), rankOf(w).label
+        pdfSafe(w.status), pdfSafe(w.klass), String(ci(w).riskIndex), rankOf(w).label
       ]),
       styles:{font:'helvetica',fontSize:9,cellPadding:5,overflow:'linebreak',valign:'middle'},
       headStyles:{fillColor:[23,34,56],textColor:255,fontStyle:'bold'},
