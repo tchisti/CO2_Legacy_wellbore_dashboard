@@ -177,6 +177,7 @@ dialog.confirm { max-width: 420px; }
 </main>
 <section id="methodPage" hidden></section>
 <div id="toasts"></div>
+<script src="scoring.js"></script>
 <script>
 (() => {
   var __create = Object.create;
@@ -993,8 +994,19 @@ dialog.confirm { max-width: 420px; }
     { key: "reservoirPenetrated", label: "Reservoir Penetrated", group: "construction", type: "bool", aliases: ["reservoir"] },
     { key: "distToInjector", label: "Distance to Injector (m)", group: "risk", type: "number", derived: true, aliases: ["distance to injector"] },
     { key: "distToAorBoundary", label: "Distance to AOR Boundary (m)", group: "risk", type: "number", derived: true, aliases: ["distance to aor boundary", "aor distance"] },
+    { key: "s_plugQuality", label: "Score: Abandonment & Plug Quality (1-5)", group: "risk", type: "number", min: 1, max: 5 },
+    { key: "s_cement", label: "Score: Cement Coverage & Quality (1-5)", group: "risk", type: "number", min: 1, max: 5 },
+    { key: "s_barriers", label: "Score: Barriers Across Flow Zones (1-5)", group: "risk", type: "number", min: 1, max: 5 },
+    { key: "s_scvf", label: "Score: SCVF / GM History (1-5)", group: "risk", type: "number", min: 1, max: 5 },
+    { key: "s_age", label: "Score: Well Age & Era (1-5)", group: "risk", type: "number", min: 1, max: 5 },
+    { key: "s_complexity", label: "Score: Wellbore Complexity (1-5)", group: "risk", type: "number", min: 1, max: 5 },
+    { key: "s_data", label: "Score: Data Confidence (1-5)", group: "risk", type: "number", min: 1, max: 5 },
+    { key: "s_penetration", label: "Score: Penetration vs Storage Complex (1-5)", group: "risk", type: "number", min: 1, max: 5 },
+    { key: "s_plume", label: "Score: Position vs Plume / AoR (1-5)", group: "risk", type: "number", min: 1, max: 5 },
+    { key: "s_usdw", label: "Score: USDW-BGWP Isolation (1-5)", group: "risk", type: "number", min: 1, max: 5 },
+    { key: "s_access", label: "Score: Corrective-Action Accessibility (1-5)", group: "risk", type: "number", min: 1, max: 5 },
     { key: "leakageRiskOverride", label: "Estimated Leakage Risk", group: "risk", type: "select", options: RISK_OVERRIDES, aliases: ["leakage risk", "estimated leakage risk"] },
-    { key: "integrityScore", label: "Integrity Score (0\u2013100)", group: "risk", type: "number", min: 0, max: 100, aliases: ["integrity score", "integrity"] },
+    { key: "integrityScore", label: "Integrity Score (0\u2013100)", group: "risk", type: "number", min: 0, max: 100, derived: true, aliases: ["integrity score", "integrity"] },
     { key: "reviewer", label: "Reviewer", group: "risk", type: "text" },
     { key: "reviewDate", label: "Review Date", group: "risk", type: "date", aliases: ["review date"] },
     { key: "notes", label: "Engineering Notes", group: "risk", type: "textarea", aliases: ["notes"] },
@@ -1035,10 +1047,20 @@ dialog.confirm { max-width: 420px; }
   }
 
   // src/risk.js
+  var UNIFIED_METH = WellScoring.FALLBACK_METHODOLOGY;
+  var UNIFIED_SOURCE = "fallback";
+  WellScoring.loadMethodology("methodology.json").then((r) => {
+    UNIFIED_METH = r.methodology; UNIFIED_SOURCE = r.source;
+    // No "recompute" action exists in store.js's dispatch vocabulary (well/add, well/update,
+    // well/remove, well/duplicate, wells/import, wells/resetDemo — see store.js ~1276). The
+    // closest fit, wells/import with a synthetic mode, would mutate every well's `source` to
+    // "import" and pollute undo history, so it's skipped per the brief's fallback: fallback
+    // and remote are both rev 2.0.0 today (zero scoring delta), and every well/add + well/update
+    // already re-runs computeRisk() against this live UNIFIED_METH closure var, so any well
+    // touched after this promise resolves picks up "remote" automatically.
+  });
   var RISK_ORDER = ["low", "medium", "high", "critical"];
   var RISK_LABELS = { low: "Low", medium: "Medium", high: "High", critical: "Very High" };
-  var CEMENT_PTS = { Excellent: 0, Good: 5, Fair: 15, Poor: 30, Unknown: 20 };
-  var PLUG_PTS = { "Plugged & Verified": 0, "Plugged": 5, "Partially Plugged": 15, "Unplugged": 25, "Unknown": 25 };
   var isNum2 = (v) => typeof v === "number" && !Number.isNaN(v);
   function deriveDistances(w, site2) {
     if (!isNum2(w.x) || !isNum2(w.y)) return w;
@@ -1057,32 +1079,34 @@ dialog.confirm { max-width: 420px; }
     }
     return w;
   }
+  var RANK_TO_CLASS = { "Low": "low", "Moderate": "medium", "High": "high", "Very High": "critical" };
   function classifyScore(s) {
     return s >= 75 ? "critical" : s >= 50 ? "high" : s >= 25 ? "medium" : "low";
   }
+  function resolveWellScores(w) {
+    const derived = WellScoring.deriveScoresFromReviewer(w);
+    const scores = {}, source = {};
+    for (const p of UNIFIED_METH.params) {
+      const explicit = w["s_" + p.key];
+      if (typeof explicit === "number" && explicit >= 1 && explicit <= 5) { scores[p.key] = explicit; source[p.key] = "scored"; }
+      else if (typeof derived[p.key] === "number") { scores[p.key] = derived[p.key]; source[p.key] = "derived"; }
+      else { scores[p.key] = null; source[p.key] = "unknown"; }
+    }
+    return { scores, source };
+  }
   function computeRisk(w, site2) {
-    const factors = [];
-    const add = (label, pts) => {
-      if (pts > 0) factors.push({ label, pts });
-    };
-    const integ = isNum2(w.integrityScore) ? w.integrityScore : 50;
-    add("Integrity deficit", Math.round(0.45 * (100 - integ)));
-    add(`Cement: ${w.cementQuality}`, CEMENT_PTS[w.cementQuality] ?? 20);
-    add(`Plugging: ${w.pluggingStatus}`, PLUG_PTS[w.pluggingStatus] ?? 25);
-    if (isNum2(w.drillingYear)) add(`Vintage (${w.drillingYear})`, w.drillingYear < 1960 ? 15 : w.drillingYear < 1980 ? 10 : w.drillingYear < 2e3 ? 5 : 0);
-    if (w.caprockPenetrated) add("Caprock penetrated", 10);
-    if (w.reservoirPenetrated) add("Reservoir penetrated", 10);
-    if (isNum2(w.distToInjector)) add("Injector proximity", w.distToInjector < 500 ? 15 : w.distToInjector < 1500 ? 8 : 0);
-    if (isNum2(w.distToAorBoundary) && w.distToAorBoundary > 0) add("Inside AOR", 5);
-    const score = Math.max(0, Math.min(100, factors.reduce((s, f) => s + f.pts, 0)));
-    let cls = classifyScore(score), overridden = false;
+    const { scores, source } = resolveWellScores(w);
+    const c = WellScoring.computeWell(scores, UNIFIED_METH);
+    const factors = UNIFIED_METH.params.map((p) => ({
+      label: p.name + " = " + (scores[p.key] === null ? "? (" + p.unknownScore + ")" : scores[p.key]) + " [" + source[p.key] + "]",
+      pts: +(p.weight * WellScoring.resolveScore(p, scores[p.key])).toFixed(2)
+    }));
+    let cls = RANK_TO_CLASS[c.rank.label] || "low", overridden = false;
     const ov = String(w.leakageRiskOverride || "Auto").toLowerCase();
     const ovKey = ov === "very high" ? "critical" : ov;
-    if (ovKey !== "auto" && RISK_ORDER.includes(ovKey)) {
-      cls = ovKey;
-      overridden = true;
-    }
-    return { score, class: cls, factors, overridden };
+    if (ovKey !== "auto" && RISK_ORDER.includes(ovKey)) { cls = ovKey; overridden = true; }
+    return { score: c.riskScore, class: cls, factors, overridden,
+             L: c.L, C: c.C, cell: c.cell, riskIndex: c.riskIndex, rankLabel: c.rank.label, integrity: c.integrity, scores };
   }
   function computeKpis(wells, { includeScenario = false } = {}) {
     const set = wells.filter((w) => includeScenario || !w.isScenario);
@@ -1102,7 +1126,7 @@ dialog.confirm { max-width: 420px; }
       const r = w._risk || { score: 0, class: "low" };
       k.counts[r.class] = (k.counts[r.class] || 0) + 1;
       sr += r.score;
-      const integ = isNum2(w.integrityScore) ? w.integrityScore : 0;
+      const integ = (w._risk && isNum2(w._risk.integrity)) ? w._risk.integrity : 0;
       si += integ;
       k.integrityBuckets[Math.min(3, Math.floor(integ / 25))]++;
       if (w.reviewer) rev++;
@@ -1577,7 +1601,7 @@ dialog.confirm { max-width: 420px; }
   var CAP = 1e3;
   function createList(table, handlers2) {
     let sortKey = "risk", sortDir = -1;
-    const sortVal = (w, k) => k === "risk" ? w._risk.score : w[k] ?? "";
+    const sortVal = (w, k) => k === "risk" ? w._risk.score : k === "integrityScore" ? w._risk?.integrity ?? "" : w[k] ?? "";
     function render2(wells, view) {
       const sorted = [...wells].sort((a, b) => {
         const va = sortVal(a, sortKey), vb = sortVal(b, sortKey);
@@ -1610,7 +1634,7 @@ dialog.confirm { max-width: 420px; }
         el("td", {}, fmt(w.operator)),
         el("td", {}, fmt(w.wellType)),
         el("td", {}, el("span", { class: `badge ${w._risk.class}` }, `${RISK_LABELS[w._risk.class] || w._risk.class} ${w._risk.score}`)),
-        el("td", {}, fmt(w.integrityScore)),
+        el("td", {}, fmt(w._risk?.integrity)),
         el("td", {}, w.reviewer ? "\u2713" : ""),
         el(
           "td",
@@ -24143,6 +24167,15 @@ dialog.confirm { max-width: 420px; }
         const c = coerce(f, v);
         if (c !== null) w[key] = c;
       }
+      // Native unified-engine scores (e.g. pushed from the dashboard register via
+      // lwms:importWells) travel as a nested `scores` object, not flat columns —
+      // unpack them into s_<key> so they import losslessly instead of falling back
+      // to derived/unknown.
+      if (row.scores && typeof row.scores === "object" && "plugQuality" in row.scores) {
+        for (const [k, v] of Object.entries(row.scores)) {
+          if (typeof v === "number" && v >= 1 && v <= 5) w["s_" + k] = v;
+        }
+      }
       const { errors, ok } = validateWell({ ...blankWell(), ...w });
       if (!ok) {
         issues.push({ row: i + 1, uwi: w.uwi || "", errors: Object.values(errors) });
@@ -24250,51 +24283,45 @@ dialog.confirm { max-width: 420px; }
     ["US EPA", "40 CFR \xA7146.84 \u2014 Class VI Area of Review and Corrective Action.", "AoR delineation and the corrective-action evaluation of artificial penetrations; the conceptual basis for the inside-AOR and injector-proximity factors."],
     ["ISO 27914:2017", "Carbon dioxide capture, transportation and geological storage \u2014 Geological storage.", "International standard practice for site characterization, including legacy-well integrity assessment."]
   ];
-  var factorRows = [
-    ["Integrity deficit", "0.45 \xD7 (100 \u2212 Integrity Score)", "0 \u2013 45", "Direct engineering assessment of the wellbore (cement bond, casing condition, SCVF/GM history where known). Weighted heaviest: wellbore condition dominates leakage likelihood (Watson & Bachu 2009)."],
-    ["Cement quality", Object.entries(CEMENT_PTS).map(([k, v]) => `${k} +${v}`).join(" \xB7 "), "0 \u2013 30", 'Annular cement is the primary barrier. "Unknown" is scored worse than "Fair" \u2014 absence of records in pre-regulation wells is itself a risk signal.'],
-    ["Plugging status", Object.entries(PLUG_PTS).map(([k, v]) => `${k} +${v}`).join(" \xB7 "), "0 \u2013 25", 'Abandonment plugs are the terminal barrier; unverified or absent plugs leave an open pathway. "Unknown" scores as "Unplugged" (conservative).'],
-    ["Vintage", "pre-1960 +15 \xB7 1960\u201379 +10 \xB7 1980\u201399 +5 \xB7 2000+ 0", "0 \u2013 15", "Drilling year is a proxy for cementing and abandonment practice; pre-regulation-era wells commonly have surface casing only and undocumented plugs (Watson & Bachu 2009)."],
-    ["Caprock penetrated", "+10 if yes", "0 \u2013 10", "A wellbore through the confining zone is a potential bypass of the seal."],
-    ["Reservoir penetrated", "+10 if yes", "0 \u2013 10", "Direct communication with the injection zone; combined with caprock penetration this is the classic leakage pathway."],
-    ["Injector proximity", "< 500 m +15 \xB7 < 1,500 m +8", "0 \u2013 15", "Pressure increase and plume arrival probability decay with distance from the injector; nearest-injector distance is auto-computed."],
-    ["Inside AOR", "+5 if within the AOR boundary", "0 \u2013 5", "Wells inside the delineated Area of Review are within the predicted pressure/plume footprint (40 CFR 146.84)."]
-  ];
+  var CLASS_ACTION = { critical: "priority candidates for re-entry / re-abandonment review", high: "detailed records review; monitor", medium: "periodic review", low: "no action beyond inventory" };
   function renderMethodology(root, site2) {
     const chip = (cls) => el("span", { class: `badge ${cls}`, style: "margin-right:6px" }, RISK_LABELS[cls] || cls);
-    const refPt = site2.injectors[0] || { x: site2.domainSize_m / 2, y: site2.domainSize_m / 2 };
-    const worstCase = deriveDistances({ ...blankWell(), x: refPt.x + 300, y: refPt.y, td: 1500, integrityScore: 25, cementQuality: "Unknown", pluggingStatus: "Unknown", drillingYear: 1949, caprockPenetrated: true, reservoirPenetrated: true }, site2);
-    const worst = computeRisk(worstCase, site2);
-    const modern = deriveDistances({ ...blankWell(), x: refPt.x + 300, y: refPt.y, td: 2300, integrityScore: 92, cementQuality: "Good", pluggingStatus: "Unplugged", drillingYear: 2025, caprockPenetrated: true, reservoirPenetrated: true, leakageRiskOverride: "Low" }, site2);
-    const modernR = computeRisk(modern, site2);
+    const paramRows = UNIFIED_METH.params.map((p) => [
+      p.name + " (" + (p.axis === "L" ? "Likelihood" : "Consequence") + ")",
+      "w = " + p.weight.toFixed(2),
+      "1: " + p.anchors[1] + " \xB7 3: " + p.anchors[3] + " \xB7 5: " + p.anchors[5],
+      "Unknown \u2192 " + p.unknownScore
+    ]);
     root.replaceChildren(el(
       "div",
       { class: "method-doc" },
       el("h1", {}, "Risk Score Profile, Model Logic & Methodology"),
       el("p", { class: "muted" }, `Applies to every dataset in this tool (current site: ${site2.name}). Screening-level model for demonstration and prioritization \u2014 see Limitations.`),
       el("h2", {}, "1. Purpose and scope"),
-      el("p", {}, 'The model produces a 0\u2013100 leakage-risk screening score for each legacy wellbore inside or near an injection Area of Review (AOR), so that a well inventory can be triaged for detailed review, monitoring, or corrective action. It is an additive, fully transparent index \u2014 every point on every well is attributable to a named factor (shown as the "Risk factors" breakdown in the side panel). It follows the corrective-action logic of offset wellbore reviews used to support scheme applications (AER Directive 065) and Class VI area-of-review evaluations (40 CFR 146.84).'),
+      el("p", {}, 'The model produces a 0\u2013100 leakage-risk screening score for each legacy wellbore inside or near an injection Area of Review (AOR), so that a well inventory can be triaged for detailed review, monitoring, or corrective action. It is a weighted L\xD7C matrix, displayed as a 0\u2013100 risk score for continuity \u2014 every parameter on every well is attributable and shown with its [scored]/[derived]/[unknown] provenance in the "Risk factors" breakdown in the side panel. It follows the corrective-action logic of offset wellbore reviews used to support scheme applications (AER Directive 065) and Class VI area-of-review evaluations (40 CFR 146.84).'),
       el("h2", {}, "2. Score composition"),
-      el("p", {}, "score = clamp( \u03A3 factor points, 0, 100 ), computed live on every add or edit:"),
+      el("p", {}, "Unified weighted L\xD7C model, revision " + UNIFIED_METH.revision +
+        (UNIFIED_SOURCE === "fallback" ? " (built-in fallback \u2014 live methodology.json unavailable)" : " (live)") +
+        ". L = \u03A3 w\u1D62\xB7s\u1D62 over 7 likelihood parameters; C over 4 consequence parameters; " +
+        "matrix cell = round(L) \xD7 round(C); bands: " +
+        UNIFIED_METH.matrix.bands.map((b) => b.label + " " + b.min + "\u2013" + b.max).join(" \xB7 ") +
+        ". Governed by the shared register \u2014 edits happen in the dashboard's \u2696 Methodology panel."),
       el("div", { class: "method-table-wrap" }, el(
         "table",
         { class: "method-table" },
-        el("thead", {}, el("tr", {}, ...["Factor", "Points", "Range", "Rationale"].map((h) => el("th", {}, h)))),
-        el("tbody", {}, ...factorRows.map((r) => el("tr", {}, ...r.map((c, i) => el("td", i === 3 ? { class: "muted" } : {}, c)))))
+        el("thead", {}, el("tr", {}, ...["Parameter (axis)", "Weight", "Anchors (1 \xB7 3 \xB7 5)", "Unknown"].map((h) => el("th", {}, h)))),
+        el("tbody", {}, ...paramRows.map((r) => el("tr", {}, ...r.map((c, i) => el("td", i === 2 ? { class: "muted" } : {}, c)))))
       )),
       el("h2", {}, "3. Classification thresholds"),
       el(
         "p",
         {},
-        chip("critical"),
-        "score \u2265 75 \u2014 priority candidates for re-entry / re-abandonment review.  ",
-        chip("high"),
-        "score \u2265 50 \u2014 detailed records review; monitor.  ",
-        chip("medium"),
-        "score \u2265 25 \u2014 periodic review.  ",
-        chip("low"),
-        "score < 25 \u2014 no action beyond inventory."
+        ...[...UNIFIED_METH.matrix.bands].reverse().flatMap((b) => {
+          const cls = RANK_TO_CLASS[b.label] || b.cls;
+          return [chip(cls), `matrix cell ${b.min}\u2013${b.max} (${b.label}) \u2014 ${CLASS_ACTION[cls] || ""}.  `];
+        })
       ),
+      el("p", {}, "Class is assigned from the L\u00d7C matrix cell (round(L) \u00d7 round(C)), not the 0\u2013100 score directly \u2014 the score is a monotonic re-expression of the same risk index (unrounded L \u00d7 C) kept for continuity with the legacy 0\u2013100 display."),
       el("p", {}, 'Manual override: the "Estimated Leakage Risk" field lets a reviewing engineer override the computed class (shown with a "(manual)" marker and the computed score retained). Engineering judgment always outranks the index \u2014 the model is a screen, not a verdict.'),
       el("h2", {}, "4. Derived quantities"),
       el(
@@ -24304,35 +24331,23 @@ dialog.confirm { max-width: 420px; }
         el("li", {}, `Distance to AOR boundary \u2014 positive inside, negative outside. ${site2.aor.mode === "perInjector" ? `This site uses per-injector AOR circles (radius ${(site2.aor.radius_m / 1e3).toFixed(1)} km around each of ${site2.injectors.length} injectors); a well is "inside" if within the radius of any circle.` : site2.aor.mode === "none" ? "This site is an evaluation area with no defined injectors or AOR \u2014 the proximity and inside-AOR factors are inactive here." : `This site uses a single AOR of radius ${(site2.aor.radius_m / 1e3).toFixed(1)} km.`}`),
         el("li", {}, 'Both fields are derived ("(auto)" in the editor) so the spatial factors can never disagree with the map.')
       ),
-      el("h2", {}, "5. Worked examples (computed live by the engine)"),
-      el("div", { class: "method-table-wrap" }, el(
-        "table",
-        { class: "method-table" },
-        el("thead", {}, el("tr", {}, el("th", {}, "Pre-regulation open-hole wildcat (1949, unknown cement/plugs, through caprock, near injector)"), el("th", {}, "Modern engineered injector-class well (2025, good cement, overridden Low)"))),
-        el("tbody", {}, el(
-          "tr",
-          {},
-          el("td", {}, ...worst.factors.map((f) => el("div", {}, `${f.label}: +${f.pts}`)), el("div", { class: "method-total" }, `\u2192 score ${worst.score}, class ${(RISK_LABELS[worst.class] || "").toUpperCase()}`)),
-          el("td", {}, ...modernR.factors.map((f) => el("div", {}, `${f.label}: +${f.pts}`)), el("div", { class: "method-total" }, `\u2192 score ${modernR.score}, class ${(RISK_LABELS[modernR.class] || "").toUpperCase()}${modernR.overridden ? " (manual override)" : ""}`))
-        ))
-      )),
-      el("h2", {}, "6. Data provenance (this build)"),
+      el("h2", {}, "5. Data provenance (this build)"),
       el(
         "ul",
         {},
         el("li", {}, 'Nisku Enbridge POC AOR site: well attributes, formation tops, casing programs and plug records from "Nisku Offset Wellbore Review 5 km radius from PineOakCedar.xlsx" (AccuMap abandoned-well search, NAD83 ATS 4.1); injector locations and 5 km AOR circles from the Enbridge Wabamun Hub Ltd map "5 km from Injection Potential Nisku-Penetrating Wells" (Jul 22, 2026, NAD27). Injector placements read from the DLS grid (\xB11 section); Pine/Oak/Cedar naming assumed north\u2192south. Integrity Scores are screening-level judgment from casing/vintage/plug evidence, not AER data.'),
         el("li", {}, "Wabamun Demo site: synthetic but statistically representative 20-well dataset (deterministic seed).")
       ),
-      el("h2", {}, "7. Limitations"),
+      el("h2", {}, "6. Limitations"),
       el(
         "ul",
         {},
-        el("li", {}, "Additive screening index, not a calibrated probability of leakage; weights are expert-assigned, aligned qualitatively with Watson & Bachu (2009), not statistically fitted."),
-        el("li", {}, "No SCVF / gas-migration test results, cement bond logs, or pressure-transient evidence are ingested; where such data exist they should drive the Integrity Score and override."),
+        el("li", {}, "Weighted L\xD7C screening index, not a calibrated probability of leakage; weights are expert-assigned, aligned qualitatively with Watson & Bachu (2009), not statistically fitted."),
+        el("li", {}, "No SCVF / gas-migration test results, cement bond logs, or pressure-transient evidence are ingested; where such data exist they should drive the corresponding parameter score and override."),
         el("li", {}, "Distance factors are proxies \u2014 they do not model pressure evolution or plume migration. Pair with reservoir simulation for AOR delineation (e.g., the companion Nisku VE simulator / CMG-GEM decks)."),
         el("li", {}, "Not a substitute for AER Directive 020/065 assessment or a Class VI corrective-action plan.")
       ),
-      el("h2", {}, "8. References"),
+      el("h2", {}, "7. References"),
       el("ol", { class: "method-refs" }, ...REFS.map(([auth, title, note]) => el("li", {}, el("b", {}, auth + " "), title, el("div", { class: "muted" }, note))))
     ));
   }
@@ -24737,7 +24752,9 @@ dialog.confirm { max-width: 420px; }
         toast("No wells to push (scenario wells are excluded).", { error: true });
         return;
       }
-      const rows = wells.map(({ _risk, ...w }) => ({ ...w, riskScore: _risk?.score, riskClass: RISK_LABELS[_risk?.class] ?? _risk?.class }));
+      const rows = wells.map(({ _risk, ...w }) => ({ ...w,
+        riskScore: _risk?.score, riskClass: RISK_LABELS[_risk?.class] ?? _risk?.class,
+        scores: _risk?.scores ?? null, scoredUnder: UNIFIED_METH.revision }));
       window.parent.postMessage({ type: "lwms:exportWells", site: site.name, rows }, "*");
     });
     $("#toolbar").append(pushBtn);
