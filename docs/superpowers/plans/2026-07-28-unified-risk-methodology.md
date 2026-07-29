@@ -110,7 +110,7 @@ const v1well = { id:'W-TEST', licence:'100/13-06-055-22W4/00', klass:'Type 1',
 eq('isV1Well', S.isV1Well(v1well), true);
 const mig = S.migrateV1(v1well, M);
 eq('V4 migrated scores', mig.scores,
-   { plugQuality:5, cement:5, barriers:3, scvf:null, age:5, complexity:3, data:5,
+   { plugQuality:5, cement:5, barriers:3, scvf:null, age:5, complexity:null, data:5,
      penetration:5, plume:1, usdw:null, access:1 });
 eq('V4 migrated computed', { L:mig.computed.L, C:mig.computed.C, cell:mig.computed.cell,
    riskIndex:mig.computed.riskIndex, rank:mig.computed.rankLabel, integrity:mig.computed.integrity },
