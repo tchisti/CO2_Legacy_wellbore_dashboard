@@ -88,5 +88,15 @@ eq('text change → patch', S.bumpRevision(M, tChange), '2.0.1');
 // --- built-in self test agrees ---
 eq('runSelfTest passes', S.runSelfTest().pass, true);
 
+// --- methodology.json ↔ fallback parity (anti-drift) ---
+const fs = require('fs');
+const mjPath = path.join(__dirname, '..', 'methodology.json');
+eq('methodology.json exists', fs.existsSync(mjPath), true);
+if (fs.existsSync(mjPath)) {
+  const live = JSON.parse(fs.readFileSync(mjPath, 'utf8'));
+  eq('methodology.json validates', S.validateMethodology(live).ok, true);
+  eq('methodology.json parity with fallback', live, S.FALLBACK_METHODOLOGY);
+}
+
 console.log(failures ? `\n${failures} FAILURE(S)` : '\nALL TESTS PASS');
 process.exit(failures ? 1 : 0);
