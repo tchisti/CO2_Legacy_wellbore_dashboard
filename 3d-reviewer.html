@@ -1472,7 +1472,7 @@ dialog.confirm { max-width: 420px; }
       if (f.wellTypes.length && !f.wellTypes.includes(w.wellType)) return false;
       if (f.formations.length && !f.formations.includes(w.formationPenetrated)) return false;
       if (f.riskClasses.length && !f.riskClasses.includes(w._risk?.class)) return false;
-      const integ = typeof w.integrityScore === "number" ? w.integrityScore : 0;
+      const integ = (w._risk && isNum2(w._risk.integrity)) ? w._risk.integrity : 0;
       if (integ < f.integrityMin || integ > f.integrityMax) return false;
       if (f.yearMin != null && !(w.abandonmentYear >= f.yearMin)) return false;
       if (f.yearMax != null && !(w.abandonmentYear <= f.yearMax)) return false;
