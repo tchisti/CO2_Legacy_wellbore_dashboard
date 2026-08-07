@@ -283,48 +283,5 @@
       },
       "total": 35
     }
-  },
-  {
-    "id": "W-FCEFST",
-    "licence": "UNNAMED",
-    "operator": "Unknown",
-    "lat": null,
-    "lon": null,
-    "year": null,
-    "type": "Oil Producer",
-    "traj": "Vertical",
-    "status": "Active",
-    "klass": "Type 1",
-    "reviewer": "",
-    "notes": "",
-    "schema": 2,
-    "scores": {
-      "plugQuality": 1,
-      "cement": 1,
-      "barriers": 1,
-      "scvf": 2,
-      "age": 4,
-      "complexity": 2,
-      "data": 1,
-      "penetration": 5,
-      "plume": 1,
-      "usdw": 1,
-      "access": 2
-    },
-    "computed": {
-      "L": 1.56,
-      "C": 2.4,
-      "Lr": 2,
-      "Cr": 2,
-      "cell": 4,
-      "riskIndex": 3.74,
-      "rankLabel": "Low",
-      "integrity": 89
-    },
-    "scoredUnder": "2.0.0",
-    "needsReview": false,
-    "createdAt": "2026-08-07T16:08:06.085Z",
-    "updatedAt": "2026-08-07T16:08:06.085Z",
-    "updatedBy": "Tahir Chisti"
   }
 ]
