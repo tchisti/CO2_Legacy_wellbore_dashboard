@@ -66,6 +66,20 @@ button.ghost{background:transparent}
 
 .grid2{display:grid;grid-template-columns:1.2fr .8fr;gap:16px}
 @media (max-width:1300px){.grid2{grid-template-columns:1fr}}
+
+.wb-grid{display:grid;grid-template-columns:1.4fr .6fr;gap:16px}
+@media (max-width:900px){.wb-grid{grid-template-columns:1fr}}
+.wb-legend div{display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;border-radius:6px}
+.wb-legend .sw{width:14px;height:14px;border-radius:3px;flex:none}
+#wbSvg{width:100%;height:auto;display:block;touch-action:none}
+.wb-legend .sw{border:1px solid rgba(255,255,255,.18)}
+.wb-legend div:hover,.wb-legend div.on{background:var(--field)}
+.wb-toolbar{display:flex;align-items:center;gap:8px}
+.wb-unit-toggle{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.wb-unit-toggle button{border:none;border-radius:0;padding:5px 12px;font-size:11px;background:var(--field);color:var(--muted);margin:0}
+.wb-unit-toggle button:hover{transform:none;border-color:transparent}
+.wb-unit-toggle button.on{background:var(--accent);color:#04101f;font-weight:700}
+#tooltip{position:fixed;z-index:200;pointer-events:none;display:none;background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:6px 10px;font-size:12px;color:var(--text);box-shadow:var(--shadow);max-width:320px;line-height:1.4}
 .matrix{display:grid;grid-template-columns:64px repeat(5,1fr);grid-template-rows:36px repeat(5,46px);gap:4px}
 .cell{display:grid;place-items:center;border-radius:6px;font-weight:700;font-size:12px;color:#0b1220;position:relative;cursor:default}
 .cell.lbl{background:transparent;color:var(--muted);font-weight:600;font-size:11px}
@@ -522,6 +536,8 @@ footer{padding:18px 24px;color:var(--muted);font-size:11px;border-top:1px solid 
   cross-checked against EPA UIC Class VI 40 CFR §146.84, AER Directive 051/020, CSA Z741, ISO 27914, API RP 65-3 ·
   Arbad et al., IJGGC vol. 133 (2024).
 </footer>
+
+<div id="tooltip"></div>
 
 <script src="scoring.js"></script>
 <script>
@@ -1246,6 +1262,267 @@ function wellboreFrom3D() { return null; }
 globalThis.Wellbore = { mToFt, ftToM, parseDepth, parseIntervalsText, parseCasingText, parseWellboreReport, wellboreStats, depthScale, renderWellboreSVG, wellboreFrom3D };
 /* ===== WELLBORE PURE END ===== */
 
+/* ===== WELLBORE UI ===== */
+
+const WB_KIND_LABELS = { casing:'Casing', cement:'Cement', openhole:'Open Hole', zone:'Zone', formation:'Formation', plug:'Plug', perf:'Perforations', packer:'Packer', note:'Note' };
+const WB_KIND_COLORS = { casing:'#8a93a1', cement:'#a8cdea', openhole:'#8a6b4f', zone:'#b9a7e6', formation:'#e08a2e', plug:'#1d6b47', perf:'#d4453a', packer:'#5c6470', note:'var(--muted)' };
+const WB_FIELD_LABELS = { top_m:'Top', bottom_m:'Bottom', shoe_m:'Shoe', toc_m:'TOC', depth_m:'Depth', od_mm:'OD', weight_kgm:'Weight', name:'Name', type:'Type', grade:'Grade', kind:'Kind', n:'Plug #', sacks:'Sacks', status:'Status', text:'Note' };
+
+// Active display unit for the mounted schematic — persisted across sessions/tabs.
+let schemUnit = (function(){ try { return localStorage.getItem('lwms:schemUnit') === 'ft' ? 'ft' : 'm'; } catch(e){ return 'm'; } })();
+
+// Mount state for the single wellbore schematic shown on the detail tab at a time.
+// {host, wb, licence, highlightId, hoverKind, lockedKinds:Set}
+let wbState = null;
+
+function mountWellboreSchematic(host, wb, licence){
+  wbState = null;
+  if(!host) return;
+  if(!wb || !(wb.td > 0)){
+    host.innerHTML = `<div class="panel"><h2>Wellbore Schematic</h2><div class="empty">No construction records — paste an abandonment report in Edit, or push this well from the 3D Reviewer.</div></div>`;
+    return;
+  }
+  wbState = { host, wb, licence, highlightId:null, hoverKind:null, lockedKinds:new Set() };
+  wbRenderCard();
+}
+
+function wbRenderCard(){
+  const st = wbState; if(!st) return;
+  const svgHtml = Wellbore.renderWellboreSVG(st.wb, {unit:schemUnit});
+  const kinds = wbKindsPresent(svgHtml);
+  const stats = Wellbore.wellboreStats(st.wb);
+  st.host.innerHTML = `
+    <div class="panel">
+      <div class="row spread" style="margin-bottom:4px">
+        <h2 style="margin:0">Wellbore Schematic</h2>
+        <div id="wbToolbar" class="wb-toolbar">
+          <div class="wb-unit-toggle">
+            <button type="button" data-unit="m" class="${schemUnit==='m'?'on':''}" onclick="wbSetUnit('m')">m</button>
+            <button type="button" data-unit="ft" class="${schemUnit==='ft'?'on':''}" onclick="wbSetUnit('ft')">ft</button>
+          </div>
+        </div>
+      </div>
+      <div class="wb-grid">
+        <div id="wbSvgHost">${svgHtml.replace('<svg ', '<svg id="wbSvg" ')}</div>
+        <div>
+          <div class="rec-card">
+            <h4 style="margin:0 0 8px 0">Legend</h4>
+            <div class="wb-legend" id="wbLegend">${kinds.map(k=>wbLegendRow(k)).join('') || '<div class="muted" style="padding:4px 0">No components</div>'}</div>
+          </div>
+          <div class="rec-card">
+            <h4 style="margin:0 0 8px 0">Statistics</h4>
+            <div id="wbStats">${wbStatsHtml(stats)}</div>
+          </div>
+          <div class="rec-card">
+            <h4 style="margin:0 0 8px 0">Selection</h4>
+            <div id="wbSel" class="muted">Click a component…</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+  wbWireSvgEvents();
+}
+
+// Component kinds actually drawn in a rendered SVG string, in first-seen order,
+// excluding the structural "axis"/"surface" groups (those aren't legend items).
+function wbKindsPresent(svgHtml){
+  const seen = new Set(); const order = [];
+  const re = /data-kind="([a-z]+)"/g; let m;
+  while((m = re.exec(svgHtml))){
+    const k = m[1];
+    if(k==='axis' || k==='surface') continue;
+    if(!seen.has(k)){ seen.add(k); order.push(k); }
+  }
+  return order;
+}
+
+function wbLegendRow(kind){
+  const label = WB_KIND_LABELS[kind] || kind;
+  const color = WB_KIND_COLORS[kind] || 'var(--muted)';
+  return `<div data-kind="${kind}" onmouseenter="wbHoverLegend('${kind}',true)" onmouseleave="wbHoverLegend('${kind}',false)" onclick="wbToggleLegend('${kind}')">`
+    + `<span class="sw" style="background:${color}"></span><span>${escapeHtml(label)}</span></div>`;
+}
+
+// Format a metres value for on-screen display in the active schematic unit.
+function wbFmt(m, unit){
+  if(typeof m !== 'number' || !Number.isFinite(m)) return '—';
+  const v = unit==='ft' ? Wellbore.mToFt(m) : m;
+  return (+v.toFixed(1)) + (unit==='ft' ? ' ft' : ' m');
+}
+
+function wbStatsHtml(stats){
+  const fmt = v => wbFmt(v, schemUnit);
+  const rows = [
+    ['Total Depth', fmt(stats.td)],
+    ['Casing Strings', stats.casingCount ?? '—'],
+    ['Plugs', stats.plugCount ?? '—'],
+    ['Deepest Plug', fmt(stats.deepestPlug)],
+    ['Shallowest Plug', fmt(stats.shallowestPlug)],
+    ['Longest Plug', fmt(stats.longestPlug)],
+    ['Total Plugged Interval', fmt(stats.pluggedTotal)],
+    ['Plugged Coverage', stats.coveragePct!=null ? stats.coveragePct.toFixed(1)+'%' : '—'],
+    ['Open Hole Length', fmt(stats.openHoleLen)],
+    ['Perforation Intervals', stats.perfCount ?? '—'],
+    ['Formation Tops', stats.formationCount ?? '—']
+  ];
+  return `<table class="wells"><tbody>${rows.map(([k,v])=>`<tr><td>${k}</td><td style="text-align:right">${v}</td></tr>`).join('')}</tbody></table>`;
+}
+
+function wbWireSvgEvents(){
+  const svg = document.getElementById('wbSvg');
+  if(svg){
+    svg.addEventListener('mouseover', wbHandleSvgHover);
+    svg.addEventListener('mousemove', wbHandleSvgHover);
+    svg.addEventListener('mouseout', wbHandleSvgOut);
+    svg.addEventListener('click', wbHandleSvgClick);
+  }
+  wbApplyLegendState();
+}
+
+function wbHandleSvgHover(e){
+  const tip = document.getElementById('tooltip');
+  if(!tip) return;
+  const g = e.target.closest && e.target.closest('[data-id]');
+  if(!g){ tip.style.display='none'; return; }
+  tip.textContent = g.getAttribute('aria-label') || '';
+  tip.style.display = 'block';
+  tip.style.left = (e.clientX + 14) + 'px';
+  tip.style.top = (e.clientY + 14) + 'px';
+}
+
+function wbHandleSvgOut(){
+  const tip = document.getElementById('tooltip');
+  if(tip) tip.style.display = 'none';
+}
+
+function wbHandleSvgClick(e){
+  const g = e.target.closest && e.target.closest('[data-id]');
+  selectWbElement(g ? g.getAttribute('data-id') : null);
+}
+
+// Click-selection resolver — data-id "kind:index" → the underlying wellbore
+// object. cement:i and casing:i both resolve into wb.casings[i] (cement is
+// drawn per casing, using the casing's ORIGINAL array index); openhole:0 is
+// the singleton wb.openHole; perf:i resolves into wb.perforations (the kind
+// string differs from the array name); everything else is wb[kind+'s'][i].
+function wbResolveTarget(wb, id){
+  if(!wb || !id) return null;
+  const idx = id.indexOf(':');
+  if(idx < 0) return null;
+  const kind = id.slice(0, idx);
+  const i = parseInt(id.slice(idx+1), 10);
+  if(kind === 'cement') return (Array.isArray(wb.casings) ? wb.casings[i] : null) || null;
+  if(kind === 'openhole') return wb.openHole || null;
+  if(kind === 'perf') return (Array.isArray(wb.perforations) ? wb.perforations[i] : null) || null;
+  const arr = wb[kind + 's'];
+  return Array.isArray(arr) ? (arr[i] || null) : null;
+}
+
+function selectWbElement(id){
+  const st = wbState; if(!st) return;
+  st.highlightId = id || null;
+  wbRerenderSvgPreserveView();
+  wbUpdateSelectionCard();
+}
+
+// Re-render #wbSvg (new unit and/or highlight) while preserving whatever
+// viewBox is currently set — Task 4's zoom/pan writes that attribute and
+// must survive unit toggles and selection clicks.
+function wbRerenderSvgPreserveView(){
+  const st = wbState; if(!st) return;
+  const old = document.getElementById('wbSvg');
+  const vb = old ? old.getAttribute('viewBox') : null;
+  const svgHtml = Wellbore.renderWellboreSVG(st.wb, {unit:schemUnit, highlightId:st.highlightId});
+  const host = document.getElementById('wbSvgHost');
+  if(!host) return;
+  host.innerHTML = svgHtml.replace('<svg ', '<svg id="wbSvg" ');
+  const fresh = document.getElementById('wbSvg');
+  if(fresh && vb) fresh.setAttribute('viewBox', vb);
+  wbWireSvgEvents();
+}
+
+function wbHumanize(k){
+  return k.replace(/_m$/, '').replace(/_mm$/, ' (mm)').replace(/_kgm$/, ' (kg/m)').replace(/_/g, ' ').replace(/^./, c=>c.toUpperCase());
+}
+
+function wbFieldsDl(obj){
+  const keys = Object.keys(obj);
+  if(!keys.length) return '<div class="muted">(no fields)</div>';
+  const rows = keys.map(k=>{
+    const label = WB_FIELD_LABELS[k] || wbHumanize(k);
+    const v = obj[k];
+    let out;
+    if(v === null || v === undefined || v === '') out = '—';
+    else if(k.endsWith('_m')) out = wbFmt(v, schemUnit);
+    else if(typeof v === 'number') out = (+v.toFixed(2)).toString();
+    else out = escapeHtml(String(v));
+    return `<tr><td>${escapeHtml(label)}</td><td style="text-align:right">${out}</td></tr>`;
+  }).join('');
+  return `<table class="wells"><tbody>${rows}</tbody></table>`;
+}
+
+function wbUpdateSelectionCard(){
+  const st = wbState; if(!st) return;
+  const sel = document.getElementById('wbSel');
+  if(!sel) return;
+  if(!st.highlightId){ sel.className = 'muted'; sel.textContent = 'Click a component…'; return; }
+  const obj = wbResolveTarget(st.wb, st.highlightId);
+  if(!obj){ sel.className = 'muted'; sel.textContent = 'No data for selection.'; return; }
+  sel.className = '';
+  sel.innerHTML = wbFieldsDl(obj);
+}
+
+function wbSetUnit(u){
+  schemUnit = (u === 'ft') ? 'ft' : 'm';
+  try { localStorage.setItem('lwms:schemUnit', schemUnit); } catch(e){}
+  const st = wbState; if(!st) return;
+  const toolbar = document.getElementById('wbToolbar');
+  if(toolbar){
+    toolbar.querySelectorAll('.wb-unit-toggle button').forEach(b=>{
+      b.classList.toggle('on', b.getAttribute('data-unit') === schemUnit);
+    });
+  }
+  wbRerenderSvgPreserveView();
+  const statsEl = document.getElementById('wbStats');
+  if(statsEl) statsEl.innerHTML = wbStatsHtml(Wellbore.wellboreStats(st.wb));
+  wbUpdateSelectionCard();
+}
+
+function wbHoverLegend(kind, entering){
+  const st = wbState; if(!st) return;
+  st.hoverKind = entering ? kind : null;
+  wbApplyLegendState();
+}
+
+function wbToggleLegend(kind){
+  const st = wbState; if(!st) return;
+  if(st.lockedKinds.has(kind)) st.lockedKinds.delete(kind); else st.lockedKinds.add(kind);
+  wbApplyLegendState();
+}
+
+function wbApplyLegendState(){
+  const st = wbState; if(!st) return;
+  const active = st.hoverKind ? new Set([st.hoverKind]) : st.lockedKinds;
+  const legend = document.getElementById('wbLegend');
+  if(legend){
+    legend.querySelectorAll('[data-kind]').forEach(row=>{
+      const k = row.getAttribute('data-kind');
+      row.classList.toggle('on', st.lockedKinds.has(k) || st.hoverKind === k);
+    });
+  }
+  const svg = document.getElementById('wbSvg');
+  if(svg){
+    svg.querySelectorAll('[data-kind]').forEach(g=>{
+      const k = g.getAttribute('data-kind');
+      if(k === 'axis' || k === 'surface' || !active.size){ g.style.opacity = ''; return; }
+      g.style.opacity = active.has(k) ? '1' : '0.15';
+    });
+  }
+}
+
+/* ===== END WELLBORE UI ===== */
+
 /* ============ SCORING MODEL — Appendix D + § 7.2 ============ */
 
 /* Legacy well classifications — Table A-1 / Figure A-4, Enbridge "CO2 Underground
@@ -1734,11 +2011,14 @@ function openDetail(id){
       </div>
     </div>
 
+    <div id="wbSection" style="margin-top:14px"></div>
+
     <div class="actions-row" style="margin-top:14px">
       <button class="ghost" onclick="editWell('${w2.id}')">Edit</button>
       <button class="primary" onclick="exportPDF('${w2.id}')">⬇ Download Well PDF</button>
     </div>
   `;
+  mountWellboreSchematic(document.getElementById('wbSection'), w2.wellbore, w2.licence);
 }
 
 /* Recommendation engine — first-principles wiring of Appendix D output into § 8 actions */
