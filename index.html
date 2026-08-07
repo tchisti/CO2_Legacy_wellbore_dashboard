@@ -252,6 +252,12 @@ footer{padding:18px 24px;color:var(--muted);font-size:11px;border-top:1px solid 
         <div><label>Spud / Completion Year (optional)</label><input id="f_year" type="number" min="1900" max="2100" placeholder="e.g. 1972"/></div>
         <div><label>Reviewer (optional)</label><input id="f_reviewer" placeholder="e.g. T. Khan"/></div>
         <div style="grid-column:1/-1"><label>Notes / Justification (optional)</label><textarea id="f_notes" rows="2" placeholder="Field observations, surface conditions, regulatory file numbers, references…"></textarea></div>
+        <div style="grid-column:1/-1"><details id="wbEditorWrap"><summary style="cursor:pointer;font-weight:700">Wellbore Construction (schematic)</summary>
+          <div id="wbEditor" style="margin-top:8px"></div>
+          <label style="margin-top:10px">Paste abandonment report…</label>
+          <textarea id="wbPaste" rows="4" placeholder="Plug #1  3658–3277 ft  170 sacks cement  2% CaCl2 …"></textarea>
+          <div class="row" style="gap:8px;margin-top:6px"><button type="button" class="ghost" onclick="wbParsePaste()">Parse into rows</button><span id="wbParseWarn" style="font-size:11px;color:var(--muted)"></span></div>
+        </details></div>
       </div>
 
       <div class="divider"></div>
@@ -1654,6 +1660,255 @@ function wbApplyLegendState(){
   }
 }
 
+/* ---- Wellbore Construction rows editor (Add/Edit Well form, §7) ---- */
+
+// Field definitions per list, in the exact order requested by the brief.
+// `numeric:true` fields are parsed with parseFloat and dropped (left
+// undefined) when blank/unparseable; `select:[...]` fields render a <select>
+// with a blank "unset" option plus the given values.
+const WB_LIST_DEFS = {
+  casings: { title: 'Casings', add: '+ Add casing', fields: [
+    { key: 'name', label: 'Name' },
+    { key: 'od_mm', label: 'OD (mm)', numeric: true },
+    { key: 'grade', label: 'Grade' },
+    { key: 'weight_kgm', label: 'Weight (kg/m)', numeric: true },
+    { key: 'top_m', label: 'Top (m)', numeric: true },
+    { key: 'shoe_m', label: 'Shoe (m)', numeric: true },
+    { key: 'toc_m', label: 'TOC (m)', numeric: true },
+  ] },
+  plugs: { title: 'Plugs', add: '+ Add plug', fields: [
+    { key: 'n', label: '#', numeric: true },
+    { key: 'kind', label: 'Kind', select: ['cement', 'bridge', 'cibp'] },
+    { key: 'top_m', label: 'Top (m)', numeric: true },
+    { key: 'bottom_m', label: 'Bottom (m)', numeric: true },
+    { key: 'sacks', label: 'Sacks', numeric: true },
+    { key: 'additives', label: 'Additives' },
+    { key: 'notes', label: 'Notes' },
+  ] },
+  perforations: { title: 'Perforations', add: '+ Add perforation', fields: [
+    { key: 'top_m', label: 'Top (m)', numeric: true },
+    { key: 'bottom_m', label: 'Bottom (m)', numeric: true },
+    { key: 'status', label: 'Status' },
+  ] },
+  formations: { title: 'Formations', add: '+ Add formation', fields: [
+    { key: 'name', label: 'Name' },
+    { key: 'top_m', label: 'Top (m)', numeric: true },
+  ] },
+  packers: { title: 'Packers', add: '+ Add packer', fields: [
+    { key: 'depth_m', label: 'Depth (m)', numeric: true },
+  ] },
+  zones: { title: 'Zones', add: '+ Add zone', fields: [
+    { key: 'kind', label: 'Kind', select: ['salt', 'hydrocarbon'] },
+    { key: 'top_m', label: 'Top (m)', numeric: true },
+    { key: 'bottom_m', label: 'Bottom (m)', numeric: true },
+  ] },
+};
+
+// Fields present in the §2 shape that this rows editor has no per-row UI
+// for (top-level `notes`, `openHole`). Stashed on load and passed through
+// unchanged on read so an untouched round-trip (editWell → save) never
+// silently drops data the editor doesn't expose — same reasoning as
+// `legacy: prev?.legacy` in readForm().
+let wbEditorExtra = { notes: undefined, openHole: undefined };
+
+// Builds one repeatable row: one input/select per field (data-wb="<key>"),
+// ending in a ✕ remove button. Values come from teammate-synced well data
+// (bridge/parse/manual), so every value="..." attribute is escaped.
+function wbRowHtml(fields, data) {
+  data = data || {};
+  const cells = fields.map(f => {
+    const raw = data[f.key];
+    if (f.select) {
+      const opts = [''].concat(f.select).map(o => {
+        const label = o ? (o.charAt(0).toUpperCase() + o.slice(1)) : '—';
+        const sel = (raw || '') === o ? ' selected' : '';
+        return `<option value="${escapeHtml(o)}"${sel}>${escapeHtml(label)}</option>`;
+      }).join('');
+      return `<select data-wb="${escapeHtml(f.key)}" title="${escapeHtml(f.label)}">${opts}</select>`;
+    }
+    const val = (raw === undefined || raw === null) ? '' : escapeHtml(String(raw));
+    const typeAttr = f.numeric ? ' type="number" step="0.1"' : '';
+    return `<input${typeAttr} data-wb="${escapeHtml(f.key)}" placeholder="${escapeHtml(f.label)}" title="${escapeHtml(f.label)}" value="${val}"/>`;
+  }).join('');
+  return `<div class="wb-erow" data-wb-row style="display:grid;grid-template-columns:repeat(${fields.length},1fr) 26px;gap:6px;margin-bottom:6px;align-items:center">${cells}<button type="button" class="ghost" onclick="wbRemoveRow(this)" title="Remove row" style="padding:4px 6px;font-size:11px;margin:0">✕</button></div>`;
+}
+
+function wbAddRow(key) {
+  const def = WB_LIST_DEFS[key];
+  const container = document.getElementById('wbRows_' + key);
+  if (!def || !container) return;
+  container.insertAdjacentHTML('beforeend', wbRowHtml(def.fields, {}));
+}
+
+function wbRemoveRow(btn) {
+  const row = btn.closest('[data-wb-row]');
+  if (row) row.remove();
+}
+
+// Delegated listener attached once to the static #wbEditor container (its
+// innerHTML is replaced wholesale on every load/parse, but the container
+// node itself never is, so a single delegated 'input' listener survives
+// re-renders). Any real user keystroke inside the editor — and ONLY that —
+// flips the tracked source to 'manual' (spec §7 / task-5 brief step 2).
+function wbEditorAttachListener() {
+  const el = document.getElementById('wbEditor');
+  if (!el || el.dataset.wbListener) return;
+  el.dataset.wbListener = '1';
+  el.addEventListener('input', () => { el.dataset.wbSource = 'manual'; });
+}
+
+// wbEditorLoad(wb) — renders TD/KB + one repeatable-rows block per list.
+// wb may be null/undefined (empty form) or a full/partial §2 object.
+function wbEditorLoad(wb) {
+  const el = document.getElementById('wbEditor');
+  if (!el) return;
+  wbEditorAttachListener();
+  wb = wb || {};
+  wbEditorExtra = {
+    notes: Array.isArray(wb.notes) ? wb.notes : undefined,
+    openHole: (wb.openHole && typeof wb.openHole === 'object') ? wb.openHole : undefined,
+  };
+  // Setting innerHTML/value attributes below never fires 'input', so this
+  // load never itself flips the source — only a subsequent keystroke does.
+  el.dataset.wbSource = wb.source || '';
+  const tdVal = typeof wb.td === 'number' ? wb.td : '';
+  const kbVal = typeof wb.kbElev === 'number' ? wb.kbElev : '';
+  const blocks = Object.keys(WB_LIST_DEFS).map(key => {
+    const def = WB_LIST_DEFS[key];
+    const rows = Array.isArray(wb[key]) ? wb[key] : [];
+    const rowsHtml = rows.map(r => wbRowHtml(def.fields, r || {})).join('');
+    return `<div style="margin-top:12px">
+      <div style="font-weight:700;font-size:12px;margin-bottom:4px">${escapeHtml(def.title)}</div>
+      <div id="wbRows_${key}">${rowsHtml}</div>
+      <button type="button" class="ghost" style="font-size:11px" onclick="wbAddRow('${key}')">${escapeHtml(def.add)}</button>
+    </div>`;
+  }).join('');
+  el.innerHTML = `
+    <div class="form-grid">
+      <div><label>Total Depth (m)</label><input id="wbTd" type="number" step="0.1" value="${tdVal}"/></div>
+      <div><label>KB Elevation (m)</label><input id="wbKb" type="number" step="0.1" value="${kbVal}"/></div>
+    </div>
+    ${blocks}
+    <div id="wbEditorWarn" class="muted" style="font-size:11px;margin-top:8px"></div>
+  `;
+}
+
+// Reads every row currently under #wbRows_<key> into plain objects, keyed
+// generically off each input/select's data-wb attribute — no per-list
+// special-casing needed here; drop/swap rules are applied by the caller.
+function wbEditorReadRows(key) {
+  const def = WB_LIST_DEFS[key];
+  const container = document.getElementById('wbRows_' + key);
+  const rowEls = container ? [...container.querySelectorAll('[data-wb-row]')] : [];
+  return rowEls.map(row => {
+    const obj = {};
+    def.fields.forEach(f => {
+      const input = row.querySelector(`[data-wb="${f.key}"]`);
+      if (!input) return;
+      const raw = input.value;
+      if (f.numeric) {
+        if (raw === '') return;
+        const n = parseFloat(raw);
+        if (Number.isFinite(n)) obj[f.key] = n;
+      } else {
+        const s = String(raw).trim();
+        if (s) obj[f.key] = s;
+      }
+    });
+    return obj;
+  });
+}
+
+// wbEditorRead() → §2 wellbore object | null. null only when TD is empty
+// AND every list serialized to zero rows (task-5 brief guardrails). Rows
+// missing their required numeric depth are dropped (counted into
+// #wbEditorWarn); top>bottom pairs are swapped rather than rejected.
+function wbEditorRead() {
+  const tdEl = document.getElementById('wbTd');
+  const kbEl = document.getElementById('wbKb');
+  const tdRaw = tdEl ? tdEl.value : '';
+  const kbRaw = kbEl ? kbEl.value : '';
+  const td = tdRaw === '' ? null : parseFloat(tdRaw);
+  const kbElev = kbRaw === '' ? null : parseFloat(kbRaw);
+
+  let dropped = 0;
+  const swapIfInverted = (o, a, b) => {
+    if (typeof o[a] === 'number' && typeof o[b] === 'number' && o[a] > o[b]) {
+      const t = o[a]; o[a] = o[b]; o[b] = t;
+    }
+  };
+
+  const casings = wbEditorReadRows('casings').filter(c => {
+    swapIfInverted(c, 'top_m', 'shoe_m');
+    if (typeof c.shoe_m !== 'number') { dropped++; return false; }
+    return true;
+  });
+
+  const readRangeList = key => wbEditorReadRows(key).filter(o => {
+    if (typeof o.top_m !== 'number' || typeof o.bottom_m !== 'number') { dropped++; return false; }
+    swapIfInverted(o, 'top_m', 'bottom_m');
+    return true;
+  });
+  const plugs = readRangeList('plugs');
+  const perforations = readRangeList('perforations');
+  const zones = readRangeList('zones');
+
+  const formations = wbEditorReadRows('formations').filter(f => {
+    if (typeof f.top_m !== 'number') { dropped++; return false; }
+    return true;
+  });
+  const packers = wbEditorReadRows('packers').filter(p => {
+    if (typeof p.depth_m !== 'number') { dropped++; return false; }
+    return true;
+  });
+
+  const warnEl = document.getElementById('wbEditorWarn');
+  if (warnEl) warnEl.textContent = dropped ? `${dropped} row${dropped === 1 ? '' : 's'} dropped — missing required depth.` : '';
+
+  const hasRows = casings.length || plugs.length || perforations.length || formations.length || packers.length || zones.length;
+  if (td === null && !hasRows) return null;
+
+  const wb = {};
+  if (td !== null) wb.td = td;
+  if (kbElev !== null) wb.kbElev = kbElev;
+  if (casings.length) wb.casings = casings;
+  if (plugs.length) wb.plugs = plugs;
+  if (perforations.length) wb.perforations = perforations;
+  if (formations.length) wb.formations = formations;
+  if (packers.length) wb.packers = packers;
+  if (zones.length) wb.zones = zones;
+  if (wbEditorExtra.notes && wbEditorExtra.notes.length) wb.notes = wbEditorExtra.notes;
+  if (wbEditorExtra.openHole) wb.openHole = wbEditorExtra.openHole;
+
+  const el = document.getElementById('wbEditor');
+  wb.source = (el && el.dataset.wbSource) || 'manual';
+
+  return wb;
+}
+
+// wbParsePaste() — runs the pure parser over #wbPaste and loads the result
+// into the rows editor, tagging it 'parsed'. Confirms before clobbering
+// existing rows (never before clobbering an editor that's already empty).
+function wbParsePaste() {
+  const ta = document.getElementById('wbPaste');
+  const warnEl = document.getElementById('wbParseWarn');
+  if (!ta) return;
+  const hasRows = document.querySelectorAll('#wbEditor [data-wb-row]').length > 0;
+  if (hasRows && !confirm('Replace the current construction rows with the parsed report?')) return;
+  const { wellbore, warnings } = Wellbore.parseWellboreReport(ta.value);
+  wbEditorLoad(wellbore);
+  const el = document.getElementById('wbEditor');
+  if (el) el.dataset.wbSource = 'parsed';
+  if (warnEl) {
+    if (warnings.length) {
+      const shown = warnings.slice(0, 3).join(' · ');
+      warnEl.textContent = `${warnings.length} warning${warnings.length === 1 ? '' : 's'}: ${shown}${warnings.length > 3 ? ' …' : ''}`;
+    } else {
+      warnEl.textContent = '';
+    }
+  }
+}
+
 /* ===== END WELLBORE UI ===== */
 
 /* ============ SCORING MODEL — Appendix D + § 7.2 ============ */
@@ -1776,7 +2031,7 @@ function readForm(){
   let year = yearRaw==='' ? null : parseInt(yearRaw,10);
   if(year!==null && (isNaN(year) || year<1850 || year>new Date().getFullYear()+1)){ alert('Year must be between 1850 and the current year'); throw new Error('bad year'); }
   const prev = state.editingId ? state.wells.find(x=>x.id===state.editingId) : null;
-  return {
+  const w = {
     id: state.editingId || uid(),
     licence: document.getElementById('f_id').value.trim() || 'UNNAMED',
     operator: document.getElementById('f_op').value.trim() || 'Unknown',
@@ -1798,6 +2053,9 @@ function readForm(){
     updatedAt: new Date().toISOString(),
     updatedBy: syncName() || prev?.updatedBy || '',
   };
+  const wb = wbEditorRead();
+  if (wb) w.wellbore = wb; else delete w.wellbore;
+  return w;
 }
 
 function saveWell(){
@@ -1831,6 +2089,9 @@ function resetForm(keepScores){
   document.getElementById('f_class').selectedIndex=0; updateClassHint();
   if(!keepScores){ state.currentForm = defaultScores(); }
   updateAllSegs(); updateLiveTotal();
+  wbEditorLoad(null);
+  const wbp = document.getElementById('wbPaste'); if(wbp) wbp.value = '';
+  const wbWarn = document.getElementById('wbParseWarn'); if(wbWarn) wbWarn.textContent = '';
 }
 
 function editWell(id){
@@ -1852,6 +2113,9 @@ function editWell(id){
   const nw = WellScoring.normalizeWell(w, METHODOLOGY);
   state.currentForm = {...nw.scores};
   updateAllSegs(); updateLiveTotal();
+  wbEditorLoad(w.wellbore || null);
+  const wbp = document.getElementById('wbPaste'); if(wbp) wbp.value = '';
+  const wbWarn = document.getElementById('wbParseWarn'); if(wbWarn) wbWarn.textContent = '';
   window.scrollTo({top:0,behavior:'smooth'});
 }
 
@@ -3254,6 +3518,7 @@ function initSync(){
 load();           // local cache first (instant paint, offline fallback)
 buildScoring();
 updateLiveTotal();
+wbEditorLoad(null);  // seed the empty-state rows editor so #wbEditor isn't blank before the first editWell()/resetForm()
 render();
 initSync();       // then pull the shared team register and start auto-refresh; must run even if render() above failed
 </script>
