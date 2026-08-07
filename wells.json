@@ -456,63 +456,6 @@
     }
   },
   {
-    "id": "W-IRKTDE",
-    "licence": "100/01-04-049-05W5/00",
-    "operator": "Unknown",
-    "lat": 53.195233,
-    "lon": -114.664227,
-    "year": 2000,
-    "type": "Gas Producer",
-    "traj": "Vertical",
-    "status": "Abandoned, Re-Entered Gas",
-    "klass": "Type 7",
-    "reviewer": "",
-    "notes": "2000 Abandoned, Re-Entered Gas, abandoned 2015. 2 casing string(s), surface to 327 m. 17 formation tops on record, TD in Banff @ 1819 m. 3 plug/treatment record(s). [Auto-compiled from South Seq. Eval. Area wellbore review; integrity score is rule-based screening judgment] [From 3D Reviewer: Low 15/100 — subscores and Type derived; verify Classification, Access, Data]",
-    "scores": {
-      "plugQuality": 3,
-      "cement": 3,
-      "barriers": 1,
-      "scvf": null,
-      "age": 1,
-      "complexity": null,
-      "data": 1,
-      "penetration": 1,
-      "plume": 3,
-      "usdw": null,
-      "access": 1
-    },
-    "createdAt": "2026-07-24T16:17:13.481Z",
-    "updatedAt": "2026-07-24T17:13:00.401Z",
-    "updatedBy": "Tahir Chisti (3D Reviewer)",
-    "schema": 2,
-    "computed": {
-      "L": 2.36,
-      "C": 2,
-      "Lr": 2,
-      "Cr": 2,
-      "cell": 4,
-      "riskIndex": 4.72,
-      "rankLabel": "Low",
-      "integrity": 84
-    },
-    "scoredUnder": "1.0.0",
-    "needsReview": true,
-    "legacy": {
-      "scores": {
-        "plug": 3,
-        "barriers": 1,
-        "cement": 3,
-        "prox": 3,
-        "depthR": 1,
-        "depthC": 1,
-        "age": 1,
-        "access": 1,
-        "data": 1
-      },
-      "total": 15
-    }
-  },
-  {
     "id": "W-M3JVK8",
     "licence": "100/01-04-049-05W5/02",
     "operator": "Maverick Strategic Growth Fund (India) L",
