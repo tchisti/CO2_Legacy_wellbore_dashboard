@@ -140,4 +140,29 @@ eq('null → empty string', W.renderWellboreSVG(null, {unit:'m'}), '');
 // resolvedColors inlined for export (no CSS var() left in output)
 ok('resolvedColors inlined', !W.renderWellboreSVG(wbFull,{unit:'m',resolvedColors:{line:'#123456',muted:'#654321',ink:'#ffffff',bg:'#000000'}}).includes('var(--'));
 
+// --- fix round: null array entries must never throw (Finding 1) ---
+// One pinning test per kind, plus a combined all-kinds fixture. In every
+// case the original array index is preserved in data-id for the surviving
+// (non-null) entry — nulls are skipped in place, not filtered-and-renumbered.
+ok('null casing entry tolerated', W.renderWellboreSVG({td:1500, casings:[null, {top_m:0, shoe_m:200}]}, {unit:'m'}).includes('data-id="casing:1"'));
+ok('null plug entry tolerated', W.renderWellboreSVG({td:1500, plugs:[null, {top_m:100, bottom_m:200}]}, {unit:'m'}).includes('data-id="plug:1"'));
+ok('null perforation entry tolerated', W.renderWellboreSVG({td:1500, perforations:[null, {top_m:100, bottom_m:110}]}, {unit:'m'}).includes('data-id="perf:1"'));
+ok('null formation entry tolerated', W.renderWellboreSVG({td:1500, formations:[null, {name:'X', top_m:100}]}, {unit:'m'}).includes('data-id="formation:1"'));
+ok('null zone entry tolerated', W.renderWellboreSVG({td:1500, zones:[null, {kind:'salt', top_m:100, bottom_m:200}]}, {unit:'m'}).includes('data-id="zone:1"'));
+ok('null packer entry tolerated', W.renderWellboreSVG({td:1500, packers:[null, {depth_m:100}]}, {unit:'m'}).includes('data-id="packer:1"'));
+ok('null note entry tolerated', W.renderWellboreSVG({td:1500, notes:[null, {depth_m:100, text:'x'}]}, {unit:'m'}).includes('data-id="note:1"'));
+ok('all-kinds-with-null fixture never throws', W.renderWellboreSVG({
+  td: 1500,
+  casings: [null, {top_m:0, shoe_m:200}],
+  plugs: [null, {top_m:100, bottom_m:200}],
+  perforations: [null, {top_m:300, bottom_m:310}],
+  formations: [null, {name:'X', top_m:400}],
+  zones: [null, {kind:'salt', top_m:500, bottom_m:600}],
+  packers: [null, {depth_m:700}],
+  notes: [null, {depth_m:800, text:'y'}]
+}, {unit:'m'}).startsWith('<svg'));
+
+// --- fix round: labels must be escaped exactly once (Finding 2) ---
+ok('no double escaping', W.renderWellboreSVG({td:1000, formations:[{name:"Driller's Nisku & Wabamun", top_m:500}]}, {unit:'m'}).includes('Driller&#39;s Nisku &amp; Wabamun') === true && !W.renderWellboreSVG({td:1000, formations:[{name:"Driller's Nisku & Wabamun", top_m:500}]}, {unit:'m'}).includes('&amp;amp;'));
+
 process.exit(failures ? 1 : 0);

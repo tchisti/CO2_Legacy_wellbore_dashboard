@@ -1073,7 +1073,7 @@ function renderWellboreSVG(wb, opts) {
   // ---- casings (sorted by shoe_m ascending; outermost = widest) ----
   const sortedCasings = casings
     .map((c, i) => ({ c, i }))
-    .filter(x => typeof x.c.shoe_m === 'number')
+    .filter(x => x.c && typeof x.c.shoe_m === 'number')
     .sort((a, b) => a.c.shoe_m - b.c.shoe_m);
   // Outermost = deepest-drawn-first in nesting terms: the LAST casing run
   // (largest shoe_m, typically the longest/production string) is narrowest;
@@ -1146,10 +1146,11 @@ function renderWellboreSVG(wb, opts) {
 
   // ---- zones (full-width translucent bands) ----
   zones.forEach((z, i) => {
+    if (!z) return;
     const id = `zone:${i}`;
     const yTop = y(z.top_m), yBot = y(z.bottom_m);
     const color = z.kind === 'hydrocarbon' ? '#e6c78a' : '#b9a7e6';
-    const label = `Zone (${esc(z.kind || '—')}) — ${fmtDepth(z.top_m, unit)} to ${fmtDepth(z.bottom_m, unit)}`;
+    const label = `Zone (${z.kind || '—'}) — ${fmtDepth(z.top_m, unit)} to ${fmtDepth(z.bottom_m, unit)}`;
     parts.push(`<g data-kind="zone" data-id="${id}" aria-label="${esc(label)}"${hl(id)}>`);
     parts.push(`<title>${esc(label)}</title>`);
     parts.push(`<rect x="${GUTTER_L}" y="${yTop}" width="${plotW}" height="${Math.max(0, yBot - yTop)}" fill="${color}" fill-opacity="0.18"/>`);
@@ -1158,9 +1159,10 @@ function renderWellboreSVG(wb, opts) {
 
   // ---- formations (dashed line + name to the right of the bore) ----
   formations.forEach((f, i) => {
+    if (!f) return;
     const id = `formation:${i}`;
     const fy = y(f.top_m);
-    const label = `Formation top: ${esc(f.name || '—')} at ${fmtDepth(f.top_m, unit)}`;
+    const label = `Formation top: ${f.name || '—'} at ${fmtDepth(f.top_m, unit)}`;
     parts.push(`<g data-kind="formation" data-id="${id}" aria-label="${esc(label)}"${hl(id)}>`);
     parts.push(`<title>${esc(label)}</title>`);
     parts.push(`<line x1="${GUTTER_L}" y1="${fy}" x2="${cx + boreHalf}" y2="${fy}" stroke="#e08a2e" stroke-width="1.5" stroke-dasharray="4,3"/>`);
@@ -1170,9 +1172,10 @@ function renderWellboreSVG(wb, opts) {
 
   // ---- plugs ----
   plugs.forEach((p, i) => {
+    if (!p) return;
     const id = `plug:${i}`;
     const yTop = y(p.top_m), yBot = y(p.bottom_m);
-    const label = `Plug ${p.n != null ? 'P' + p.n : '—'} (${esc(p.kind || 'cement')}) — ${fmtDepth(p.top_m, unit)} to ${fmtDepth(p.bottom_m, unit)}, sacks: ${p.sacks != null ? p.sacks : '—'}`;
+    const label = `Plug ${p.n != null ? 'P' + p.n : '—'} (${p.kind || 'cement'}) — ${fmtDepth(p.top_m, unit)} to ${fmtDepth(p.bottom_m, unit)}, sacks: ${p.sacks != null ? p.sacks : '—'}`;
     parts.push(`<g data-kind="plug" data-id="${id}" aria-label="${esc(label)}"${hl(id)}>`);
     parts.push(`<title>${esc(label)}</title>`);
     if (p.kind === 'bridge' || p.kind === 'cibp') {
@@ -1191,6 +1194,7 @@ function renderWellboreSVG(wb, opts) {
 
   // ---- perforations (rows of small outward triangles on both walls) ----
   perforations.forEach((pf, i) => {
+    if (!pf) return;
     const id = `perf:${i}`;
     const yTop = y(pf.top_m), yBot = y(pf.bottom_m);
     const opacity = pf.status === 'squeezed' ? 0.45 : 1;
@@ -1210,6 +1214,7 @@ function renderWellboreSVG(wb, opts) {
 
   // ---- packers (opposed solid black triangles inside bore) ----
   packers.forEach((pk, i) => {
+    if (!pk) return;
     const id = `packer:${i}`;
     const py = y(pk.depth_m);
     const label = `Packer at ${fmtDepth(pk.depth_m, unit)}`;
@@ -1222,9 +1227,10 @@ function renderWellboreSVG(wb, opts) {
 
   // ---- notes (ⓘ glyph in right gutter) ----
   notes.forEach((n, i) => {
+    if (!n) return;
     const id = `note:${i}`;
     const ny = typeof n.depth_m === 'number' ? y(n.depth_m) : y(0);
-    const label = `Note at ${fmtDepth(n.depth_m, unit)}: ${esc(n.text || '—')}`;
+    const label = `Note at ${fmtDepth(n.depth_m, unit)}: ${n.text || '—'}`;
     parts.push(`<g data-kind="note" data-id="${id}" aria-label="${esc(label)}"${hl(id)}>`);
     parts.push(`<title>${esc(label)}</title>`);
     parts.push(`<text x="${W - GUTTER_R + 6}" y="${ny + 3}" fill="${cInk}">ⓘ</text>`);
