@@ -774,8 +774,9 @@ function deleteSelected(){
   const n = state.bulkSelected.size;
   if(!n) return;
   const shared = syncToken() ? ' from the SHARED team register (for everyone)' : '';
-  if(!confirm(`Delete ${n} wells${shared}? Tip: Export CSV first if you want a backup.`)) return;
-  deleteWells([...state.bulkSelected], `Delete ${n} wells`);
+  const plural = n===1 ? 'well' : 'wells';
+  if(!confirm(`Delete ${n} ${plural}${shared}? Tip: Export CSV first if you want a backup.`)) return;
+  deleteWells([...state.bulkSelected], `Delete ${n} ${plural}`);
 }
 function resetRegister(){
   if(!state.wells.length){ alert('Register is already empty.'); return; }
@@ -1924,6 +1925,7 @@ async function pullRemote(initial){
   if(SYNC.pushing || SYNC.dirty) return; // never clobber unsaved local edits; push() merges instead
   try{
     const r = await fetchRemote(true);
+    if(SYNC.pushing || SYNC.dirty) return; // user saved/deleted while the fetch was in flight — don't clobber
     if(r.unchanged){ if(SYNC.mode!=='error') setSyncStatus(syncToken()?'live':'view'); return; }
     if(r.missing){
       SYNC.sha=null; SYNC.etag=null;

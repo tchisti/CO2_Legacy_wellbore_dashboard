@@ -21,7 +21,7 @@ Let the user act on many wells at once in the Legacy Well Register: select multi
 
 - When `state.bulkSelected.size >= 1`, a slim bar renders between the register header and the table: "**{N} selected** · [Delete selected] · [Clear selection]".
 - **Delete selected** shows ONE `confirm()`:
-  - Text: `Delete {N} wells{shared}? Tip: Export CSV first if you want a backup.` where `{shared}` is ` from the SHARED team register (for everyone)` when `syncToken()` is truthy — identical wording to the existing `deleteWell`.
+  - Text: `Delete {N} {well|wells}{shared}? Tip: Export CSV first if you want a backup.` (singular "well" when N=1 — amended 2026-08-07 post-review) where `{shared}` is ` from the SHARED team register (for everyone)` when `syncToken()` is truthy — identical wording to the existing `deleteWell`.
   - On confirm: remove all selected wells from `state.wells`, add each id to `SYNC.pendingDeletes`, clear `state.selected` if it was among them, empty `state.bulkSelected`, `save('Delete {N} wells')`, `render()`.
 - **Clear selection** empties `state.bulkSelected` and re-renders. No confirm.
 
