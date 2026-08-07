@@ -239,36 +239,33 @@
     "status": "Abandoned (P&A)",
     "klass": "Type 3",
     "reviewer": "",
-    "notes": "1965 D&A, Redwater field. Surface casing only to 185.9 m. Tops: Calmar 1016, Nisku 1029, Ireton 1069, Leduc 1095 m — penetrates caprock and reservoir. Just outside the 5 km circles (~5.1 km from the Pine injector) but inside the review area. [From 3D Reviewer: critical 100/100 — subscores derived; verify Classification, Access, Data]",
+    "notes": "1965 D&A, Redwater field. Surface casing only to 185.9 m. Tops: Calmar 1016, Nisku 1029, Ireton 1069, Leduc 1095 m — penetrates caprock and reservoir. Just outside the 5 km circles (~5.1 km from the Pine injector) but inside the review area. \n\nThe well was abandoned with four cement plugs after reaching T.D. 3660' (July 2-4, 1965). Plug No. 1: 3658'-3277' with 170 sx cement, cementing equipment rigged up and plug down @ 5:30 P.M. July 2/65, pulled 15 stands and waited on cement; felt plug No. 1 at 3217'-3219'. Plug No. 2: 3130'-3029' with 50 sx cement and 2% C.C., plug down @ 2:00 A.M., felt at 2994'. Plug No. 3: 2430'-2290' with 64 sx cement and 2% C.C., plug down @ 10:30 A.M., felt at 2275'. Plug No. 4: 660'-560' with 65 sx cement and 2% C.C., plug down @ 8:00 P.M., felt at 520' at 4:00 A.M. Surface casing (8 5/8\" 24 lb J-55, 0-610') had been cemented with 320 sx normal cement plus 2% C.C. After the final plug the pipe was laid down, B.O.P. and rig laid down, and the rig was released at 8:00 A.M. July 4/65.",
+    "schema": 2,
     "scores": {
-      "plugQuality": 5,
-      "cement": 5,
-      "barriers": 3,
-      "scvf": null,
-      "age": 5,
-      "complexity": null,
-      "data": 5,
-      "penetration": 5,
+      "plugQuality": 1,
+      "cement": 1,
+      "barriers": 1,
+      "scvf": 3,
+      "age": 3,
+      "complexity": 3,
+      "data": 1,
+      "penetration": 4,
       "plume": 1,
-      "usdw": null,
+      "usdw": 1,
       "access": 1
     },
-    "createdAt": "2026-07-24T12:15:02.272Z",
-    "updatedAt": "2026-07-24T16:05:01.676Z",
-    "updatedBy": "Tahir Chisti",
-    "schema": 2,
     "computed": {
-      "L": 4.24,
-      "C": 2.7,
-      "Lr": 4,
-      "Cr": 3,
-      "cell": 12,
-      "riskIndex": 11.45,
-      "rankLabel": "High",
-      "integrity": 56
+      "L": 1.72,
+      "C": 1.9,
+      "Lr": 2,
+      "Cr": 2,
+      "cell": 4,
+      "riskIndex": 3.27,
+      "rankLabel": "Low",
+      "integrity": 91
     },
-    "scoredUnder": "1.0.0",
-    "needsReview": true,
+    "scoredUnder": "2.0.0",
+    "needsReview": false,
     "legacy": {
       "scores": {
         "plug": 5,
@@ -282,6 +279,9 @@
         "data": 5
       },
       "total": 35
-    }
+    },
+    "createdAt": "2026-07-24T12:15:02.272Z",
+    "updatedAt": "2026-08-07T16:20:33.019Z",
+    "updatedBy": "Tahir Chisti"
   }
 ]
