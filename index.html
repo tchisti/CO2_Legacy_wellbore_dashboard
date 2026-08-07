@@ -237,6 +237,7 @@ footer{padding:18px 24px;color:var(--muted);font-size:11px;border-top:1px solid 
         <div><label>Spud / Completion Year (optional)</label><input id="f_year" type="number" min="1900" max="2100" placeholder="e.g. 1972"/></div>
         <div><label>Reviewer (optional)</label><input id="f_reviewer" placeholder="e.g. T. Khan"/></div>
         <div style="grid-column:1/-1"><label>Notes / Justification (optional)</label><textarea id="f_notes" rows="2" placeholder="Field observations, surface conditions, regulatory file numbers, references…"></textarea></div>
+        <div style="grid-column:1/-1"><label>Recommended Action (§ 8) — reviewer override</label><textarea id="f_recAction" rows="4" placeholder="Prefilled with the automatic recommendation when editing — change the wording to override it."></textarea><small style="display:block;margin-top:2px;color:var(--muted)">Leave empty to restore the automatic recommendation.</small></div>
       </div>
 
       <div class="divider"></div>
@@ -645,7 +646,7 @@ function readForm(){
   let year = yearRaw==='' ? null : parseInt(yearRaw,10);
   if(year!==null && (isNaN(year) || year<1850 || year>new Date().getFullYear()+1)){ alert('Year must be between 1850 and the current year'); throw new Error('bad year'); }
   const prev = state.editingId ? state.wells.find(x=>x.id===state.editingId) : null;
-  return {
+  const w = {
     id: state.editingId || uid(),
     licence: document.getElementById('f_id').value.trim() || 'UNNAMED',
     operator: document.getElementById('f_op').value.trim() || 'Unknown',
@@ -667,6 +668,9 @@ function readForm(){
     updatedAt: new Date().toISOString(),
     updatedBy: syncName() || prev?.updatedBy || '',
   };
+  const t = document.getElementById('f_recAction').value.trim();
+  w.recActionOverride = (t && t !== recPlainText(w).trim()) ? t : '';
+  return w;
 }
 
 function saveWell(){
@@ -693,7 +697,7 @@ function resetForm(keepScores){
   state.editingId = null;
   document.getElementById('formTitle').textContent='Add Legacy Well';
   document.getElementById('saveBtn').textContent='Save Well';
-  ['f_id','f_op','f_lat','f_lon','f_year','f_reviewer','f_notes'].forEach(id=>document.getElementById(id).value='');
+  ['f_id','f_op','f_lat','f_lon','f_year','f_reviewer','f_notes','f_recAction'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('f_type').selectedIndex=0;
   document.getElementById('f_traj').selectedIndex=0;
   document.getElementById('f_status').selectedIndex=0;
@@ -714,6 +718,7 @@ function editWell(id){
   document.getElementById('f_year').value=(w.year===null||w.year===undefined)?'':w.year;
   document.getElementById('f_reviewer').value=w.reviewer||'';
   document.getElementById('f_notes').value=w.notes||'';
+  document.getElementById('f_recAction').value = w.recActionOverride || recPlainText(w);
   document.getElementById('f_type').value=w.type;
   document.getElementById('f_traj').value=w.traj;
   document.getElementById('f_status').value=w.status;
@@ -1047,6 +1052,21 @@ function recommend(w){
   }
   return {title:'No Further Action — Monitor at MMV Cycle',
     body:`<b>Low Tier.</b> Well is adequately documented and unlikely to act as a migration pathway. Carry through as background population; re-evaluate on AoR refresh or if plume forecast shifts.`};
+}
+
+/* Plain-text rendering of the engine recommendation — used to prefill the edit
+   form and to detect "saved unchanged" so an untouched form never freezes an
+   override (spec 2026-08-07-recommended-action-override §4). */
+function recPlainText(w){
+  const rec = recommend(w);
+  const html = '<b>'+rec.title+'</b><br>'+rec.body + (rec.warn ? '<br>'+rec.warn : '');
+  const div = document.createElement('div');
+  div.innerHTML = String(html)
+    .replace(/<br\s*\/?>/gi,'\n')
+    .replace(/<li[^>]*>/gi,'\n- ')
+    .replace(/<\/li>/gi,'')
+    .replace(/<ul[^>]*>|<\/ul>/gi,'\n');
+  return div.textContent.replace(/[ \t]+\n/g,'\n').replace(/\n{3,}/g,'\n\n').trim();
 }
 
 /* ============ REFERENCE TABLE ============ */
