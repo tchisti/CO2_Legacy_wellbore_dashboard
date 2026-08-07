@@ -110,4 +110,34 @@ eq('yOf td', sc.yOf(1000), 500);
 eq('metric ticks every 50', sc.ticks('m')[1].m, 50);
 eq('imperial ticks every 100ft', +(sc.ticks('ft')[1].m/0.3048).toFixed(0), 100);
 
+// renderer — full fixture
+const wbFull = { td: 1500, kbElev: 800, source: 'manual',
+  casings: [{name:'Surface Casing', od_mm:219, grade:'J55', top_m:0, shoe_m:186, toc_m:0}, {name:'Production Casing', od_mm:139.7, top_m:0, shoe_m:1450, toc_m:900}],
+  plugs: [{n:1, top_m:1400, bottom_m:1450, sacks:25, kind:'cement'}, {top_m:1200, bottom_m:1200, kind:'cibp'}],
+  perforations: [{top_m:1300, bottom_m:1310, status:'squeezed'}],
+  formations: [{name:'Nisku', top_m:1100}],
+  packers: [{depth_m:1000}], zones: [{kind:'salt', top_m:600, bottom_m:700}],
+  openHole: {top_m:1450, bottom_m:1500}, notes: [{depth_m:1400, text:'felt plug'}] };
+const svg = W.renderWellboreSVG(wbFull, {unit:'m'});
+ok('svg root', /^<svg[^>]*viewBox="0 0 \d+ \d+"/.test(svg));
+ok('ground surface label', svg.includes('Ground Surface'));
+for (const k of ['casing','cement','plug','perf','formation','zone','packer','note','openhole'])
+  ok('kind rendered: '+k, svg.includes(`data-kind="${k}"`));
+ok('formation name shown', svg.includes('Nisku'));
+ok('aria labels present', (svg.match(/aria-label=/g)||[]).length >= 8);
+ok('titles present', (svg.match(/<title>/g)||[]).length >= 8);
+ok('KB marker', /KB/.test(svg));
+// unit relabel without geometry change
+const svgFt = W.renderWellboreSVG(wbFull, {unit:'ft'});
+ok('ft axis label', svgFt.includes('Depth (ft)'));
+ok('same viewBox both units', svg.match(/viewBox="[^"]+"/)[0] === svgFt.match(/viewBox="[^"]+"/)[0]);
+// highlight
+ok('highlight stroke applied', W.renderWellboreSVG(wbFull, {unit:'m', highlightId:'plug:0'}).includes('stroke-width="2.5"'));
+// sparse fixtures never throw
+ok('td-only renders', W.renderWellboreSVG({td: 900}, {unit:'m'}).startsWith('<svg'));
+eq('no td → empty string', W.renderWellboreSVG({casings:[]}, {unit:'m'}), '');
+eq('null → empty string', W.renderWellboreSVG(null, {unit:'m'}), '');
+// resolvedColors inlined for export (no CSS var() left in output)
+ok('resolvedColors inlined', !W.renderWellboreSVG(wbFull,{unit:'m',resolvedColors:{line:'#123456',muted:'#654321',ink:'#ffffff',bg:'#000000'}}).includes('var(--'));
+
 process.exit(failures ? 1 : 0);
