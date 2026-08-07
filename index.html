@@ -300,6 +300,7 @@ footer{padding:18px 24px;color:var(--muted);font-size:11px;border-top:1px solid 
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
               <input id="search" placeholder="Filter by ID, operator, status…" oninput="render()"/>
             </div>
+            <button class="danger" style="padding:5px 10px;font-size:11px" onclick="resetRegister()" title="Delete every well in the register">Reset register…</button>
           </div>
         </div>
         <div id="bulkBar" style="display:none;margin-bottom:8px;padding:8px 12px;border:1px solid var(--line);border-radius:10px;background:var(--field);font-size:12px" class="row spread">
@@ -755,16 +756,33 @@ function clearSelection(){
   state.bulkSelected.clear();
   render();
 }
-function deleteSelected(){} /* implemented in the bulk-delete task */
-
+function deleteWells(ids, label){
+  const del = new Set(ids);
+  state.wells = state.wells.filter(w=>!del.has(w.id));
+  del.forEach(id=>{ SYNC.pendingDeletes.add(id); state.bulkSelected.delete(id); });
+  if(state.selected && del.has(state.selected)) state.selected=null;
+  save(label); render();
+}
 function deleteWell(id){
   const w = state.wells.find(x=>x.id===id);
   const shared = syncToken() ? ' from the SHARED team register (for everyone)' : '';
   if(!confirm(`Delete well ${w?w.licence:''}${shared}?`)) return;
-  state.wells = state.wells.filter(x=>x.id!==id);
-  SYNC.pendingDeletes.add(id);
-  if(state.selected===id) state.selected=null;
-  save('Delete well '+(w?w.licence:id)); render();
+  deleteWells([id], 'Delete well '+(w?w.licence:id));
+}
+
+function deleteSelected(){
+  const n = state.bulkSelected.size;
+  if(!n) return;
+  const shared = syncToken() ? ' from the SHARED team register (for everyone)' : '';
+  if(!confirm(`Delete ${n} wells${shared}? Tip: Export CSV first if you want a backup.`)) return;
+  deleteWells([...state.bulkSelected], `Delete ${n} wells`);
+}
+function resetRegister(){
+  if(!state.wells.length){ alert('Register is already empty.'); return; }
+  const n = state.wells.length;
+  const shared = syncToken() ? ' from the SHARED team register (for everyone)' : '';
+  if(!confirm(`Reset the register? This deletes ALL ${n} wells${shared} and cannot be undone. Tip: Export CSV first if you want a backup.`)) return;
+  deleteWells(state.wells.map(w=>w.id), `Reset register (${n} wells removed)`);
 }
 
 /* ============ RENDER ============ */
