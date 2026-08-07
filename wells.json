@@ -69,6 +69,7 @@
     "klass": "Type 7",
     "reviewer": "T. Chisti",
     "notes": "Enbridge disposal well, spud 2025-11-16, Fort Saskatchewan field. Modern four-string design with CRS bottom liner — engineered for injection service. Risk override LOW: active engineered wellbore, not a legacy abandonment. [From 3D Reviewer: low 67/100 — subscores derived; verify Classification, Access, Data]",
+    "schema": 2,
     "scores": {
       "plugQuality": 1,
       "cement": 1,
@@ -78,26 +79,22 @@
       "complexity": null,
       "data": 1,
       "penetration": 3,
-      "plume": 3,
-      "usdw": null,
+      "plume": 2,
+      "usdw": 1,
       "access": 1
     },
-    "createdAt": "2026-07-24T12:15:02.272Z",
-    "updatedAt": "2026-07-24T16:14:59.568Z",
-    "updatedBy": "Tahir Chisti",
-    "schema": 2,
     "computed": {
       "L": 1.52,
-      "C": 2.6,
+      "C": 1.85,
       "Lr": 2,
-      "Cr": 3,
-      "cell": 6,
-      "riskIndex": 3.95,
-      "rankLabel": "Moderate",
-      "integrity": 88
+      "Cr": 2,
+      "cell": 4,
+      "riskIndex": 2.81,
+      "rankLabel": "Low",
+      "integrity": 92
     },
-    "scoredUnder": "1.0.0",
-    "needsReview": true,
+    "scoredUnder": "2.0.0",
+    "needsReview": false,
     "legacy": {
       "scores": {
         "plug": 1,
@@ -111,7 +108,10 @@
         "data": 1
       },
       "total": 15
-    }
+    },
+    "createdAt": "2026-07-24T12:15:02.272Z",
+    "updatedAt": "2026-08-07T17:02:02.318Z",
+    "updatedBy": "Tahir Chisti"
   },
   {
     "id": "W-4A62O7",
