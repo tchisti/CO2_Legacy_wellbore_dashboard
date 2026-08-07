@@ -1047,20 +1047,16 @@ dialog.confirm { max-width: 420px; }
   }
 
   // src/risk.js
+  var RISK_ORDER = ["low", "medium", "high", "critical"];
+  var RISK_LABELS = { low: "Low", medium: "Medium", high: "High", critical: "Very High" };
+  var RANK_TO_CLASS = { "Low": "low", "Moderate": "medium", "High": "high", "Very High": "critical" };
+  var WellScoring = (typeof window !== "undefined" ? window : globalThis).WellScoring;
   var UNIFIED_METH = WellScoring.FALLBACK_METHODOLOGY;
   var UNIFIED_SOURCE = "fallback";
   WellScoring.loadMethodology("methodology.json").then((r) => {
-    UNIFIED_METH = r.methodology; UNIFIED_SOURCE = r.source;
-    // No "recompute" action exists in store.js's dispatch vocabulary (well/add, well/update,
-    // well/remove, well/duplicate, wells/import, wells/resetDemo — see store.js ~1276). The
-    // closest fit, wells/import with a synthetic mode, would mutate every well's `source` to
-    // "import" and pollute undo history, so it's skipped per the brief's fallback: fallback
-    // and remote are both rev 2.0.0 today (zero scoring delta), and every well/add + well/update
-    // already re-runs computeRisk() against this live UNIFIED_METH closure var, so any well
-    // touched after this promise resolves picks up "remote" automatically.
+    UNIFIED_METH = r.methodology;
+    UNIFIED_SOURCE = r.source;
   });
-  var RISK_ORDER = ["low", "medium", "high", "critical"];
-  var RISK_LABELS = { low: "Low", medium: "Medium", high: "High", critical: "Very High" };
   var isNum2 = (v) => typeof v === "number" && !Number.isNaN(v);
   function deriveDistances(w, site2) {
     if (!isNum2(w.x) || !isNum2(w.y)) return w;
@@ -1079,18 +1075,21 @@ dialog.confirm { max-width: 420px; }
     }
     return w;
   }
-  var RANK_TO_CLASS = { "Low": "low", "Moderate": "medium", "High": "high", "Very High": "critical" };
-  function classifyScore(s) {
-    return s >= 75 ? "critical" : s >= 50 ? "high" : s >= 25 ? "medium" : "low";
-  }
   function resolveWellScores(w) {
     const derived = WellScoring.deriveScoresFromReviewer(w);
     const scores = {}, source = {};
     for (const p of UNIFIED_METH.params) {
       const explicit = w["s_" + p.key];
-      if (typeof explicit === "number" && explicit >= 1 && explicit <= 5) { scores[p.key] = explicit; source[p.key] = "scored"; }
-      else if (typeof derived[p.key] === "number") { scores[p.key] = derived[p.key]; source[p.key] = "derived"; }
-      else { scores[p.key] = null; source[p.key] = "unknown"; }
+      if (typeof explicit === "number" && explicit >= 1 && explicit <= 5) {
+        scores[p.key] = explicit;
+        source[p.key] = "scored";
+      } else if (typeof derived[p.key] === "number") {
+        scores[p.key] = derived[p.key];
+        source[p.key] = "derived";
+      } else {
+        scores[p.key] = null;
+        source[p.key] = "unknown";
+      }
     }
     return { scores, source };
   }
@@ -1104,9 +1103,24 @@ dialog.confirm { max-width: 420px; }
     let cls = RANK_TO_CLASS[c.rank.label] || "low", overridden = false;
     const ov = String(w.leakageRiskOverride || "Auto").toLowerCase();
     const ovKey = ov === "very high" ? "critical" : ov;
-    if (ovKey !== "auto" && RISK_ORDER.includes(ovKey)) { cls = ovKey; overridden = true; }
-    return { score: c.riskScore, class: cls, factors, overridden,
-             L: c.L, C: c.C, cell: c.cell, riskIndex: c.riskIndex, rankLabel: c.rank.label, integrity: c.integrity, scores, sources: source };
+    if (ovKey !== "auto" && RISK_ORDER.includes(ovKey)) {
+      cls = ovKey;
+      overridden = true;
+    }
+    return {
+      score: c.riskScore,
+      class: cls,
+      factors,
+      overridden,
+      L: c.L,
+      C: c.C,
+      cell: c.cell,
+      riskIndex: c.riskIndex,
+      rankLabel: c.rank.label,
+      integrity: c.integrity,
+      scores,
+      sources: source
+    };
   }
   function computeKpis(wells, { includeScenario = false } = {}) {
     const set = wells.filter((w) => includeScenario || !w.isScenario);
@@ -1126,7 +1140,7 @@ dialog.confirm { max-width: 420px; }
       const r = w._risk || { score: 0, class: "low" };
       k.counts[r.class] = (k.counts[r.class] || 0) + 1;
       sr += r.score;
-      const integ = (w._risk && isNum2(w._risk.integrity)) ? w._risk.integrity : 0;
+      const integ = w._risk && isNum2(w._risk.integrity) ? w._risk.integrity : 0;
       si += integ;
       k.integrityBuckets[Math.min(3, Math.floor(integ / 25))]++;
       if (w.reviewer) rev++;
@@ -1472,7 +1486,7 @@ dialog.confirm { max-width: 420px; }
       if (f.wellTypes.length && !f.wellTypes.includes(w.wellType)) return false;
       if (f.formations.length && !f.formations.includes(w.formationPenetrated)) return false;
       if (f.riskClasses.length && !f.riskClasses.includes(w._risk?.class)) return false;
-      const integ = (w._risk && isNum2(w._risk.integrity)) ? w._risk.integrity : 0;
+      const integ = Number.isFinite(w._risk?.integrity) ? w._risk.integrity : 0;
       if (integ < f.integrityMin || integ > f.integrityMax) return false;
       if (f.yearMin != null && !(w.abandonmentYear >= f.yearMin)) return false;
       if (f.yearMax != null && !(w.abandonmentYear <= f.yearMax)) return false;
@@ -23543,10 +23557,21 @@ dialog.confirm { max-width: 420px; }
     }
   };
 
-  // src/scene3d.js
+  // src/frame.js
   var S = 0.1;
+  function sceneFrame(domainSize_m) {
+    const D = domainSize_m * S;
+    const cx = D / 2, cz = D / 2;
+    const clamp3 = (v) => Math.min(domainSize_m, Math.max(0, v));
+    return {
+      toScene: (x, y) => [x * S - cx, y * S - cz],
+      fromScene: (px2, pz2) => [clamp3((px2 + cx) / S), clamp3((pz2 + cz) / S)]
+    };
+  }
+
+  // src/scene3d.js
   var easeOut = (t) => 1 - Math.pow(1 - t, 3);
-  function createScene({ canvas, site: site2, onSelect, onEdit, onHover, theme: theme2 = "dark", formations = [], vexag: vexag2 = 1 }) {
+  function createScene({ canvas, site: site2, onSelect, onEdit, onHover, onMove, theme: theme2 = "dark", formations = [], vexag: vexag2 = 1 }) {
     let renderer;
     try {
       renderer = new WebGLRenderer({ canvas, antialias: true });
@@ -23559,7 +23584,7 @@ dialog.confirm { max-width: 420px; }
     scene.background = new Color(PAL.bg);
     const D = site2.domainSize_m * S;
     const cx = D / 2, cz = D / 2;
-    const toScene = (x, y) => [x * S - cx, y * S - cz];
+    const { toScene, fromScene } = sceneFrame(site2.domainSize_m);
     const ringCenters = site2.aor.mode === "perInjector" ? site2.injectors : site2.aor.mode === "none" ? [] : [site2.aor.center];
     const rr = site2.aor.radius_m;
     const bbMinX = ringCenters.length ? Math.min(...ringCenters.map((c) => c.x - rr)) : 0;
@@ -23884,6 +23909,27 @@ dialog.confirm { max-width: 420px; }
     }
     const ray = new Raycaster();
     const ndc = new Vector2();
+    const groundPlane = new Plane(new Vector3(0, 1, 0), 0);
+    const dragPt = new Vector3();
+    let moveMode = false, drag = null;
+    function setMoveMode(b) {
+      moveMode = !!b;
+      if (!moveMode) cancelDrag();
+    }
+    function endDrag() {
+      drag = null;
+      controls.enabled = true;
+    }
+    function cancelDrag() {
+      if (!drag) return false;
+      const o = objects.get(drag.id);
+      if (o) {
+        o.group.position.copy(drag.startPos);
+        if (drag.id === selectedId) selRing.position.set(drag.startPos.x, 1.6, drag.startPos.z);
+      }
+      endDrag();
+      return true;
+    }
     function pick(ev) {
       const rect = canvas.getBoundingClientRect();
       ndc.x = (ev.clientX - rect.left) / rect.width * 2 - 1;
@@ -23895,6 +23941,15 @@ dialog.confirm { max-width: 420px; }
     let downAt = null;
     canvas.addEventListener("pointerdown", (ev) => {
       downAt = [ev.clientX, ev.clientY];
+      if (!moveMode || ev.button !== 0) return;
+      if (drag) return;
+      const id = pick(ev);
+      if (!id) return;
+      const o = objects.get(id);
+      if (!o) return;
+      drag = { id, startPos: o.group.position.clone() };
+      controls.enabled = false;
+      canvas.setPointerCapture(ev.pointerId);
     });
     canvas.addEventListener("click", (ev) => {
       if (downAt && Math.hypot(ev.clientX - downAt[0], ev.clientY - downAt[1]) > 5) return;
@@ -23905,11 +23960,45 @@ dialog.confirm { max-width: 420px; }
       if (id) onEdit?.(id);
     });
     canvas.addEventListener("pointermove", (ev) => {
+      if (drag) {
+        const rect = canvas.getBoundingClientRect();
+        ndc.x = (ev.clientX - rect.left) / rect.width * 2 - 1;
+        ndc.y = -((ev.clientY - rect.top) / rect.height) * 2 + 1;
+        ray.setFromCamera(ndc, camera);
+        if (ray.ray.intersectPlane(groundPlane, dragPt)) {
+          const [mx, my] = fromScene(dragPt.x, dragPt.z);
+          const [px2, pz2] = toScene(mx, my);
+          const o = objects.get(drag.id);
+          if (o) {
+            o.group.position.set(px2, 0, pz2);
+            if (drag.id === selectedId) selRing.position.set(px2, 1.6, pz2);
+          }
+        }
+        canvas.style.cursor = "grabbing";
+        onHover?.(null, 0, 0);
+        return;
+      }
       const id = pick(ev);
-      canvas.style.cursor = id ? "pointer" : "grab";
+      canvas.style.cursor = id ? moveMode ? "move" : "pointer" : "grab";
       onHover?.(id, ev.clientX, ev.clientY);
     });
+    canvas.addEventListener("pointerup", (ev) => {
+      if (!drag) return;
+      if (ev.button !== 0) return;
+      const { id, startPos } = drag;
+      const o = objects.get(id);
+      endDrag();
+      if (!o) return;
+      const [mx, my] = fromScene(o.group.position.x, o.group.position.z);
+      const [sx, sy] = fromScene(startPos.x, startPos.z);
+      if (Math.hypot(mx - sx, my - sy) >= 1) onMove?.(id, Math.round(mx), Math.round(my));
+      else {
+        o.group.position.copy(startPos);
+        if (id === selectedId) selRing.position.set(startPos.x, 1.6, startPos.z);
+      }
+    });
     canvas.addEventListener("pointerleave", () => onHover?.(null, 0, 0));
+    canvas.addEventListener("pointercancel", () => cancelDrag());
     function resizeIfNeeded() {
       const w = canvas.clientWidth, h = canvas.clientHeight;
       if (!w || !h) return;
@@ -23964,7 +24053,7 @@ dialog.confirm { max-width: 420px; }
       syncAll(wells);
       setSelected(keep);
     }
-    return { supported: true, syncAll, upsert, remove, setSelected, setDimmed, setScenarioVisible, pulse, setFormations, setLabelMode, resetView, viewTop, zoomBy, setAutoRotate, setVerticalScale };
+    return { supported: true, syncAll, upsert, remove, setSelected, setDimmed, setScenarioVisible, pulse, setFormations, setLabelMode, resetView, viewTop, zoomBy, setAutoRotate, setVerticalScale, setMoveMode, cancelDrag };
   }
 
   // src/fallback2d.js
@@ -24167,10 +24256,6 @@ dialog.confirm { max-width: 420px; }
         const c = coerce(f, v);
         if (c !== null) w[key] = c;
       }
-      // Native unified-engine scores (e.g. pushed from the dashboard register via
-      // lwms:importWells) travel as a nested `scores` object, not flat columns —
-      // unpack them into s_<key> so they import losslessly instead of falling back
-      // to derived/unknown.
       if (row.scores && typeof row.scores === "object" && "plugQuality" in row.scores) {
         for (const [k, v] of Object.entries(row.scores)) {
           if (typeof v === "number" && v >= 1 && v <= 5) w["s_" + k] = v;
@@ -24300,12 +24385,7 @@ dialog.confirm { max-width: 420px; }
       el("h2", {}, "1. Purpose and scope"),
       el("p", {}, 'The model produces a 0\u2013100 leakage-risk screening score for each legacy wellbore inside or near an injection Area of Review (AOR), so that a well inventory can be triaged for detailed review, monitoring, or corrective action. It is a weighted L\xD7C matrix, displayed as a 0\u2013100 risk score for continuity \u2014 every parameter on every well is attributable and shown with its [scored]/[derived]/[unknown] provenance in the "Risk factors" breakdown in the side panel. It follows the corrective-action logic of offset wellbore reviews used to support scheme applications (AER Directive 065) and Class VI area-of-review evaluations (40 CFR 146.84).'),
       el("h2", {}, "2. Score composition"),
-      el("p", {}, "Unified weighted L\xD7C model, revision " + UNIFIED_METH.revision +
-        (UNIFIED_SOURCE === "fallback" ? " (built-in fallback \u2014 live methodology.json unavailable)" : " (live)") +
-        ". L = \u03A3 w\u1D62\xB7s\u1D62 over 7 likelihood parameters; C over 4 consequence parameters; " +
-        "matrix cell = round(L) \xD7 round(C); bands: " +
-        UNIFIED_METH.matrix.bands.map((b) => b.label + " " + b.min + "\u2013" + b.max).join(" \xB7 ") +
-        ". Governed by the shared register \u2014 edits happen in the dashboard's \u2696 Methodology panel."),
+      el("p", {}, "Unified weighted L\xD7C model, revision " + UNIFIED_METH.revision + (UNIFIED_SOURCE === "fallback" ? " (built-in fallback \u2014 live methodology.json unavailable)" : " (live)") + ". L = \u03A3 w\u1D62\xB7s\u1D62 over 7 likelihood parameters; C over 4 consequence parameters; matrix cell = round(L) \xD7 round(C); bands: " + UNIFIED_METH.matrix.bands.map((b) => b.label + " " + b.min + "\u2013" + b.max).join(" \xB7 ") + ". Governed by the shared register \u2014 edits happen in the dashboard's \u2696 Methodology panel."),
       el("div", { class: "method-table-wrap" }, el(
         "table",
         { class: "method-table" },
@@ -24321,7 +24401,7 @@ dialog.confirm { max-width: 420px; }
           return [chip(cls), `matrix cell ${b.min}\u2013${b.max} (${b.label}) \u2014 ${CLASS_ACTION[cls] || ""}.  `];
         })
       ),
-      el("p", {}, "Class is assigned from the L\u00d7C matrix cell (round(L) \u00d7 round(C)), not the 0\u2013100 score directly \u2014 the score is a monotonic re-expression of the same risk index (unrounded L \u00d7 C) kept for continuity with the legacy 0\u2013100 display."),
+      el("p", {}, "Class is assigned from the L\xD7C matrix cell (round(L) \xD7 round(C)), not the 0\u2013100 score directly \u2014 the score is a monotonic re-expression of the same risk index (unrounded L \xD7 C) kept for continuity with the legacy 0\u2013100 display."),
       el("p", {}, 'Manual override: the "Estimated Leakage Risk" field lets a reviewing engineer override the computed class (shown with a "(manual)" marker and the computed score retained). Engineering judgment always outranks the index \u2014 the model is a screen, not a verdict.'),
       el("h2", {}, "4. Derived quantities"),
       el(
@@ -24576,7 +24656,9 @@ dialog.confirm { max-width: 420px; }
     vexag,
     onSelect: (id) => store.setView({ selection: id }),
     onEdit: (id) => handlers.onEdit(id),
-    onHover: showTooltip
+    onHover: showTooltip,
+    onMove: (id, x, y) => store.dispatch({ type: "well/update", id, patch: { x, y } })
+    // scene x/y only — surfaceLat/Lon stay frozen (spec 2026-08-07)
   });
   if (sceneApi.supported) {
     const veVal = el("span", { class: "mono" }, `${vexag}\xD7`);
@@ -24597,6 +24679,15 @@ dialog.confirm { max-width: 420px; }
       sceneApi.setAutoRotate(spinning);
       spinBtn.classList.toggle("on", spinning);
     } }, "\u27F3");
+    let moveMode = false;
+    const moveBtn = el("button", { title: "Move wells \u2014 drag a well to a new spot (its lat/lon record is not changed). Esc exits." }, "\u2725");
+    const setMoveMode = (on) => {
+      moveMode = on;
+      moveBtn.classList.toggle("on", on);
+      sceneApi.setMoveMode(on);
+      if (on) toast("Move mode \u2014 drag a well to reposition it. Esc or \u2725 to exit.");
+    };
+    moveBtn.addEventListener("click", () => setMoveMode(!moveMode));
     $("#center").append(el(
       "div",
       { class: "scene-nav" },
@@ -24605,11 +24696,18 @@ dialog.confirm { max-width: 420px; }
       el("button", { title: "Zoom in", onclick: () => sceneApi.zoomBy(0.7) }, "\uFF0B"),
       el("button", { title: "Zoom out", onclick: () => sceneApi.zoomBy(1.45) }, "\uFF0D"),
       spinBtn,
+      moveBtn,
       el("span", { class: "scene-nav-sep" }),
       el("span", { class: "muted", title: "Vertical exaggeration" }, "VE"),
       veSlider,
       veVal
     ));
+    document.addEventListener("keydown", (e) => {
+      if (e.key !== "Escape" || !moveMode) return;
+      if (document.querySelector("dialog[open]")) return;
+      if (sceneApi.cancelDrag()) return;
+      setMoveMode(false);
+    });
   }
   if (!sceneApi.supported) {
     $("#scene").hidden = true;
@@ -24752,9 +24850,14 @@ dialog.confirm { max-width: 420px; }
         toast("No wells to push (scenario wells are excluded).", { error: true });
         return;
       }
-      const rows = wells.map(({ _risk, ...w }) => ({ ...w,
-        riskScore: _risk?.score, riskClass: RISK_LABELS[_risk?.class] ?? _risk?.class,
-        scores: _risk?.scores ?? null, scoredUnder: UNIFIED_METH.revision, scoreSources: _risk?.sources ?? null }));
+      const rows = wells.map(({ _risk, ...w }) => ({
+        ...w,
+        riskScore: _risk?.score,
+        riskClass: RISK_LABELS[_risk?.class] ?? _risk?.class,
+        scores: _risk?.scores ?? null,
+        scoredUnder: UNIFIED_METH.revision,
+        scoreSources: _risk?.sources ?? null
+      }));
       window.parent.postMessage({ type: "lwms:exportWells", site: site.name, rows }, "*");
     });
     $("#toolbar").append(pushBtn);
