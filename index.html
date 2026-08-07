@@ -71,7 +71,8 @@ button.ghost{background:transparent}
 @media (max-width:900px){.wb-grid{grid-template-columns:1fr}}
 .wb-legend div{display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;border-radius:6px}
 .wb-legend .sw{width:14px;height:14px;border-radius:3px;flex:none}
-#wbSvg{width:100%;height:auto;display:block;touch-action:none}
+#wbSvg{width:100%;height:auto;display:block;touch-action:none;outline:none}
+#wbSvg:focus{outline:2px solid var(--accent, #3aa0ff);outline-offset:2px}
 .wb-legend .sw{border:1px solid rgba(255,255,255,.18)}
 .wb-legend div:hover,.wb-legend div.on{background:var(--field)}
 .wb-toolbar{display:flex;align-items:center;gap:8px}
@@ -1282,7 +1283,7 @@ function mountWellboreSchematic(host, wb, licence){
     host.innerHTML = `<div class="panel"><h2>Wellbore Schematic</h2><div class="empty">No construction records — paste an abandonment report in Edit, or push this well from the 3D Reviewer.</div></div>`;
     return;
   }
-  wbState = { host, wb, licence, highlightId:null, hoverKind:null, lockedKinds:new Set() };
+  wbState = { host, wb, licence, highlightId:null, hoverKind:null, lockedKinds:new Set(), vb:null, suppressNextClick:false };
   wbRenderCard();
 }
 
@@ -1296,6 +1297,7 @@ function wbRenderCard(){
       <div class="row spread" style="margin-bottom:4px">
         <h2 style="margin:0">Wellbore Schematic</h2>
         <div id="wbToolbar" class="wb-toolbar">
+          <input type="text" id="wbJump" placeholder="Go to depth…" style="width:140px;font-size:13px">
           <div class="wb-unit-toggle">
             <button type="button" data-unit="m" class="${schemUnit==='m'?'on':''}" onclick="wbSetUnit('m')">m</button>
             <button type="button" data-unit="ft" class="${schemUnit==='ft'?'on':''}" onclick="wbSetUnit('ft')">ft</button>
@@ -1340,7 +1342,7 @@ function wbKindsPresent(svgHtml){
 function wbLegendRow(kind){
   const label = WB_KIND_LABELS[kind] || kind;
   const color = WB_KIND_COLORS[kind] || 'var(--muted)';
-  return `<div data-kind="${kind}" onmouseenter="wbHoverLegend('${kind}',true)" onmouseleave="wbHoverLegend('${kind}',false)" onclick="wbToggleLegend('${kind}')">`
+  return `<div data-kind="${kind}" tabindex="0" onmouseenter="wbHoverLegend('${kind}',true)" onmouseleave="wbHoverLegend('${kind}',false)" onclick="wbToggleLegend('${kind}')" onkeydown="event.key==='Enter'&&wbToggleLegend('${kind}')">`
     + `<span class="sw" style="background:${color}"></span><span>${escapeHtml(label)}</span></div>`;
 }
 
@@ -1370,13 +1372,135 @@ function wbStatsHtml(stats){
 }
 
 function wbWireSvgEvents(){
+  const st = wbState; if(!st) return;
   const svg = document.getElementById('wbSvg');
-  if(svg){
-    svg.addEventListener('mouseover', wbHandleSvgHover);
-    svg.addEventListener('mousemove', wbHandleSvgHover);
-    svg.addEventListener('mouseout', wbHandleSvgOut);
-    svg.addEventListener('click', wbHandleSvgClick);
+  if(!svg) return;
+
+  // Attach basic hover/click handlers
+  svg.addEventListener('mouseover', wbHandleSvgHover);
+  svg.addEventListener('mousemove', wbHandleSvgHover);
+  svg.addEventListener('mouseout', wbHandleSvgOut);
+  svg.addEventListener('click', wbHandleSvgClick);
+
+  // Parse viewBox to get dimensions
+  const vb_attr = svg.getAttribute('viewBox');
+  const vb_parts = vb_attr ? vb_attr.split(/\s+/).map(Number) : [0, 0, 760, 920];
+  const VBW = vb_parts[2], VBH = vb_parts[3];
+
+  // Initialize vb state on fresh mount (vb is null after selectWbElement, re-init here)
+  if(!st.vb) st.vb = [0, 0, VBW, VBH];
+
+  // Apply the current viewBox
+  const applyVB = () => svg.setAttribute('viewBox', st.vb.join(' '));
+  applyVB();
+
+  // Wheel zoom
+  svg.addEventListener('wheel', e => {
+    e.preventDefault();
+    const f = e.deltaY < 0 ? 0.85 : 1/0.85;
+    const r = svg.getBoundingClientRect();
+    const mx = st.vb[0] + (e.clientX - r.left) / r.width * st.vb[2];
+    const my = st.vb[1] + (e.clientY - r.top) / r.height * st.vb[3];
+    st.vb = [mx - (mx - st.vb[0]) * f, my - (my - st.vb[1]) * f, st.vb[2] * f, st.vb[3] * f];
+    applyVB();
+  }, { passive: false });
+
+  // Pointer pan
+  let pan = null;
+  svg.addEventListener('pointerdown', e => {
+    pan = { x: e.clientX, y: e.clientY, vb: [...st.vb] };
+    svg.setPointerCapture(e.pointerId);
+  });
+  svg.addEventListener('pointermove', e => {
+    if(!pan) return;
+    const r = svg.getBoundingClientRect();
+    st.vb[0] = pan.vb[0] - (e.clientX - pan.x) / r.width * st.vb[2];
+    st.vb[1] = pan.vb[1] - (e.clientY - pan.y) / r.height * st.vb[3];
+    applyVB();
+  });
+  svg.addEventListener('pointerup', e => {
+    const moved = pan && Math.hypot(e.clientX - pan.x, e.clientY - pan.y) > 5;
+    pan = null;
+    if(moved) st.suppressNextClick = true;
+  });
+  svg.addEventListener('pointercancel', () => { pan = null; });
+
+  // Double-click reset
+  svg.addEventListener('dblclick', () => {
+    st.vb = [0, 0, VBW, VBH];
+    applyVB();
+  });
+
+  // Keyboard navigation
+  svg.addEventListener('keydown', e => {
+    if(e.key.startsWith('Arrow')){
+      e.preventDefault();
+      const step = st.vb[3] * 0.1;
+      if(e.key === 'ArrowUp') st.vb[1] -= step;
+      else if(e.key === 'ArrowDown') st.vb[1] += step;
+      else if(e.key === 'ArrowLeft') st.vb[0] -= step;
+      else if(e.key === 'ArrowRight') st.vb[0] += step;
+      applyVB();
+    }
+    else if(e.key === '+' || e.key === '='){
+      e.preventDefault();
+      const f = 0.85;
+      const mx = st.vb[0] + st.vb[2]/2;
+      const my = st.vb[1] + st.vb[3]/2;
+      st.vb = [mx - (mx - st.vb[0]) * f, my - (my - st.vb[1]) * f, st.vb[2] * f, st.vb[3] * f];
+      applyVB();
+    }
+    else if(e.key === '-' || e.key === '_'){
+      e.preventDefault();
+      const f = 1/0.85;
+      const mx = st.vb[0] + st.vb[2]/2;
+      const my = st.vb[1] + st.vb[3]/2;
+      st.vb = [mx - (mx - st.vb[0]) * f, my - (my - st.vb[1]) * f, st.vb[2] * f, st.vb[3] * f];
+      applyVB();
+    }
+    else if(e.key === '0'){
+      e.preventDefault();
+      st.vb = [0, 0, VBW, VBH];
+      applyVB();
+    }
+  });
+
+  // Set ARIA attributes and make focusable
+  svg.tabIndex = 0;
+  svg.setAttribute('role', 'group');
+  svg.setAttribute('aria-label', 'Interactive wellbore schematic for ' + st.licence);
+
+  // Jump-to-depth input handler
+  const jumpInput = document.getElementById('wbJump');
+  if(jumpInput){
+    jumpInput.addEventListener('keydown', e => {
+      if(e.key !== 'Enter') return;
+      const input = jumpInput.value.trim();
+      if(!input) return;
+      const depthVal = parseFloat(input);
+      if(!Number.isFinite(depthVal)) return;
+
+      // Convert to metres if needed
+      const m = schemUnit === 'ft' ? Wellbore.ftToM(depthVal) : depthVal;
+
+      // Get renderer constants from the pure section
+      const H = 920;
+      const TOP = 56;
+      const BOTTOM = 24;
+      const plotH = H - TOP - BOTTOM;
+
+      // Compute y in original SVG coords using depthScale equivalent
+      const scale = Wellbore.depthScale(st.wb.td, plotH);
+      const yTarget = TOP + scale.yOf(m);
+
+      // Jump to depth: set vb[1] to center the depth in view, clamped
+      st.vb[1] = Math.max(0, Math.min(VBH - st.vb[3], yTarget - st.vb[3]/2));
+      applyVB();
+      jumpInput.value = '';
+      jumpInput.blur();
+    });
   }
+
   wbApplyLegendState();
 }
 
@@ -1397,6 +1521,8 @@ function wbHandleSvgOut(){
 }
 
 function wbHandleSvgClick(e){
+  const st = wbState; if(!st) return;
+  if(st.suppressNextClick){ st.suppressNextClick = false; return; }
   const g = e.target.closest && e.target.closest('[data-id]');
   selectWbElement(g ? g.getAttribute('data-id') : null);
 }
@@ -1431,14 +1557,10 @@ function selectWbElement(id){
 // must survive unit toggles and selection clicks.
 function wbRerenderSvgPreserveView(){
   const st = wbState; if(!st) return;
-  const old = document.getElementById('wbSvg');
-  const vb = old ? old.getAttribute('viewBox') : null;
   const svgHtml = Wellbore.renderWellboreSVG(st.wb, {unit:schemUnit, highlightId:st.highlightId});
   const host = document.getElementById('wbSvgHost');
   if(!host) return;
   host.innerHTML = svgHtml.replace('<svg ', '<svg id="wbSvg" ');
-  const fresh = document.getElementById('wbSvg');
-  if(fresh && vb) fresh.setAttribute('viewBox', vb);
   wbWireSvgEvents();
 }
 
