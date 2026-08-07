@@ -50,6 +50,51 @@ const rep = W.parseWellboreReport('Plug #1\n1463–1448 m\n25 sacks\n2% CaCl2\nt
 ok('report plug found', rep.wellbore.plugs.length === 1);
 ok('report warning kept', rep.warnings.length >= 1);
 
+// --- review-fix regression tests (task-1 report review) ---
+
+// Finding 1 — a plug's own depth line must not spawn a phantom casing, and
+// must remain min/max-normalized like every other plug.
+const repPhantom = W.parseWellboreReport('Plug #1\n1463–1448 m\n25 sacks\n2% CaCl2');
+eq('no phantom casing from bare plug depth line', repPhantom.wellbore.casings.length, 0);
+eq('plug from phantom-probe still normalized top<bottom', [repPhantom.wellbore.plugs[0].top_m, repPhantom.wellbore.plugs[0].bottom_m], [1448, 1463]);
+// casing shoe/top ranges are still recognized AND normalized when real
+// casing context is present.
+const cNeg = W.parseCasingText('Casing 850–200 m');
+eq('casing range with context is min/max-normalized', [cNeg.casings[0].top_m, cNeg.casings[0].shoe_m], [200, 850]);
+
+// Finding 2 — open-hole prose must survive as a structured signal AND as a
+// note, end-to-end through parseWellboreReport (not silently dropped).
+const c2b = W.parseCasingText('None — open hole below surface casing');
+eq('parseCasingText open-hole structured signal', c2b.openHole, {});
+const repOpenHole = W.parseWellboreReport('None — open hole below surface casing');
+ok('open-hole flag survives to wellbore.openHole', !!repOpenHole.wellbore.openHole);
+ok('open-hole note survives to wellbore.notes', repOpenHole.wellbore.notes.some(n => n.depth_m === null && /open hole/i.test(n.text)));
+
+// Finding 3 — sacks/additives on lines AFTER the depth range (multi-line
+// plug record) must attach to that plug, not vanish as unparsed noise.
+eq('multi-line sacks attach to the plug', repPhantom.wellbore.plugs[0].sacks, 25);
+ok('multi-line additive attaches to the plug', /CaCl2/i.test(repPhantom.wellbore.plugs[0].additives || ''));
+
+// Finding 4 — a number's own inline unit wins over the line-level fallback
+// unit (and over defaultUnit); a dash-less mixed-unit sentence is grammar
+// we intentionally don't guess at, so it must be left unparsed rather than
+// silently misconverted.
+const iv5 = W.parseIntervalsText('plug 3658–3277 ft', 'm');
+eq('per-number unit overrides line fallback + defaultUnit', [iv5.plugs[0].top_m, iv5.plugs[0].bottom_m], [+(3277*0.3048).toFixed(1), +(3658*0.3048).toFixed(1)]);
+const ivMixed = W.parseIntervalsText('from 100 m to 400 ft');
+eq('dash-less mixed-unit prose left unparsed, not misconverted', [ivMixed.plugs.length, ivMixed.perforations.length, ivMixed.warnings.length >= 1], [0, 0, true]);
+
+// Finding 5 — a line genuinely unparsed by BOTH the interval and casing
+// parsers must land in wellbore.notes as well as warnings.
+ok('report gibberish line also noted', rep.wellbore.notes.some(n => n.depth_m === null && n.text === 'totally unparseable gibberish line'));
+const repGibberish = W.parseWellboreReport('totally unparseable gibberish line');
+ok('standalone gibberish line warns', repGibberish.warnings.length >= 1);
+ok('standalone gibberish line also notes', repGibberish.wellbore.notes.some(n => n.depth_m === null && n.text === 'totally unparseable gibberish line'));
+
+// Finding 6 — casing warnings must not be suppressed wholesale just because
+// the same chunk also contains a plug/perforation.
+ok('casing warnings survive alongside a found plug', repPhantom.warnings.some(w => /Unparsed casing line/.test(w)));
+
 // stats
 const wbFix = { td: 1000, casings: [{top_m:0, shoe_m:200}], plugs: [{top_m:100, bottom_m:200}, {top_m:150, bottom_m:300}], perforations: [{top_m:900, bottom_m:910}], formations: [{name:'X', top_m:800}], openHole: {top_m:200, bottom_m:1000} };
 const st = W.wellboreStats(wbFix);

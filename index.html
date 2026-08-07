@@ -571,6 +571,9 @@ function parseIntervalsText(text, defaultUnit = 'm') {
   const rawLines = String(text).split(/\n|;/).map(l => l.trim()).filter(Boolean);
 
   let lastPlugHeader = null; // { num }
+  let lastPlug = null; // most recently pushed plug object — continuation
+                        // lines (sacks/additives/kind with no depth of
+                        // their own) attach to this (spec §4, Finding 3).
 
   for (const line of rawLines) {
     const lower = line.toLowerCase();
@@ -582,22 +585,31 @@ function parseIntervalsText(text, defaultUnit = 'm') {
     }
 
     // Detect explicit unit override on the line ("... ft" / "... m") used
-    // as a fallback default for bare numbers found on this line.
+    // as a fallback default for bare numbers found on this line — but a
+    // number carrying its OWN unit suffix (checked per-number in the range
+    // regex below) always wins over this line-level fallback (Finding 4).
     let lineUnit = defaultUnit;
     if (/\bft\b/i.test(line) && !/\bm\b(?!m)/i.test(line)) lineUnit = 'ft';
     else if (/\bm\b(?!m)/i.test(line) && !/\bft\b/i.test(line)) lineUnit = 'm';
 
-    // Plug header e.g. "Plug #1"
+    // Plug header e.g. "Plug #1" — starts a fresh block; the plug it
+    // eventually produces (from a later/trailing range) becomes the new
+    // `lastPlug` continuation target, not whatever plug preceded it.
     const hdrMatch = line.match(/plug\s*#?\s*(\d+)/i);
     if (hdrMatch && !new RegExp(`${NUM}\\s*${DASH}\\s*${NUM}`).test(line)) {
       lastPlugHeader = { num: hdrMatch[1] };
+      lastPlug = null;
     }
 
     // Formation names in trailing (...) become notes.
     const parenMatches = [...line.matchAll(/\(([^)]+)\)/g)];
 
-    // Find interval range(s): "<num> - <num>" possibly followed by "and <num>"
-    const rangeRe = new RegExp(`(${NUM})\\s*${DASH}\\s*(${NUM})(?:\\s*(?:m|ft)\\b)?`, 'gi');
+    // Find interval range(s): "<num>[unit] - <num>[unit]" possibly followed
+    // by "and <num>[unit]". Each side's unit is captured independently so a
+    // mixed-unit range (rare, but possible in free text) never silently
+    // borrows the wrong side's unit — only a number with NO unit of its own
+    // falls back to lineUnit (Finding 4).
+    const rangeRe = new RegExp(`(${NUM})(?:\\s*(m|ft)\\b)?\\s*${DASH}\\s*(${NUM})(?:\\s*(m|ft)\\b)?`, 'gi');
     const ranges = [...line.matchAll(rangeRe)];
 
     // "and <num>" continuation — treated as an additional single-depth entry
@@ -627,8 +639,10 @@ function parseIntervalsText(text, defaultUnit = 'm') {
 
     if (ranges.length) {
       for (const r of ranges) {
-        let a = numToM(toNum(r[1]), lineUnit);
-        let b = numToM(toNum(r[2]), lineUnit);
+        const topUnit = (r[2] || lineUnit).toLowerCase();
+        const bottomUnit = (r[4] || lineUnit).toLowerCase();
+        let a = numToM(toNum(r[1]), topUnit);
+        let b = numToM(toNum(r[3]), bottomUnit);
         const top_m = Math.min(a, b);
         const bottom_m = Math.max(a, b);
         entries.push({ top_m, bottom_m });
@@ -671,14 +685,27 @@ function parseIntervalsText(text, defaultUnit = 'm') {
           if (additives) plug.additives = additives;
           if (lastPlugHeader) plug.num = lastPlugHeader.num;
           out.plugs.push(plug);
+          lastPlug = plug;
         } else {
           // Unclassified interval — keep as a note so nothing is silently dropped.
           out.notes.push({ depth_m: e.top_m, text: `Interval noted: "${line}"` });
         }
       }
     } else if (!/felt plug/i.test(line)) {
-      // No depth found on a non-empty, non-header line → warning.
-      if (!hdrMatch) out.warnings.push(`Unparsed interval line: "${line}"`);
+      // No depth on this line. Within a Plug #N block, a continuation line
+      // that carries sacks/additive/kind metadata but no depth of its own
+      // (e.g. a "25 sacks" or "2% CaCl2" line following the depth range)
+      // attaches to the most recently opened plug rather than being
+      // reported as unparsed (spec §4 multi-line plug records, Finding 3).
+      const isContinuation = !hdrMatch && lastPlug && (sacks !== undefined || additives || kind);
+      if (isContinuation) {
+        if (sacks !== undefined && lastPlug.sacks === undefined) lastPlug.sacks = sacks;
+        if (additives) lastPlug.additives = lastPlug.additives ? `${lastPlug.additives}; ${additives}` : additives;
+        if (kind && !lastPlug.kind) lastPlug.kind = kind;
+      } else if (!hdrMatch) {
+        // No depth found on a non-empty, non-header, non-continuation line → warning.
+        out.warnings.push(`Unparsed interval line: "${line}"`);
+      }
     }
 
     for (const pm of parenMatches) {
@@ -700,6 +727,10 @@ function parseCasingText(text) {
   for (const line of rawLines) {
     if (/none\s*[—–-]?\s*open hole/i.test(line) || /open hole below/i.test(line)) {
       out.notes.push(`Open hole: "${line}"`);
+      // Structured signal (not just prose in `notes`): {} means "open hole
+      // below the last casing, depths unknown" so a downstream bridge
+      // builder (Task 6) can detect it without re-parsing text (Finding 2).
+      out.openHole = {};
       continue;
     }
 
@@ -743,14 +774,26 @@ function parseCasingText(text) {
       shoe_m = numToM(toNum(shoeMatch[1]), unit);
     }
 
-    // range: "0–610 ft" — top and shoe. Negative lookahead on the second
-    // number avoids matching the fraction in an OD token like `8-5/8"`.
+    // Casing keyword/signal context: OD, grade token, weight, an explicit
+    // shoe (`@`), TOC, or a casing/liner/type word. A bare "<num>–<num>"
+    // with NONE of these present is far more likely to be a plug/perf depth
+    // line that leaked into this chunk from a mixed report (Finding 1) —
+    // it must NOT be treated as casing data.
+    const hasCasingContext = od_mm !== undefined || grade !== undefined || weight_kgm !== undefined || shoe_m !== undefined ||
+      /casing|liner/i.test(line) || /\btoc\b/i.test(line) || /@/.test(line) ||
+      /surface|intermediate|production|conductor/i.test(line);
+
+    // range: "0–610 ft" — top and shoe, min/max-normalized like plugs.
+    // Negative lookahead on the second number avoids matching the fraction
+    // in an OD token like `8-5/8"`.
     let top_m;
     const rangeMatch = line.match(new RegExp(`(${NUM})\\s*${DASH}\\s*(${NUM})(?!\\s*/)\\s*(m|ft)?`, 'i'));
-    if (rangeMatch) {
+    if (rangeMatch && hasCasingContext) {
       const unit = (rangeMatch[3] || 'm').toLowerCase();
-      top_m = numToM(toNum(rangeMatch[1]), unit);
-      const bottom = numToM(toNum(rangeMatch[2]), unit);
+      const a = numToM(toNum(rangeMatch[1]), unit);
+      const b = numToM(toNum(rangeMatch[2]), unit);
+      top_m = Math.min(a, b);
+      const bottom = Math.max(a, b);
       if (shoe_m === undefined) shoe_m = bottom;
     }
 
@@ -813,7 +856,29 @@ function parseWellboreReport(text) {
 
       if (cs.casings.length) wellbore.casings.push(...cs.casings);
       if (cs.openHole) wellbore.openHole = cs.openHole;
-      warnings.push(...cs.warnings.filter(w => !iv.plugs.length && !iv.perforations.length));
+      // Casing notes (e.g. open-hole prose) are plain strings from
+      // parseCasingText — carry them into wellbore.notes as structured
+      // entries so they survive end-to-end (Finding 2).
+      for (const n of cs.notes) wellbore.notes.push({ depth_m: null, text: n });
+      // Never suppress a whole parser's warnings just because the other
+      // parser found something in the same chunk (Finding 6) — every real
+      // warning is signal. Dedupe identical strings instead of dropping.
+      for (const w of cs.warnings) { if (!warnings.includes(w)) warnings.push(w); }
+
+      // A line genuinely unparsed by BOTH parsers (no plug/perf/casing/note
+      // extracted from it by either) gets a note as well as its warning,
+      // per the brief: "unparsed lines → notes + warnings" (Finding 5).
+      const quoted = (arr, prefix) => {
+        const set = new Set();
+        const re = new RegExp(`^${prefix}: "([\\s\\S]*)"$`);
+        for (const w of arr) { const m = w.match(re); if (m) set.add(m[1]); }
+        return set;
+      };
+      const ivUnparsed = quoted(iv.warnings, 'Unparsed interval line');
+      const csUnparsed = quoted(cs.warnings, 'Unparsed casing line');
+      for (const rawLine of ivUnparsed) {
+        if (csUnparsed.has(rawLine)) wellbore.notes.push({ depth_m: null, text: rawLine });
+      }
     };
 
     // Group lines that look like they belong together (a header + its
@@ -872,7 +937,10 @@ function wellboreStats(wb) {
   const longestPlug = validPlugs.length ? Math.max(...validPlugs.map(p => p.bottom_m - p.top_m)) : null;
 
   const merged = mergeIntervals(validPlugs);
-  const pluggedTotal = merged.length ? +merged.reduce((sum, iv) => sum + (iv.bottom_m - iv.top_m), 0).toFixed(1) : (validPlugs.length ? 0 : null);
+  // merged.length is 0 iff validPlugs.length is 0 (mergeIntervals never
+  // drops a non-overlapping interval), so the "no plugs but somehow merged
+  // is empty" case can't happen — null is the only reachable "else".
+  const pluggedTotal = merged.length ? +merged.reduce((sum, iv) => sum + (iv.bottom_m - iv.top_m), 0).toFixed(1) : null;
 
   const coveragePct = (td && td > 0 && pluggedTotal !== null) ? +((pluggedTotal / td) * 100).toFixed(1) : null;
 
