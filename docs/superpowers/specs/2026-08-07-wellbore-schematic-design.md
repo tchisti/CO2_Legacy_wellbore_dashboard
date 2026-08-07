@@ -6,7 +6,7 @@
 
 ## 1. Goal & placement
 
-A professional, interactive wellbore schematic (casings, cement, plugs, perforations, formations, open hole) on the Well Detail tab, placed directly AFTER the "Score Breakdown" card and BEFORE the remaining detail content (Spatial/Identification column). Gives reviewers a construction/abandonment picture at a glance, in the style of industry well schematics (SLB/Halliburton/WellCat), matching the dashboard's theme incl. dark mode.
+A professional, interactive wellbore schematic (casings, cement, plugs, perforations, formations, open hole) on the Well Detail tab, placed as a full-width section directly AFTER the dossier's `grid2` block (which holds Score Breakdown side-by-side with Spatial/Identification) and BEFORE the Edit / Download-PDF actions row. (The source prompt's "between Score Breakdown and remaining details" is impossible without wrecking the two-column grid; full-width below it is the faithful practical placement and gives the schematic the width it needs.) Gives reviewers a construction/abandonment picture at a glance, in the style of industry well schematics (SLB/Halliburton/WellCat), matching the dashboard's theme incl. dark mode.
 
 ## 2. Data model (stored per well, metres internally)
 
