@@ -525,6 +525,407 @@ footer{padding:18px 24px;color:var(--muted);font-size:11px;border-top:1px solid 
 
 <script src="scoring.js"></script>
 <script>
+/* ===== WELLBORE PURE BEGIN ===== */
+/* Pure, DOM-free core for the wellbore schematic feature: unit conversions,
+   free-text depth/interval/casing/report parsers, aggregate stats, and the
+   linear depth-scale helper used by the SVG renderer (Task 2+). Nothing in
+   this section reads `document` or `window` — see spec §2/§4/§5. */
+
+const mToFt = m => m / 0.3048;
+const ftToM = ft => ft * 0.3048;
+
+/* parseDepth: accepts "1463", "1,463.5", "3219 ft", "850 m"; bare numbers
+   use defaultUnit. Returns metres rounded to 0.1, or null if unparseable. */
+function parseDepth(str, defaultUnit = 'm') {
+  if (str === null || str === undefined) return null;
+  const s = String(str).trim();
+  if (!s) return null;
+  const m = s.match(/^(-?[\d,]+(?:\.\d+)?)\s*(m|ft)?\b/i);
+  if (!m) return null;
+  const num = parseFloat(m[1].replace(/,/g, ''));
+  if (!Number.isFinite(num)) return null;
+  const unit = (m[2] || defaultUnit).toLowerCase();
+  const metres = unit === 'ft' ? ftToM(num) : num;
+  return +metres.toFixed(1);
+}
+
+/* ---- interval text parsing (plugs / perforations / notes / warnings) ---- */
+
+const DASH = '[–—-]'; // en dash, em dash, hyphen
+const NUM = '[\\d,]+(?:\\.\\d+)?';
+
+function toNum(numStr) {
+  return parseFloat(String(numStr).replace(/,/g, ''));
+}
+
+// Convert a raw number (already parsed as a float, in defaultUnit) to metres.
+function numToM(n, defaultUnit) {
+  return +(defaultUnit === 'ft' ? ftToM(n) : n).toFixed(1);
+}
+
+function parseIntervalsText(text, defaultUnit = 'm') {
+  const out = { plugs: [], perforations: [], notes: [], warnings: [] };
+  if (!text || !String(text).trim()) return out;
+
+  // Split into candidate clauses on line breaks and `;`.
+  const rawLines = String(text).split(/\n|;/).map(l => l.trim()).filter(Boolean);
+
+  let lastPlugHeader = null; // { num }
+
+  for (const line of rawLines) {
+    const lower = line.toLowerCase();
+
+    // "No plug records on file" / similar negative statements → warning only.
+    if (/^no\s+.*(records?|plugs?)\b/i.test(line) || /no plug records/i.test(line)) {
+      out.warnings.push(`No records: "${line}"`);
+      continue;
+    }
+
+    // Detect explicit unit override on the line ("... ft" / "... m") used
+    // as a fallback default for bare numbers found on this line.
+    let lineUnit = defaultUnit;
+    if (/\bft\b/i.test(line) && !/\bm\b(?!m)/i.test(line)) lineUnit = 'ft';
+    else if (/\bm\b(?!m)/i.test(line) && !/\bft\b/i.test(line)) lineUnit = 'm';
+
+    // Plug header e.g. "Plug #1"
+    const hdrMatch = line.match(/plug\s*#?\s*(\d+)/i);
+    if (hdrMatch && !new RegExp(`${NUM}\\s*${DASH}\\s*${NUM}`).test(line)) {
+      lastPlugHeader = { num: hdrMatch[1] };
+    }
+
+    // Formation names in trailing (...) become notes.
+    const parenMatches = [...line.matchAll(/\(([^)]+)\)/g)];
+
+    // Find interval range(s): "<num> - <num>" possibly followed by "and <num>"
+    const rangeRe = new RegExp(`(${NUM})\\s*${DASH}\\s*(${NUM})(?:\\s*(?:m|ft)\\b)?`, 'gi');
+    const ranges = [...line.matchAll(rangeRe)];
+
+    // "and <num>" continuation — treated as an additional single-depth entry
+    // (e.g. "squeezed 831.7–839.7 and 871.5 m") sharing the same status.
+    const andMatches = [...line.matchAll(new RegExp(`\\band\\s+(${NUM})\\s*(m|ft)?\\b`, 'gi'))];
+
+    const isPerf = /perf|squeez/i.test(line);
+    const isPlugKindLine = /jet|treatment|plug|cibp|bridge/i.test(line);
+
+    // sacks
+    const sacksMatch = line.match(/(\d+)\s*sacks?/i);
+    const sacks = sacksMatch ? parseInt(sacksMatch[1], 10) : undefined;
+
+    // additives, e.g. "2% CaCl2"
+    const addMatch = line.match(/(\d+(?:\.\d+)?%\s*[A-Za-z0-9]+(?:\s+cement)?)/i) || line.match(/(cement[^,.;]*)/i);
+    const additives = addMatch ? addMatch[1].trim() : undefined;
+
+    // status: squeezed
+    const status = /squeez/i.test(line) ? 'squeezed' : undefined;
+
+    // kind: cibp / bridge
+    let kind;
+    if (/cibp/i.test(line)) kind = 'cibp';
+    else if (/bridge/i.test(line)) kind = 'bridge';
+
+    const entries = [];
+
+    if (ranges.length) {
+      for (const r of ranges) {
+        let a = numToM(toNum(r[1]), lineUnit);
+        let b = numToM(toNum(r[2]), lineUnit);
+        const top_m = Math.min(a, b);
+        const bottom_m = Math.max(a, b);
+        entries.push({ top_m, bottom_m });
+      }
+    }
+
+    if (andMatches.length) {
+      for (const a of andMatches) {
+        const unit = (a[2] || lineUnit).toLowerCase();
+        const d = numToM(toNum(a[1]), unit);
+        entries.push({ top_m: d, bottom_m: d });
+      }
+    }
+
+    // Single depth like "CIBP at 1200 m" or "felt plug at 3219 ft"
+    if (!entries.length) {
+      const atMatch = line.match(new RegExp(`(?:at|@)\\s*(${NUM})\\s*(m|ft)?`, 'i'));
+      if (atMatch) {
+        const unit = (atMatch[2] || lineUnit).toLowerCase();
+        const d = numToM(toNum(atMatch[1]), unit);
+        entries.push({ top_m: d, bottom_m: d });
+      }
+    }
+
+    // "felt plug" note (may or may not carry its own depth already captured above)
+    if (/felt plug/i.test(line)) {
+      const atMatch = line.match(new RegExp(`felt plug\\s*(?:at|@)?\\s*(${NUM})?\\s*(m|ft)?`, 'i'));
+      const depth = atMatch && atMatch[1] ? numToM(toNum(atMatch[1]), (atMatch[2] || lineUnit).toLowerCase()) : (entries[0] ? entries[0].top_m : null);
+      out.notes.push({ depth_m: depth, text: `Felt plug noted: "${line}"` });
+    }
+
+    if (entries.length) {
+      for (const e of entries) {
+        if (isPerf) {
+          out.perforations.push({ top_m: e.top_m, bottom_m: e.bottom_m, ...(status ? { status } : {}) });
+        } else if (isPlugKindLine || lastPlugHeader) {
+          const plug = { top_m: e.top_m, bottom_m: e.bottom_m };
+          if (kind) plug.kind = kind;
+          if (sacks !== undefined) plug.sacks = sacks;
+          if (additives) plug.additives = additives;
+          if (lastPlugHeader) plug.num = lastPlugHeader.num;
+          out.plugs.push(plug);
+        } else {
+          // Unclassified interval — keep as a note so nothing is silently dropped.
+          out.notes.push({ depth_m: e.top_m, text: `Interval noted: "${line}"` });
+        }
+      }
+    } else if (!/felt plug/i.test(line)) {
+      // No depth found on a non-empty, non-header line → warning.
+      if (!hdrMatch) out.warnings.push(`Unparsed interval line: "${line}"`);
+    }
+
+    for (const pm of parenMatches) {
+      out.notes.push({ depth_m: entries[0] ? entries[0].top_m : null, text: `Formation: ${pm[1].trim()}` });
+    }
+  }
+
+  return out;
+}
+
+/* ---- casing text parsing ---- */
+
+function parseCasingText(text) {
+  const out = { casings: [], openHole: null, notes: [], warnings: [] };
+  if (!text || !String(text).trim()) return out;
+
+  const rawLines = String(text).split(/\n|;/).map(l => l.trim()).filter(Boolean);
+
+  for (const line of rawLines) {
+    if (/none\s*[—–-]?\s*open hole/i.test(line) || /open hole below/i.test(line)) {
+      out.notes.push(`Open hole: "${line}"`);
+      continue;
+    }
+
+    // OD in inches, e.g. 8⅝", 8-5/8", 8 5/8", or "8.625 in"
+    let od_mm;
+    const fracMap = { '⅛':0.125,'¼':0.25,'⅜':0.375,'½':0.5,'⅝':0.625,'¾':0.75,'⅞':0.875 };
+    let inchMatch = line.match(/(\d+)\s*[-\s]?\s*(\d+)\/(\d+)\s*"/); // 8-5/8" or 8 5/8"
+    if (inchMatch) {
+      const whole = parseInt(inchMatch[1], 10);
+      const frac = parseInt(inchMatch[2], 10) / parseInt(inchMatch[3], 10);
+      od_mm = (whole + frac) * 25.4;
+    } else {
+      const fracCharMatch = line.match(/(\d+)([⅛¼⅜½⅝¾⅞])\s*"/);
+      if (fracCharMatch) {
+        const whole = parseInt(fracCharMatch[1], 10);
+        od_mm = (whole + fracMap[fracCharMatch[2]]) * 25.4;
+      } else {
+        const decInMatch = line.match(/(\d+(?:\.\d+)?)\s*"/);
+        if (decInMatch) {
+          od_mm = parseFloat(decInMatch[1]) * 25.4;
+        } else {
+          const mmMatch = line.match(/(\d+(?:\.\d+)?)\s*mm\b/i);
+          if (mmMatch) od_mm = parseFloat(mmMatch[1]);
+        }
+      }
+    }
+
+    // grade, e.g. J55, K55, N80
+    const gradeMatch = line.match(/\b([A-Z]\d{2,3})\b/);
+    const grade = gradeMatch ? gradeMatch[1] : undefined;
+
+    // weight, e.g. "35.7 kg/m"
+    const wtMatch = line.match(/(\d+(?:\.\d+)?)\s*kg\/m/i);
+    const weight_kgm = wtMatch ? parseFloat(wtMatch[1]) : undefined;
+
+    // shoe depth: "@ 610 m" or "@ 1699.5 m"
+    let shoe_m;
+    const shoeMatch = line.match(new RegExp(`@\\s*(${NUM})\\s*(m|ft)?`, 'i'));
+    if (shoeMatch) {
+      const unit = (shoeMatch[2] || 'm').toLowerCase();
+      shoe_m = numToM(toNum(shoeMatch[1]), unit);
+    }
+
+    // range: "0–610 ft" — top and shoe. Negative lookahead on the second
+    // number avoids matching the fraction in an OD token like `8-5/8"`.
+    let top_m;
+    const rangeMatch = line.match(new RegExp(`(${NUM})\\s*${DASH}\\s*(${NUM})(?!\\s*/)\\s*(m|ft)?`, 'i'));
+    if (rangeMatch) {
+      const unit = (rangeMatch[3] || 'm').toLowerCase();
+      top_m = numToM(toNum(rangeMatch[1]), unit);
+      const bottom = numToM(toNum(rangeMatch[2]), unit);
+      if (shoe_m === undefined) shoe_m = bottom;
+    }
+
+    // TOC (top of cement)
+    let toc_m;
+    const tocMatch = line.match(new RegExp(`TOC\\s*(${NUM})\\s*(m|ft)?`, 'i'));
+    if (tocMatch) {
+      const unit = (tocMatch[2] || 'm').toLowerCase();
+      toc_m = numToM(toNum(tocMatch[1]), unit);
+    }
+
+    // casing type keyword
+    let type;
+    if (/surface/i.test(line)) type = 'surface';
+    else if (/intermediate/i.test(line)) type = 'intermediate';
+    else if (/production/i.test(line)) type = 'production';
+    else if (/conductor/i.test(line)) type = 'conductor';
+
+    const hasCasingData = od_mm !== undefined || shoe_m !== undefined || grade !== undefined || top_m !== undefined;
+
+    if (hasCasingData) {
+      const casing = {};
+      if (type) casing.type = type;
+      if (od_mm !== undefined) casing.od_mm = +od_mm.toFixed(2);
+      if (grade) casing.grade = grade;
+      if (weight_kgm !== undefined) casing.weight_kgm = weight_kgm;
+      if (top_m !== undefined) casing.top_m = top_m;
+      if (shoe_m !== undefined) casing.shoe_m = shoe_m;
+      if (toc_m !== undefined) casing.toc_m = toc_m;
+      out.casings.push(casing);
+    } else {
+      out.warnings.push(`Unparsed casing line: "${line}"`);
+    }
+  }
+
+  return out;
+}
+
+/* ---- full report composition ---- */
+
+function parseWellboreReport(text) {
+  const warnings = [];
+  const wellbore = { plugs: [], perforations: [], notes: [], casings: [] };
+  if (!text || !String(text).trim()) return { wellbore, warnings };
+
+  try {
+    const lines = String(text).split(/\n/);
+    let buffer = [];
+    const flush = () => {
+      if (!buffer.length) return;
+      const chunk = buffer.join('\n');
+      buffer = [];
+      const iv = parseIntervalsText(chunk);
+      const cs = parseCasingText(chunk);
+
+      wellbore.plugs.push(...iv.plugs);
+      wellbore.perforations.push(...iv.perforations);
+      wellbore.notes.push(...iv.notes);
+      warnings.push(...iv.warnings);
+
+      if (cs.casings.length) wellbore.casings.push(...cs.casings);
+      if (cs.openHole) wellbore.openHole = cs.openHole;
+      warnings.push(...cs.warnings.filter(w => !iv.plugs.length && !iv.perforations.length));
+    };
+
+    // Group lines that look like they belong together (a header + its
+    // depth/sacks/additive detail lines) into a single chunk so
+    // parseIntervalsText can associate them via lastPlugHeader / same-line
+    // sacks & additive matching. A blank line or a new "Plug #" header
+    // starts a new group.
+    for (const raw of lines) {
+      const line = raw.trim();
+      if (!line) { flush(); continue; }
+      if (/plug\s*#?\s*\d+/i.test(line) && buffer.length) { flush(); }
+      buffer.push(line);
+    }
+    flush();
+  } catch (e) {
+    warnings.push(`Report parse error: ${e && e.message}`);
+  }
+
+  return { wellbore, warnings };
+}
+
+/* ---- aggregate stats ---- */
+
+function mergeIntervals(intervals) {
+  if (!intervals.length) return [];
+  const sorted = intervals.slice().sort((a, b) => a.top_m - b.top_m);
+  const merged = [{ top_m: sorted[0].top_m, bottom_m: sorted[0].bottom_m }];
+  for (let i = 1; i < sorted.length; i++) {
+    const last = merged[merged.length - 1];
+    const cur = sorted[i];
+    if (cur.top_m <= last.bottom_m) {
+      last.bottom_m = Math.max(last.bottom_m, cur.bottom_m);
+    } else {
+      merged.push({ top_m: cur.top_m, bottom_m: cur.bottom_m });
+    }
+  }
+  return merged;
+}
+
+function wellboreStats(wb) {
+  wb = wb || {};
+  const td = typeof wb.td === 'number' ? wb.td : null;
+  const casings = Array.isArray(wb.casings) ? wb.casings : [];
+  const plugs = Array.isArray(wb.plugs) ? wb.plugs : [];
+  const perforations = Array.isArray(wb.perforations) ? wb.perforations : [];
+  const formations = Array.isArray(wb.formations) ? wb.formations : [];
+
+  const casingCount = casings.length;
+  const plugCount = plugs.length;
+  const perfCount = perforations.length;
+  const formationCount = formations.length;
+
+  const validPlugs = plugs.filter(p => typeof p.top_m === 'number' && typeof p.bottom_m === 'number');
+  const deepestPlug = validPlugs.length ? Math.max(...validPlugs.map(p => p.bottom_m)) : null;
+  const shallowestPlug = validPlugs.length ? Math.min(...validPlugs.map(p => p.top_m)) : null;
+  const longestPlug = validPlugs.length ? Math.max(...validPlugs.map(p => p.bottom_m - p.top_m)) : null;
+
+  const merged = mergeIntervals(validPlugs);
+  const pluggedTotal = merged.length ? +merged.reduce((sum, iv) => sum + (iv.bottom_m - iv.top_m), 0).toFixed(1) : (validPlugs.length ? 0 : null);
+
+  const coveragePct = (td && td > 0 && pluggedTotal !== null) ? +((pluggedTotal / td) * 100).toFixed(1) : null;
+
+  let openHoleLen = null;
+  if (wb.openHole && typeof wb.openHole.top_m === 'number' && typeof wb.openHole.bottom_m === 'number') {
+    openHoleLen = +(wb.openHole.bottom_m - wb.openHole.top_m).toFixed(1);
+  }
+
+  return {
+    td: td,
+    casingCount,
+    plugCount,
+    deepestPlug,
+    shallowestPlug,
+    longestPlug,
+    pluggedTotal,
+    coveragePct,
+    openHoleLen,
+    perfCount,
+    formationCount
+  };
+}
+
+/* ---- depth scale ---- */
+
+function depthScale(td, pxHeight) {
+  const yOf = m => (td > 0 ? (m / td) * pxHeight : 0);
+  const ticks = (unit) => {
+    const out = [];
+    if (unit === 'ft') {
+      const stepFt = 100;
+      const stepM = stepFt * 0.3048;
+      for (let m = 0; m <= td + 1e-9; m += stepM) {
+        out.push({ m: +m.toFixed(2), label: String(Math.round(mToFt(m))) });
+      }
+    } else {
+      const stepM = 50;
+      for (let m = 0; m <= td + 1e-9; m += stepM) {
+        out.push({ m: +m.toFixed(2), label: String(Math.round(m)) });
+      }
+    }
+    return out;
+  };
+  return { yOf, ticks };
+}
+
+/* ---- stubs for later tasks (Task 2: renderWellboreSVG, Task 6: wellboreFrom3D) ---- */
+const renderWellboreSVG = () => '';
+const wellboreFrom3D = () => null;
+
+globalThis.Wellbore = { mToFt, ftToM, parseDepth, parseIntervalsText, parseCasingText, parseWellboreReport, wellboreStats, depthScale, renderWellboreSVG, wellboreFrom3D };
+/* ===== WELLBORE PURE END ===== */
+
 /* ============ SCORING MODEL — Appendix D + § 7.2 ============ */
 
 /* Legacy well classifications — Table A-1 / Figure A-4, Enbridge "CO2 Underground
