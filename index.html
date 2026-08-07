@@ -1324,6 +1324,7 @@ function wbRenderCard(){
     </div>
   `;
   wbWireSvgEvents();
+  wbWireJumpInput();
 }
 
 // Component kinds actually drawn in a rendered SVG string, in first-seen order,
@@ -1470,38 +1471,48 @@ function wbWireSvgEvents(){
   svg.setAttribute('role', 'group');
   svg.setAttribute('aria-label', 'Interactive wellbore schematic for ' + st.licence);
 
-  // Jump-to-depth input handler
-  const jumpInput = document.getElementById('wbJump');
-  if(jumpInput){
-    jumpInput.addEventListener('keydown', e => {
-      if(e.key !== 'Enter') return;
-      const input = jumpInput.value.trim();
-      if(!input) return;
-      const depthVal = parseFloat(input);
-      if(!Number.isFinite(depthVal)) return;
-
-      // Convert to metres if needed
-      const m = schemUnit === 'ft' ? Wellbore.ftToM(depthVal) : depthVal;
-
-      // Get renderer constants from the pure section
-      const H = 920;
-      const TOP = 56;
-      const BOTTOM = 24;
-      const plotH = H - TOP - BOTTOM;
-
-      // Compute y in original SVG coords using depthScale equivalent
-      const scale = Wellbore.depthScale(st.wb.td, plotH);
-      const yTarget = TOP + scale.yOf(m);
-
-      // Jump to depth: set vb[1] to center the depth in view, clamped
-      st.vb[1] = Math.max(0, Math.min(VBH - st.vb[3], yTarget - st.vb[3]/2));
-      applyVB();
-      jumpInput.value = '';
-      jumpInput.blur();
-    });
-  }
-
   wbApplyLegendState();
+}
+
+function wbWireJumpInput(){
+  const st = wbState; if(!st) return;
+  const jumpInput = document.getElementById('wbJump');
+  if(!jumpInput) return;
+
+  // Guard against re-wiring (input is persistent across re-renders)
+  if(jumpInput.dataset.wired) return;
+  jumpInput.dataset.wired = '1';
+
+  jumpInput.addEventListener('keydown', e => {
+    if(e.key !== 'Enter') return;
+    const input = jumpInput.value.trim();
+    if(!input) return;
+
+    // Use canonical parseDepth to handle thousands separators, etc.
+    const m = Wellbore.parseDepth(input, schemUnit);
+    if(m === null || !Number.isFinite(m)) return;
+
+    // Get renderer constants from the pure section
+    const H = 920;
+    const TOP = 56;
+    const BOTTOM = 24;
+    const plotH = H - TOP - BOTTOM;
+
+    // Compute y in original SVG coords using depthScale equivalent
+    const scale = Wellbore.depthScale(st.wb.td, plotH);
+    const yTarget = TOP + scale.yOf(m);
+
+    // Get current vb to extract VBH
+    const vb_attr = document.getElementById('wbSvg').getAttribute('viewBox');
+    const vb_parts = vb_attr ? vb_attr.split(/\s+/).map(Number) : [0, 0, 760, 920];
+    const VBH = vb_parts[3];
+
+    // Jump to depth: set vb[1] to center the depth in view, clamped
+    st.vb[1] = Math.max(0, Math.min(VBH - st.vb[3], yTarget - st.vb[3]/2));
+    document.getElementById('wbSvg').setAttribute('viewBox', st.vb.join(' '));
+    jumpInput.value = '';
+    jumpInput.blur();
+  });
 }
 
 function wbHandleSvgHover(e){
