@@ -1013,8 +1013,9 @@ function openDetail(id){
         </tbody></table>
         ${w2.notes?`<h2 style="margin-top:14px">Notes</h2><div class="rec-card" style="white-space:pre-wrap">${escapeHtml(w2.notes)}</div>`:''}
         <h2 style="margin-top:14px">Recommended Action — § 8</h2>
-        <div class="rec-card"><h4>${rec.title}</h4>${rec.body}</div>
-        ${rec.warn?`<div class="warn" style="margin-top:8px">${rec.warn}</div>`:''}
+        ${w2.recActionOverride
+          ? `<div class="rec-card"><h4>Reviewer Recommendation <span class="tag" style="background:#3a2f12;color:#f0c96b;margin-left:6px">reviewer-edited</span></h4><div style="white-space:pre-wrap">${escapeHtml(w2.recActionOverride)}</div></div>`
+          : `<div class="rec-card"><h4>${rec.title}</h4>${rec.body}</div>${rec.warn?`<div class="warn" style="margin-top:8px">${rec.warn}</div>`:''}`}
       </div>
     </div>
 
@@ -1782,9 +1783,16 @@ async function exportPDF(singleId){
 
     // Recommended action
     const rec = recommend(w2);
+    const recOverride = w2.recActionOverride || '';
     ensure(80);
     doc.setFont('helvetica','bold'); doc.setFontSize(12);
-    doc.text(pdfSafe('Recommended Action (Sec. 8)'), M, y); y+=16;
+    doc.text(pdfSafe('Recommended Action (Sec. 8)' + (recOverride ? ' (reviewer-edited)' : '')), M, y); y+=16;
+    if(recOverride){
+      doc.setFont('helvetica','normal'); doc.setFontSize(9.5);
+      const oLines = doc.splitTextToSize(pdfSafe(recOverride), CONTENT_W);
+      oLines.forEach(line=>{ ensure(13); doc.text(line, M, y); y += 12; });
+      y += 6;
+    } else {
     doc.setFont('helvetica','bold'); doc.setFontSize(10.5);
     const titleLines = doc.splitTextToSize(pdfSafe(rec.title), CONTENT_W);
     doc.text(titleLines, M, y); y += titleLines.length*12 + 4;
@@ -1813,6 +1821,7 @@ async function exportPDF(singleId){
       doc.text(warnLines, M+7, y+24);
       doc.setTextColor(0,0,0); doc.setDrawColor(0); doc.setLineWidth(0.2);
       y += boxH + 8;
+    }
     }
   });
 
