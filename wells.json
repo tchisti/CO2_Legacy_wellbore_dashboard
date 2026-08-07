@@ -125,36 +125,33 @@
     "status": "Abandoned (P&A)",
     "klass": "Type 3",
     "reviewer": "Tahir Chisti",
-    "notes": "1953 D&A, Fort Saskatchewan field. Surface casing only to 186.2 m. Tops: Wabamun 1022, Calmar 1053, Nisku 1065, Ireton 1117, Beaverhill Lake 1450 m. Abandonment predates modern cementing standards. [From 3D Reviewer: critical 100/100 — subscores derived; verify Classification, Access, Data]",
-    "scores": {
-      "plugQuality": 5,
-      "cement": 5,
-      "barriers": 3,
-      "scvf": null,
-      "age": 5,
-      "complexity": null,
-      "data": 3,
-      "penetration": 5,
-      "plume": 3,
-      "usdw": null,
-      "access": 3
-    },
-    "createdAt": "2026-07-24T12:15:02.272Z",
-    "updatedAt": "2026-07-24T16:53:01.390Z",
-    "updatedBy": "Tahir Chisti",
+    "notes": "1953 D&A, Fort Saskatchewan field. Surface casing only to 186.2 m. Tops: Wabamun 1022, Calmar 1053, Nisku 1065, Ireton 1117, Beaverhill Lake 1450 m. \n\nThe well was plugged and abandoned April 10-12, 1953 after reaching total depth (~4801 ft). Seven cement plugs were run: Plug #1, 4801-4751 ft, 25 sax cement, down at 7:20 (Apr 10); Plug #2, 4480-4430 ft, 35 sax cement with 2% C.C., down at 8:30 PM (Apr 10); Plug #3, 3510-3460 ft, 35 sax cement & 2% C.C., down at 7:00, felt O.K. at 3440 (Apr 11); Plug #4, 3100-3050 ft, 35 sax cement and 2% C.C., down at 4:30, felt O.K. with top at 3038 (Apr 11); Plug #5, 2550-2350 ft, 100 sax cement 2% C.C., down at 4:00, felt O.K. at 2345 (Apr 12); Plug #6, 570-640 ft, 40 sax cement with 2% additive, down at 1:30, felt (Apr 12); and Plug #7 set at surface after taking off the B.O.P. (Apr 12). Waiting-on-cement periods were observed between plugs and drill pipe, drill collars and core barrel were laid down at the end of the job.",
     "schema": 2,
-    "computed": {
-      "L": 4.04,
-      "C": 3.6,
-      "Lr": 4,
-      "Cr": 4,
-      "cell": 16,
-      "riskIndex": 14.54,
-      "rankLabel": "High",
-      "integrity": 44
+    "scores": {
+      "plugQuality": 1,
+      "cement": 1,
+      "barriers": 1,
+      "scvf": 2,
+      "age": 4,
+      "complexity": 4,
+      "data": 1,
+      "penetration": 4,
+      "plume": 3,
+      "usdw": 1,
+      "access": 2
     },
-    "scoredUnder": "1.0.0",
-    "needsReview": true,
+    "computed": {
+      "L": 1.76,
+      "C": 2.6,
+      "Lr": 2,
+      "Cr": 3,
+      "cell": 6,
+      "riskIndex": 4.58,
+      "rankLabel": "Moderate",
+      "integrity": 85
+    },
+    "scoredUnder": "2.0.0",
+    "needsReview": false,
     "legacy": {
       "scores": {
         "plug": 5,
@@ -168,7 +165,10 @@
         "data": 3
       },
       "total": 37
-    }
+    },
+    "createdAt": "2026-07-24T12:15:02.272Z",
+    "updatedAt": "2026-08-07T16:16:21.843Z",
+    "updatedBy": "Tahir Chisti"
   },
   {
     "id": "W-LX242Q",
