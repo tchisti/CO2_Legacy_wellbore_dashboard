@@ -302,9 +302,18 @@ footer{padding:18px 24px;color:var(--muted);font-size:11px;border-top:1px solid 
             </div>
           </div>
         </div>
+        <div id="bulkBar" style="display:none;margin-bottom:8px;padding:8px 12px;border:1px solid var(--line);border-radius:10px;background:var(--field);font-size:12px" class="row spread">
+          <span id="bulkCount" style="font-weight:700"></span>
+          <span class="row" style="gap:8px">
+            <button class="danger" style="padding:4px 10px;font-size:11px" onclick="deleteSelected()">Delete selected</button>
+            <button class="ghost" style="padding:4px 10px;font-size:11px" onclick="clearSelection()">Clear selection</button>
+          </span>
+        </div>
+        <div id="selBanner" style="display:none;margin-bottom:8px;padding:6px 12px;border:1px dashed var(--line);border-radius:10px;font-size:12px;color:var(--muted)"></div>
         <div style="max-height:540px;overflow:auto;border:1px solid var(--line);border-radius:10px">
           <table class="wells" id="wellsTable">
             <thead><tr>
+              <th style="width:28px"><input type="checkbox" id="selAll" title="Select all visible wells" onchange="toggleSelectAll(this.checked)"></th>
               <th>Well ID</th><th>Type</th><th>Status</th><th>Class</th><th>Age</th><th>L × C</th><th>Index</th><th>Category</th><th></th>
             </tr></thead>
             <tbody id="wellsBody"></tbody>
@@ -562,7 +571,7 @@ function applyMethodology(m, source){
 }
 
 /* ============ STATE ============ */
-let state = { wells: [], editingId: null, currentForm: defaultScores(), selected: null };
+let state = { wells: [], editingId: null, currentForm: defaultScores(), selected: null, bulkSelected: new Set() };
 
 function defaultScores(){ const o={}; PARAMS.forEach(p=>o[p.key]=null); return o; }  // new wells start Unknown
 function uid(){ return 'W-'+Math.random().toString(36).slice(2,8).toUpperCase(); }
@@ -714,6 +723,40 @@ function editWell(id){
   window.scrollTo({top:0,behavior:'smooth'});
 }
 
+/* ============ BULK SELECTION ============ */
+function visibleWells(){
+  const q = (document.getElementById('search')?.value||'').toLowerCase();
+  const reviewOnly = document.getElementById('fltReview')?.checked;
+  return state.wells.filter(w=>{
+    if(q && ![w.licence,w.operator,w.status,w.klass,w.type].join(' ').toLowerCase().includes(q)) return false;
+    if(reviewOnly && !(w.needsReview || w.scoredUnder!==METHODOLOGY.revision)) return false;
+    return true;
+  });
+}
+function pruneSelection(){
+  const ids = new Set(state.wells.map(w=>w.id));
+  for(const id of [...state.bulkSelected]) if(!ids.has(id)) state.bulkSelected.delete(id);
+}
+function toggleSelect(id, on){
+  if(on) state.bulkSelected.add(id); else state.bulkSelected.delete(id);
+  render();
+}
+function toggleSelectAll(on){
+  const vis = visibleWells();
+  if(on) vis.forEach(w=>state.bulkSelected.add(w.id));
+  else vis.forEach(w=>state.bulkSelected.delete(w.id));
+  render();
+}
+function selectEntireRegister(){
+  state.wells.forEach(w=>state.bulkSelected.add(w.id));
+  render();
+}
+function clearSelection(){
+  state.bulkSelected.clear();
+  render();
+}
+function deleteSelected(){} /* implemented in the bulk-delete task */
+
 function deleteWell(id){
   const w = state.wells.find(x=>x.id===id);
   const shared = syncToken() ? ' from the SHARED team register (for everyone)' : '';
@@ -740,16 +783,11 @@ function render(){
   document.getElementById('kReview').textContent = counts.review;
 
   // table
-  const q = (document.getElementById('search')?.value||'').toLowerCase();
-  const reviewOnly = document.getElementById('fltReview')?.checked;
+  pruneSelection();
   const tbody = document.getElementById('wellsBody'); tbody.innerHTML='';
-  const filtered = state.wells.filter(w=>{
-    if(q && ![w.licence,w.operator,w.status,w.klass,w.type].join(' ').toLowerCase().includes(q)) return false;
-    if(reviewOnly && !(w.needsReview || w.scoredUnder!==METHODOLOGY.revision)) return false;
-    return true;
-  });
+  const filtered = visibleWells();
   if(!filtered.length){
-    tbody.innerHTML = `<tr><td colspan="9" class="empty">No wells. Click "Load Demo" or add a well using the form.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10" class="empty">No wells. Click "Load Demo" or add a well using the form.</td></tr>`;
   } else {
     filtered.sort((a,b)=>ci(b).riskIndex-ci(a).riskIndex).forEach(w=>{
       const t = rankOf(w);
@@ -757,6 +795,7 @@ function render(){
       const tr = document.createElement('tr');
       const reviewBadge = (w.needsReview || w.scoredUnder !== METHODOLOGY.revision) ? '<span class="tag" style="background:#3a2f12;color:#f0c96b;margin-left:4px" title="Scored under rev '+escapeHtml(w.scoredUnder||'?')+' — current '+METHODOLOGY.revision+'">re-review</span>' : '';
       tr.innerHTML = `
+        <td><input type="checkbox" ${state.bulkSelected.has(w.id)?'checked':''} onclick="event.stopPropagation();toggleSelect('${w.id}', this.checked)"></td>
         <td><span class="well-id">${escapeHtml(w.licence)}</span><br><small style="color:var(--muted)">${escapeHtml(w.operator)}</small></td>
         <td>${escapeHtml(w.type)}</td>
         <td>${escapeHtml(w.status)}</td>
@@ -773,6 +812,31 @@ function render(){
       tr.addEventListener('click',()=>openDetail(w.id));
       tbody.appendChild(tr);
     });
+  }
+
+  // bulk-selection chrome
+  const selAll = document.getElementById('selAll');
+  const visSelected = filtered.filter(w=>state.bulkSelected.has(w.id)).length;
+  if(selAll){
+    selAll.checked = filtered.length>0 && visSelected===filtered.length;
+    selAll.indeterminate = visSelected>0 && visSelected<filtered.length;
+  }
+  const bar = document.getElementById('bulkBar');
+  if(bar){
+    bar.style.display = state.bulkSelected.size ? 'flex' : 'none';
+    document.getElementById('bulkCount').textContent = `${state.bulkSelected.size} selected`;
+  }
+  const banner = document.getElementById('selBanner');
+  if(banner){
+    const total = state.wells.length;
+    const hidden = total - filtered.length;
+    if(hidden>0 && state.bulkSelected.size===total && total>0){
+      banner.style.display='block';
+      banner.innerHTML = `All ${total} wells selected — <a href="#" onclick="event.preventDefault();clearSelection()">Clear selection</a>`;
+    } else if(hidden>0 && filtered.length>0 && visSelected===filtered.length){
+      banner.style.display='block';
+      banner.innerHTML = `All ${filtered.length} filtered wells selected — <a href="#" onclick="event.preventDefault();selectEntireRegister()">Select all ${total} wells in register</a>`;
+    } else banner.style.display='none';
   }
 
   // top list
