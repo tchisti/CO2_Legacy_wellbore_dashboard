@@ -669,7 +669,8 @@ function readForm(){
     updatedBy: syncName() || prev?.updatedBy || '',
   };
   const t = document.getElementById('f_recAction').value.trim();
-  w.recActionOverride = (t && t !== recPlainText(w).trim()) ? t : '';
+  const wasPrefillEngine = prev && !prev.recActionOverride && t === recPlainText(prev).trim();
+  w.recActionOverride = (t && !wasPrefillEngine && t !== recPlainText(w).trim()) ? t : '';
   return w;
 }
 
@@ -1181,6 +1182,7 @@ function mapFrom3D(r, prev){
     scoredUnder: native ? (r.scoredUnder || METHODOLOGY.revision) : METHODOLOGY.revision,
     needsReview: !native || derivedAny,          // native pushes are already scored on the same rulebook, unless some params are machine-derived
     legacy: prev?.legacy,
+    recActionOverride: prev?.recActionOverride || '',
     createdAt: prev?.createdAt || now, updatedAt: now,
     updatedBy: (syncName() ? syncName() + ' ' : '') + '(3D Reviewer)',
   };
