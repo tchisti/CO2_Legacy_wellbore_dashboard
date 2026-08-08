@@ -165,4 +165,14 @@ ok('all-kinds-with-null fixture never throws', W.renderWellboreSVG({
 // --- fix round: labels must be escaped exactly once (Finding 2) ---
 ok('no double escaping', W.renderWellboreSVG({td:1000, formations:[{name:"Driller's Nisku & Wabamun", top_m:500}]}, {unit:'m'}).includes('Driller&#39;s Nisku &amp; Wabamun') === true && !W.renderWellboreSVG({td:1000, formations:[{name:"Driller's Nisku & Wabamun", top_m:500}]}, {unit:'m'}).includes('&amp;amp;'));
 
+// --- task-5 review fix round: canonical field names must survive parsing ---
+// The schema field is `n` (renderer reads p.n; the rows editor's data-wb
+// key is 'n') — a plug header's number must land there as a Number, not as
+// a stray `.num` string.
+ok('plug header number lands in n as number', W.parseIntervalsText('Plug #3 100–200 m').plugs[0].n === 3);
+// A casing's `type` (surface/intermediate/production/conductor) must come
+// through parseCasingText — the rows editor round-trip depends on the
+// parser actually emitting it (task-5-report Finding 1's parser-side half).
+ok('parsed casing keeps type', W.parseCasingText('9-5/8" surface casing @ 610 m').casings[0].type === 'surface');
+
 process.exit(failures ? 1 : 0);

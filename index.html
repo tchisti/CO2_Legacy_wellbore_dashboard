@@ -706,7 +706,13 @@ function parseIntervalsText(text, defaultUnit = 'm') {
           if (kind) plug.kind = kind;
           if (sacks !== undefined) plug.sacks = sacks;
           if (additives) plug.additives = additives;
-          if (lastPlugHeader) plug.num = lastPlugHeader.num;
+          // Plug number: prefer a header on THIS line (e.g. "Plug #3 100–200 m",
+          // where the guard above deliberately left lastPlugHeader stale/unset
+          // so it can't leak into a later block) and fall back to a header that
+          // was on its own preceding line (the multi-line "Plug #1\n1463–1448 m"
+          // pattern, where lastPlugHeader carries it forward).
+          const plugNum = hdrMatch ? hdrMatch[1] : (lastPlugHeader ? lastPlugHeader.num : undefined);
+          if (plugNum !== undefined) plug.n = Number(plugNum);
           out.plugs.push(plug);
           lastPlug = plug;
         } else {
@@ -1705,16 +1711,35 @@ const WB_LIST_DEFS = {
 };
 
 // Fields present in the §2 shape that this rows editor has no per-row UI
-// for (top-level `notes`, `openHole`). Stashed on load and passed through
-// unchanged on read so an untouched round-trip (editWell → save) never
-// silently drops data the editor doesn't expose — same reasoning as
-// `legacy: prev?.legacy` in readForm().
-let wbEditorExtra = { notes: undefined, openHole: undefined };
+// for. Two kinds, both stashed on load and merged back in on read so an
+// untouched round-trip (editWell → save) never silently drops data the
+// editor doesn't expose — same reasoning as `legacy: prev?.legacy` in
+// readForm():
+//   - top-level `notes` / `openHole` (no editor section at all — passed
+//     through wholesale, unconditionally, since nothing can edit them).
+//   - `rows[listKey][origIndex]` — the ORIGINAL row object for every row
+//     loaded from `wb[listKey]`, keyed by its position in that array at
+//     load time. A row's fields the editor DOESN'T recognize (e.g. a
+//     casing's `type`, set by parseCasingText/mapFrom3D but not exposed
+//     as an input here) are copied from this stash on read; fields the
+//     editor DOES recognize always come from the live DOM input instead,
+//     so clearing a known field in the UI still actually clears it.
+//     Rows the user adds via "+ Add …" carry no stash entry (start blank).
+//     Rows the user removes are simply absent from the DOM at read time,
+//     so their stash entry is never consulted — no separate bookkeeping
+//     needed for deletion. Each rendered row is stamped
+//     data-wb-orig-index="<i>" at load time so a mid-list removal/add
+//     never misaligns which stash entry a surviving row maps to.
+let wbEditorExtra = { notes: undefined, openHole: undefined, rows: {} };
 
 // Builds one repeatable row: one input/select per field (data-wb="<key>"),
 // ending in a ✕ remove button. Values come from teammate-synced well data
 // (bridge/parse/manual), so every value="..." attribute is escaped.
-function wbRowHtml(fields, data) {
+// `origIndex` (present only for rows rendered straight from loaded data,
+// never for a fresh "+ Add …" row) stamps data-wb-orig-index so
+// wbEditorReadRows can find this row's unknown-field stash back in
+// wbEditorExtra.rows[listKey].
+function wbRowHtml(fields, data, origIndex) {
   data = data || {};
   const cells = fields.map(f => {
     const raw = data[f.key];
@@ -1730,13 +1755,15 @@ function wbRowHtml(fields, data) {
     const typeAttr = f.numeric ? ' type="number" step="0.1"' : '';
     return `<input${typeAttr} data-wb="${escapeHtml(f.key)}" placeholder="${escapeHtml(f.label)}" title="${escapeHtml(f.label)}" value="${val}"/>`;
   }).join('');
-  return `<div class="wb-erow" data-wb-row style="display:grid;grid-template-columns:repeat(${fields.length},1fr) 26px;gap:6px;margin-bottom:6px;align-items:center">${cells}<button type="button" class="ghost" onclick="wbRemoveRow(this)" title="Remove row" style="padding:4px 6px;font-size:11px;margin:0">✕</button></div>`;
+  const idxAttr = (origIndex === undefined || origIndex === null) ? '' : ` data-wb-orig-index="${origIndex}"`;
+  return `<div class="wb-erow" data-wb-row${idxAttr} style="display:grid;grid-template-columns:repeat(${fields.length},1fr) 26px;gap:6px;margin-bottom:6px;align-items:center">${cells}<button type="button" class="ghost" onclick="wbRemoveRow(this)" title="Remove row" style="padding:4px 6px;font-size:11px;margin:0">✕</button></div>`;
 }
 
 function wbAddRow(key) {
   const def = WB_LIST_DEFS[key];
   const container = document.getElementById('wbRows_' + key);
   if (!def || !container) return;
+  // No origIndex: a user-added row starts with no unknown-field stash.
   container.insertAdjacentHTML('beforeend', wbRowHtml(def.fields, {}));
 }
 
@@ -1767,6 +1794,7 @@ function wbEditorLoad(wb) {
   wbEditorExtra = {
     notes: Array.isArray(wb.notes) ? wb.notes : undefined,
     openHole: (wb.openHole && typeof wb.openHole === 'object') ? wb.openHole : undefined,
+    rows: {},
   };
   // Setting innerHTML/value attributes below never fires 'input', so this
   // load never itself flips the source — only a subsequent keystroke does.
@@ -1776,7 +1804,8 @@ function wbEditorLoad(wb) {
   const blocks = Object.keys(WB_LIST_DEFS).map(key => {
     const def = WB_LIST_DEFS[key];
     const rows = Array.isArray(wb[key]) ? wb[key] : [];
-    const rowsHtml = rows.map(r => wbRowHtml(def.fields, r || {})).join('');
+    wbEditorExtra.rows[key] = rows; // stash originals for unknown-field passthrough on read
+    const rowsHtml = rows.map((r, i) => wbRowHtml(def.fields, r || {}, i)).join('');
     return `<div style="margin-top:12px">
       <div style="font-weight:700;font-size:12px;margin-bottom:4px">${escapeHtml(def.title)}</div>
       <div id="wbRows_${key}">${rowsHtml}</div>
@@ -1796,12 +1825,25 @@ function wbEditorLoad(wb) {
 // Reads every row currently under #wbRows_<key> into plain objects, keyed
 // generically off each input/select's data-wb attribute — no per-list
 // special-casing needed here; drop/swap rules are applied by the caller.
+// Fields the editor doesn't recognize are seeded from the row's stashed
+// original (matched via data-wb-orig-index, so add/remove elsewhere in the
+// list can never misalign the merge) BEFORE the known fields are applied
+// from the live DOM — so an editor-recognized field always reflects what's
+// on screen (including an intentional clear-to-blank), while an
+// editor-unrecognized field (e.g. a casing's `type`) survives untouched.
 function wbEditorReadRows(key) {
   const def = WB_LIST_DEFS[key];
+  const knownKeys = new Set(def.fields.map(f => f.key));
+  const stash = (wbEditorExtra.rows && wbEditorExtra.rows[key]) || [];
   const container = document.getElementById('wbRows_' + key);
   const rowEls = container ? [...container.querySelectorAll('[data-wb-row]')] : [];
   return rowEls.map(row => {
     const obj = {};
+    const origIdxAttr = row.getAttribute('data-wb-orig-index');
+    const orig = origIdxAttr !== null ? stash[+origIdxAttr] : undefined;
+    if (orig && typeof orig === 'object') {
+      Object.keys(orig).forEach(k => { if (!knownKeys.has(k)) obj[k] = orig[k]; });
+    }
     def.fields.forEach(f => {
       const input = row.querySelector(`[data-wb="${f.key}"]`);
       if (!input) return;
