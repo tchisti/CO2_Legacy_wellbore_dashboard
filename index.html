@@ -1288,6 +1288,10 @@ function wellboreFrom3D(r) {
     notes: []
   };
 
+  // Track deepest shoe across all casings and open-hole signal (Finding 1)
+  let deepestShoe = 0;
+  let openHoleSignal = false;
+
   // Surface casing from surfaceCasingDepth
   if (typeof r.surfaceCasingDepth === 'number' && r.surfaceCasingDepth > 0) {
     wb.casings.push({
@@ -1295,60 +1299,79 @@ function wellboreFrom3D(r) {
       top_m: 0,
       shoe_m: r.surfaceCasingDepth
     });
+    deepestShoe = Math.max(deepestShoe, r.surfaceCasingDepth);
   }
 
-  // Parse production and intermediate casings, capture open-hole signal and notes
-  let deepestShoe = null;
+  // Parse production casing
   if (r.productionCasing) {
     const pc = parseCasingText(r.productionCasing);
     wb.casings.push(...pc.casings);
     if (pc.openHole) {
-      wb.openHole = pc.openHole;
+      openHoleSignal = true;
     }
     // Convert casing notes from strings to {depth_m: null, text} format
     pc.notes.forEach(note => {
       wb.notes.push({ depth_m: null, text: note });
     });
-    // Track deepest casing shoe for TOC application
+    // Track deepest casing shoe (Finding 1 — use ALL casings)
     if (pc.casings.length > 0) {
-      deepestShoe = Math.max(...pc.casings.map(c => c.shoe_m || 0));
+      deepestShoe = Math.max(deepestShoe, ...pc.casings.map(c => c.shoe_m || 0));
     }
+    // Fold warnings into notes (Finding 2)
+    pc.warnings.forEach(warning => {
+      wb.notes.push({ depth_m: null, text: '[bridge] ' + warning });
+    });
   }
+
+  // Parse intermediate casing (Finding 1 — read ic.openHole too)
   if (r.intermediateCasing) {
     const ic = parseCasingText(r.intermediateCasing);
     wb.casings.push(...ic.casings);
+    if (ic.openHole) {
+      openHoleSignal = true;
+    }
     ic.notes.forEach(note => {
       wb.notes.push({ depth_m: null, text: note });
     });
     if (ic.casings.length > 0) {
-      deepestShoe = Math.max(deepestShoe || 0, ...ic.casings.map(c => c.shoe_m || 0));
+      deepestShoe = Math.max(deepestShoe, ...ic.casings.map(c => c.shoe_m || 0));
+    }
+    // Fold warnings into notes (Finding 2)
+    ic.warnings.forEach(warning => {
+      wb.notes.push({ depth_m: null, text: '[bridge] ' + warning });
+    });
+  }
+
+  // CONCRETIZE openHole when it's empty {} but we have open-hole signal (Finding 1)
+  if (openHoleSignal) {
+    // top_m = deepest shoe across ALL casings (else 0), bottom_m = td
+    // Only set if top < td
+    if (deepestShoe < td) {
+      wb.openHole = { top_m: deepestShoe, bottom_m: td };
     }
   }
 
-  // CONCRETIZE openHole when it's empty {} but we have surface casing depth and td
-  if (wb.openHole && Object.keys(wb.openHole).length === 0) {
-    // Find surface casing shoe (prefer highest surface casing)
-    const surfaceShoes = wb.casings
-      .filter(c => c.type === 'surface')
-      .map(c => c.shoe_m);
-    const topDepth = surfaceShoes.length > 0 ? Math.max(...surfaceShoes) : 0;
-    wb.openHole = { top_m: topDepth, bottom_m: td };
-  }
-
-  // Parse plugs and perforations
+  // Parse plugs and perforations (Finding 2 — fold warnings)
   if (r.plugIntervals) {
     const iv = parseIntervalsText(r.plugIntervals);
     wb.plugs.push(...iv.plugs);
     wb.perforations.push(...iv.perforations);
     // Notes are already {depth_m, text} format from parseIntervalsText
     wb.notes.push(...(iv.notes || []));
+    // Fold warnings into notes (Finding 2)
+    iv.warnings.forEach(warning => {
+      wb.notes.push({ depth_m: null, text: '[bridge] ' + warning });
+    });
   }
 
-  // Parse perforations (if separate from plugIntervals)
+  // Parse perforations (if separate from plugIntervals, Finding 2 — fold warnings)
   if (r.perfIntervals) {
     const iv = parseIntervalsText(r.perfIntervals);
     wb.perforations.push(...iv.perforations);
     wb.notes.push(...(iv.notes || []));
+    iv.warnings.forEach(warning => {
+      wb.notes.push({ depth_m: null, text: '[bridge] ' + warning });
+    });
   }
 
   // Apply cementTop to deepest casing

@@ -182,10 +182,17 @@ eq('bridge surface casing', [wb3.casings[0].top_m, wb3.casings[0].shoe_m], [0, 1
 ok('bridge open hole from text', !!wb3.openHole && wb3.openHole.bottom_m === 1447.2);
 ok('bridge formation noted (no depth)', wb3.notes.some(n => /Wabamun/.test(n.text)) && (wb3.formations||[]).length === 0);
 eq('bridge source', wb3.source, 'bridge');
+eq('bridge open hole top_m uses deepest shoe (Finding 1)', wb3.openHole.top_m, 186);
 const wb4 = W.wellboreFrom3D({ tvd: 1700, productionCasing: 'Production @ 1699.5 m', cementTop: 900, plugIntervals: 'JET 1677–1679 m (Nordegg)' });
 eq('bridge fallback tvd', wb4.td, 1700);
 eq('bridge TOC on deepest casing', wb4.casings.find(c=>c.shoe_m===1699.5).toc_m, 900);
 eq('bridge plug parsed', wb4.plugs.length, 1);
 eq('bridge no td → null', W.wellboreFrom3D({ operator:'X' }), null);
+const wb5 = W.wellboreFrom3D({ td: 1447.2, surfaceCasingDepth: 186, intermediateCasing: '7" intermediate @ 800 m', productionCasing: 'None — open hole below intermediate' });
+eq('bridge open hole from intermediate casing (Finding 1)', wb5.openHole, {top_m: 800, bottom_m: 1447.2});
+const wb6 = W.wellboreFrom3D({ td: 1000, productionCasing: 'None — open hole' });
+eq('bridge open hole with no casings uses 0 (Finding 1)', wb6.openHole.top_m, 0);
+const wb7 = W.wellboreFrom3D({ td: 1000, plugIntervals: 'garbled unparseable text' });
+ok('bridge warnings surfaced as notes with [bridge] tag (Finding 2)', wb7.notes.some(n => /\[bridge\]/.test(n.text)));
 
 process.exit(failures ? 1 : 0);
