@@ -28,11 +28,12 @@ On form save, compute `t = textarea.value.trim()`:
 - If `t === ''` OR `t === recPlainText(currentWell).trim()` ⇒ store `recActionOverride: ''` (automatic). Opening Edit and saving untouched never freezes the auto text.
 - Else ⇒ store `recActionOverride: t`.
 - The comparison uses the well AS SAVED (current form scores), so the engine text compared against is the one the prefill produced in the same session.
+- Text that matches the engine wording of the well AS PREFILLED (i.e. `prev` without its override) is also treated as automatic — this covers score edits made in the same session: if the reviewer changes a score (so the engine text for the new scores differs) but never touches the textarea, the stale prefilled text is not frozen into an override.
 
 ## 5. Dossier display
 
 In `openDetail`'s dossier template, the Recommended Action card becomes:
-- Override present: `<div class="rec-card"><h4>Recommended Action <span class="tag" ...>reviewer-edited</span></h4><div style="white-space:pre-wrap">${escapeHtml(override)}</div></div>` — the engine title/body/warn are not rendered.
+- Override present: `<div class="rec-card"><h4>Reviewer Recommendation <span class="tag" ...>reviewer-edited</span></h4><div style="white-space:pre-wrap">${escapeHtml(override)}</div></div>` — the engine title/body/warn are not rendered.
 - No override: exactly today's rendering (`rec.title`, `rec.body`, `rec.warn`).
 
 ## 6. PDF export
