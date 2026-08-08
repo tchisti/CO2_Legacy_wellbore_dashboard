@@ -115,12 +115,12 @@ Run the Global Constraints gate. Expected: `syntax OK — 2 inline script blocks
 
 ```bash
 node -e "
-function decide(raw, engine){ const t = raw.trim(); return (t && t !== engine.trim()) ? t : ''; }
-console.assert(decide('','ENGINE')==='','empty -> auto');
-console.assert(decide('   ','ENGINE')==='','blank -> auto');
-console.assert(decide('ENGINE','ENGINE')==='','unchanged -> auto');
-console.assert(decide('ENGINE\n','ENGINE')==='','trailing-ws unchanged -> auto');
-console.assert(decide('custom text','ENGINE')==='custom text','changed -> stored');
+function decide(raw, engineNew, enginePrefill, prevOverride){ const t = raw.trim(); const wasPrefillEngine = !prevOverride && t === enginePrefill.trim(); return (t && !wasPrefillEngine && t !== engineNew.trim()) ? t : ''; }
+console.assert(decide('','N','P','')==='','empty -> auto');
+console.assert(decide('N','N','P','')==='','unchanged-vs-new -> auto');
+console.assert(decide('P','N','P','')==='','stale prefill after score change -> auto');
+console.assert(decide('P','N','P','P')==='P','stored override kept on untouched save');
+console.assert(decide('custom','N','P','')==='custom','changed -> stored');
 console.log('override save rule OK');
 "
 ```
@@ -236,6 +236,7 @@ git commit -m "feat(dossier): render reviewer-edited Recommended Action in dossi
 - [ ] Download Well PDF → Recommended Action section shows "(reviewer-edited)" and the custom text
 - [ ] Edit again → textarea shows the custom text; clear it, Update Well → automatic wording + warning box return, no tag
 - [ ] Edit and save WITHOUT touching the field → dossier still automatic (no tag)
+- [ ] Edit a well, change one score so the tier changes, do NOT touch the textarea, save → dossier still automatic (no tag)
 - [ ] Reload the page → override persists on the edited well
 - [ ] A never-overridden well's dossier and PDF look exactly as before
 
