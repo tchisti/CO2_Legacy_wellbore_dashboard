@@ -1703,12 +1703,11 @@ function wbWireExportButtons(){
   pngBtn.addEventListener('click', wbExportPng);
 
   printBtn.addEventListener('click', () => {
+    const cleanup = () => document.documentElement.classList.remove('wb-printing');
+    window.addEventListener('afterprint', cleanup, { once: true });
     document.documentElement.classList.add('wb-printing');
     window.print();
-    document.documentElement.classList.remove('wb-printing');
-    window.addEventListener('afterprint', () => {
-      document.documentElement.classList.remove('wb-printing');
-    }, { once: true });
+    setTimeout(cleanup, 1000);  // fallback for browsers that never fire afterprint; runs after the blocking dialog closes
   });
 }
 
