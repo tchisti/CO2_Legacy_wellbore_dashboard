@@ -160,6 +160,7 @@ footer{padding:18px 24px;color:var(--muted);font-size:11px;border-top:1px solid 
 .modal h2{margin:0;font-size:15px;text-transform:none;color:var(--text);letter-spacing:0}
 .modal ol{margin:6px 0 0 18px;padding:0;font-size:12px;color:var(--muted);line-height:1.7}
 .modal a{color:var(--accent2)}
+@media print{body>*:not(#tab-detail){display:none!important}#tab-detail *{visibility:hidden}#wbSection,#wbSection *{visibility:visible}#wbSection{position:absolute;top:0;left:0;width:100%}}
 </style>
 </head>
 <body>
@@ -1436,6 +1437,9 @@ function wbRenderCard(){
             <button type="button" data-unit="m" class="${schemUnit==='m'?'on':''}" onclick="wbSetUnit('m')">m</button>
             <button type="button" data-unit="ft" class="${schemUnit==='ft'?'on':''}" onclick="wbSetUnit('ft')">ft</button>
           </div>
+          <button type="button" id="wbExportSvg" class="ghost">SVG</button>
+          <button type="button" id="wbExportPng" class="ghost">PNG</button>
+          <button type="button" id="wbExportPrint" class="ghost">Print</button>
         </div>
       </div>
       <div class="wb-grid">
@@ -1459,6 +1463,7 @@ function wbRenderCard(){
   `;
   wbWireSvgEvents();
   wbWireJumpInput();
+  wbWireExportButtons();
 }
 
 // Component kinds actually drawn in a rendered SVG string, in first-seen order,
@@ -1646,6 +1651,59 @@ function wbWireJumpInput(){
     document.getElementById('wbSvg').setAttribute('viewBox', st.vb.join(' '));
     jumpInput.value = '';
     jumpInput.blur();
+  });
+}
+
+function wbExportSvgText(){
+  const st = wbState; if(!st) return '';
+  const colors = getComputedStyle(document.documentElement);
+  const resolved = { line: colors.getPropertyValue('--line').trim() || '#26334a', muted: colors.getPropertyValue('--muted').trim() || '#9fb0cf', ink: colors.getPropertyValue('--ink').trim() || '#e7eefc', bg: colors.getPropertyValue('--panel').trim() || '#0e1830' };
+  return '<?xml version="1.0" encoding="UTF-8"?>\n' + Wellbore.renderWellboreSVG(st.wb, { unit: schemUnit, resolvedColors: resolved });
+}
+
+function wbExportPng(){
+  const st = wbState; if(!st) return;
+  const img = new Image();
+  img.onload = () => {
+    const c = document.createElement('canvas');
+    c.width = img.width * 2; c.height = img.height * 2;
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    const a = document.createElement('a');
+    a.href = c.toDataURL('image/png');
+    a.download = 'wellbore-' + sanitizeFilename(st.licence) + '.png';
+    a.click();
+  };
+  img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(wbExportSvgText());
+}
+
+function sanitizeFilename(str){
+  return str.replace(/[/\\:*?"<>|]/g, '-');
+}
+
+function wbWireExportButtons(){
+  const st = wbState; if(!st) return;
+  const svgBtn = document.getElementById('wbExportSvg');
+  const pngBtn = document.getElementById('wbExportPng');
+  const printBtn = document.getElementById('wbExportPrint');
+  if(!svgBtn || !pngBtn || !printBtn) return;
+
+  // Guard against re-wiring (buttons persist across re-renders)
+  if(svgBtn.dataset.wired) return;
+  svgBtn.dataset.wired = '1';
+
+  svgBtn.addEventListener('click', () => {
+    const svg = wbExportSvgText();
+    if(!svg) return;
+    const a = document.createElement('a');
+    a.href = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+    a.download = 'wellbore-' + sanitizeFilename(st.licence) + '.svg';
+    a.click();
+  });
+
+  pngBtn.addEventListener('click', wbExportPng);
+
+  printBtn.addEventListener('click', () => {
+    window.print();
   });
 }
 
