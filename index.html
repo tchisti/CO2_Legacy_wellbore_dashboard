@@ -160,7 +160,7 @@ footer{padding:18px 24px;color:var(--muted);font-size:11px;border-top:1px solid 
 .modal h2{margin:0;font-size:15px;text-transform:none;color:var(--text);letter-spacing:0}
 .modal ol{margin:6px 0 0 18px;padding:0;font-size:12px;color:var(--muted);line-height:1.7}
 .modal a{color:var(--accent2)}
-@media print{body>*:not(#tab-detail){display:none!important}#tab-detail *{visibility:hidden}#wbSection,#wbSection *{visibility:visible}#wbSection{position:absolute;top:0;left:0;width:100%}}
+@media print{html.wb-printing body>:not(.layout){display:none!important}html.wb-printing .layout>:not(main){display:none!important}html.wb-printing main>:not(#tab-detail){display:none!important}html.wb-printing #tab-detail>:not(#wbSection){display:none!important}html.wb-printing #tab-detail{display:block!important}}
 </style>
 </head>
 <body>
@@ -1657,7 +1657,7 @@ function wbWireJumpInput(){
 function wbExportSvgText(){
   const st = wbState; if(!st) return '';
   const colors = getComputedStyle(document.documentElement);
-  const resolved = { line: colors.getPropertyValue('--line').trim() || '#26334a', muted: colors.getPropertyValue('--muted').trim() || '#9fb0cf', ink: colors.getPropertyValue('--ink').trim() || '#e7eefc', bg: colors.getPropertyValue('--panel').trim() || '#0e1830' };
+  const resolved = { line: colors.getPropertyValue('--line').trim() || '#26334a', muted: colors.getPropertyValue('--muted').trim() || '#9fb0cf', ink: colors.getPropertyValue('--text').trim() || '#e7eefc' };
   return '<?xml version="1.0" encoding="UTF-8"?>\n' + Wellbore.renderWellboreSVG(st.wb, { unit: schemUnit, resolvedColors: resolved });
 }
 
@@ -1703,7 +1703,12 @@ function wbWireExportButtons(){
   pngBtn.addEventListener('click', wbExportPng);
 
   printBtn.addEventListener('click', () => {
+    document.documentElement.classList.add('wb-printing');
     window.print();
+    document.documentElement.classList.remove('wb-printing');
+    window.addEventListener('afterprint', () => {
+      document.documentElement.classList.remove('wb-printing');
+    }, { once: true });
   });
 }
 
