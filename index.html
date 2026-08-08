@@ -1270,7 +1270,106 @@ function renderWellboreSVG(wb, opts) {
   return parts.join('');
 }
 
-function wellboreFrom3D() { return null; }
+function wellboreFrom3D(r) {
+  // Return null if no positive td/tvd
+  const td = (typeof r.td === 'number' && r.td > 0) ? r.td : (typeof r.tvd === 'number' && r.tvd > 0) ? r.tvd : null;
+  if (!td) return null;
+
+  // Build wellbore object
+  const wb = {
+    td,
+    source: 'bridge',
+    casings: [],
+    openHole: null,
+    plugs: [],
+    perforations: [],
+    zones: [],
+    packers: [],
+    notes: []
+  };
+
+  // Surface casing from surfaceCasingDepth
+  if (typeof r.surfaceCasingDepth === 'number' && r.surfaceCasingDepth > 0) {
+    wb.casings.push({
+      type: 'surface',
+      top_m: 0,
+      shoe_m: r.surfaceCasingDepth
+    });
+  }
+
+  // Parse production and intermediate casings, capture open-hole signal and notes
+  let deepestShoe = null;
+  if (r.productionCasing) {
+    const pc = parseCasingText(r.productionCasing);
+    wb.casings.push(...pc.casings);
+    if (pc.openHole) {
+      wb.openHole = pc.openHole;
+    }
+    // Convert casing notes from strings to {depth_m: null, text} format
+    pc.notes.forEach(note => {
+      wb.notes.push({ depth_m: null, text: note });
+    });
+    // Track deepest casing shoe for TOC application
+    if (pc.casings.length > 0) {
+      deepestShoe = Math.max(...pc.casings.map(c => c.shoe_m || 0));
+    }
+  }
+  if (r.intermediateCasing) {
+    const ic = parseCasingText(r.intermediateCasing);
+    wb.casings.push(...ic.casings);
+    ic.notes.forEach(note => {
+      wb.notes.push({ depth_m: null, text: note });
+    });
+    if (ic.casings.length > 0) {
+      deepestShoe = Math.max(deepestShoe || 0, ...ic.casings.map(c => c.shoe_m || 0));
+    }
+  }
+
+  // CONCRETIZE openHole when it's empty {} but we have surface casing depth and td
+  if (wb.openHole && Object.keys(wb.openHole).length === 0) {
+    // Find surface casing shoe (prefer highest surface casing)
+    const surfaceShoes = wb.casings
+      .filter(c => c.type === 'surface')
+      .map(c => c.shoe_m);
+    const topDepth = surfaceShoes.length > 0 ? Math.max(...surfaceShoes) : 0;
+    wb.openHole = { top_m: topDepth, bottom_m: td };
+  }
+
+  // Parse plugs and perforations
+  if (r.plugIntervals) {
+    const iv = parseIntervalsText(r.plugIntervals);
+    wb.plugs.push(...iv.plugs);
+    wb.perforations.push(...iv.perforations);
+    // Notes are already {depth_m, text} format from parseIntervalsText
+    wb.notes.push(...(iv.notes || []));
+  }
+
+  // Parse perforations (if separate from plugIntervals)
+  if (r.perfIntervals) {
+    const iv = parseIntervalsText(r.perfIntervals);
+    wb.perforations.push(...iv.perforations);
+    wb.notes.push(...(iv.notes || []));
+  }
+
+  // Apply cementTop to deepest casing
+  if (typeof r.cementTop === 'number' && r.cementTop >= 0 && wb.casings.length > 0) {
+    // Find the deepest casing (highest shoe_m)
+    let deepestCasing = wb.casings[0];
+    for (const c of wb.casings) {
+      if ((c.shoe_m || 0) > (deepestCasing.shoe_m || 0)) {
+        deepestCasing = c;
+      }
+    }
+    deepestCasing.toc_m = r.cementTop;
+  }
+
+  // Formation as note (not a formation object)
+  if (r.formationPenetrated) {
+    wb.notes.push({ depth_m: null, text: r.formationPenetrated });
+  }
+
+  return wb;
+}
 
 globalThis.Wellbore = { mToFt, ftToM, parseDepth, parseIntervalsText, parseCasingText, parseWellboreReport, wellboreStats, depthScale, renderWellboreSVG, wellboreFrom3D };
 /* ===== WELLBORE PURE END ===== */
@@ -2600,6 +2699,7 @@ function mapFrom3D(r, prev){
     scoredUnder: native ? (r.scoredUnder || METHODOLOGY.revision) : METHODOLOGY.revision,
     needsReview: !native || derivedAny,          // native pushes are already scored on the same rulebook, unless some params are machine-derived
     legacy: prev?.legacy,
+    wellbore: (prev?.wellbore && prev.wellbore.source !== 'bridge') ? prev.wellbore : (Wellbore.wellboreFrom3D(r) || prev?.wellbore),
     createdAt: prev?.createdAt || now, updatedAt: now,
     updatedBy: (syncName() ? syncName() + ' ' : '') + '(3D Reviewer)',
   };

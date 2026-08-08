@@ -175,4 +175,17 @@ ok('plug header number lands in n as number', W.parseIntervalsText('Plug #3 100�
 // parser actually emitting it (task-5-report Finding 1's parser-side half).
 ok('parsed casing keeps type', W.parseCasingText('9-5/8" surface casing @ 610 m').casings[0].type === 'surface');
 
+// bridge enrichment
+const wb3 = W.wellboreFrom3D({ td: 1447.2, surfaceCasingDepth: 186, productionCasing: 'None — open hole below surface casing', cementTop: null, plugIntervals: 'No plug records on file', perfIntervals: '', formationPenetrated: 'Wabamun' });
+eq('bridge td', wb3.td, 1447.2);
+eq('bridge surface casing', [wb3.casings[0].top_m, wb3.casings[0].shoe_m], [0, 186]);
+ok('bridge open hole from text', !!wb3.openHole && wb3.openHole.bottom_m === 1447.2);
+ok('bridge formation noted (no depth)', wb3.notes.some(n => /Wabamun/.test(n.text)) && (wb3.formations||[]).length === 0);
+eq('bridge source', wb3.source, 'bridge');
+const wb4 = W.wellboreFrom3D({ tvd: 1700, productionCasing: 'Production @ 1699.5 m', cementTop: 900, plugIntervals: 'JET 1677–1679 m (Nordegg)' });
+eq('bridge fallback tvd', wb4.td, 1700);
+eq('bridge TOC on deepest casing', wb4.casings.find(c=>c.shoe_m===1699.5).toc_m, 900);
+eq('bridge plug parsed', wb4.plugs.length, 1);
+eq('bridge no td → null', W.wellboreFrom3D({ operator:'X' }), null);
+
 process.exit(failures ? 1 : 0);
