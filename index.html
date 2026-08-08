@@ -66,6 +66,21 @@ button.ghost{background:transparent}
 
 .grid2{display:grid;grid-template-columns:1.2fr .8fr;gap:16px}
 @media (max-width:1300px){.grid2{grid-template-columns:1fr}}
+
+.wb-grid{display:grid;grid-template-columns:1.4fr .6fr;gap:16px}
+@media (max-width:900px){.wb-grid{grid-template-columns:1fr}}
+.wb-legend div{display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;border-radius:6px}
+.wb-legend .sw{width:14px;height:14px;border-radius:3px;flex:none}
+#wbSvg{width:100%;height:auto;display:block;touch-action:none;outline:none}
+#wbSvg:focus{outline:2px solid var(--accent, #3aa0ff);outline-offset:2px}
+.wb-legend .sw{border:1px solid rgba(255,255,255,.18)}
+.wb-legend div:hover,.wb-legend div.on{background:var(--field)}
+.wb-toolbar{display:flex;align-items:center;gap:8px}
+.wb-unit-toggle{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.wb-unit-toggle button{border:none;border-radius:0;padding:5px 12px;font-size:11px;background:var(--field);color:var(--muted);margin:0}
+.wb-unit-toggle button:hover{transform:none;border-color:transparent}
+.wb-unit-toggle button.on{background:var(--accent);color:#04101f;font-weight:700}
+#tooltip{position:fixed;z-index:200;pointer-events:none;display:none;background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:6px 10px;font-size:12px;color:var(--text);box-shadow:var(--shadow);max-width:320px;line-height:1.4}
 .matrix{display:grid;grid-template-columns:64px repeat(5,1fr);grid-template-rows:36px repeat(5,46px);gap:4px}
 .cell{display:grid;place-items:center;border-radius:6px;font-weight:700;font-size:12px;color:#0b1220;position:relative;cursor:default}
 .cell.lbl{background:transparent;color:var(--muted);font-weight:600;font-size:11px}
@@ -145,6 +160,7 @@ footer{padding:18px 24px;color:var(--muted);font-size:11px;border-top:1px solid 
 .modal h2{margin:0;font-size:15px;text-transform:none;color:var(--text);letter-spacing:0}
 .modal ol{margin:6px 0 0 18px;padding:0;font-size:12px;color:var(--muted);line-height:1.7}
 .modal a{color:var(--accent2)}
+@media print{html.wb-printing body>:not(.layout){display:none!important}html.wb-printing .layout>:not(main){display:none!important}html.wb-printing main>:not(#tab-detail){display:none!important}html.wb-printing #tab-detail>:not(#detailPanel){display:none!important}html.wb-printing #detailPanel>:not(#wbSection){display:none!important}html.wb-printing #tab-detail{display:block!important}}
 </style>
 </head>
 <body>
@@ -238,6 +254,12 @@ footer{padding:18px 24px;color:var(--muted);font-size:11px;border-top:1px solid 
         <div><label>Reviewer (optional)</label><input id="f_reviewer" placeholder="e.g. T. Khan"/></div>
         <div style="grid-column:1/-1"><label>Notes / Justification (optional)</label><textarea id="f_notes" rows="2" placeholder="Field observations, surface conditions, regulatory file numbers, references…"></textarea></div>
         <div style="grid-column:1/-1"><label>Recommended Action (§ 8) — reviewer override</label><textarea id="f_recAction" rows="4" placeholder="Prefilled with the automatic recommendation when editing — change the wording to override it."></textarea><small style="display:block;margin-top:2px;color:var(--muted)">Leave empty to restore the automatic recommendation.</small></div>
+        <div style="grid-column:1/-1"><details id="wbEditorWrap"><summary style="cursor:pointer;font-weight:700">Wellbore Construction (schematic)</summary>
+          <div id="wbEditor" style="margin-top:8px"></div>
+          <label style="margin-top:10px">Paste abandonment report…</label>
+          <textarea id="wbPaste" rows="4" placeholder="Plug #1  3658–3277 ft  170 sacks cement  2% CaCl2 …"></textarea>
+          <div class="row" style="gap:8px;margin-top:6px"><button type="button" class="ghost" onclick="wbParsePaste()">Parse into rows</button><span id="wbParseWarn" style="font-size:11px;color:var(--muted)"></span></div>
+        </details></div>
       </div>
 
       <div class="divider"></div>
@@ -524,8 +546,1611 @@ footer{padding:18px 24px;color:var(--muted);font-size:11px;border-top:1px solid 
   Arbad et al., IJGGC vol. 133 (2024).
 </footer>
 
+<div id="tooltip"></div>
+
 <script src="scoring.js"></script>
 <script>
+/* ===== WELLBORE PURE BEGIN ===== */
+/* Pure, DOM-free core for the wellbore schematic feature: unit conversions,
+   free-text depth/interval/casing/report parsers, aggregate stats, and the
+   linear depth-scale helper used by the SVG renderer (Task 2+). Nothing in
+   this section reads `document` or `window` — see spec §2/§4/§5. */
+
+const mToFt = m => m / 0.3048;
+const ftToM = ft => ft * 0.3048;
+
+/* parseDepth: accepts "1463", "1,463.5", "3219 ft", "850 m"; bare numbers
+   use defaultUnit. Returns metres rounded to 0.1, or null if unparseable. */
+function parseDepth(str, defaultUnit = 'm') {
+  if (str === null || str === undefined) return null;
+  const s = String(str).trim();
+  if (!s) return null;
+  const m = s.match(/^(-?[\d,]+(?:\.\d+)?)\s*(m|ft)?\b/i);
+  if (!m) return null;
+  const num = parseFloat(m[1].replace(/,/g, ''));
+  if (!Number.isFinite(num)) return null;
+  const unit = (m[2] || defaultUnit).toLowerCase();
+  const metres = unit === 'ft' ? ftToM(num) : num;
+  return +metres.toFixed(1);
+}
+
+/* ---- interval text parsing (plugs / perforations / notes / warnings) ---- */
+
+const DASH = '[–—-]'; // en dash, em dash, hyphen
+const NUM = '[\\d,]+(?:\\.\\d+)?';
+
+function toNum(numStr) {
+  return parseFloat(String(numStr).replace(/,/g, ''));
+}
+
+// Convert a raw number (already parsed as a float, in defaultUnit) to metres.
+function numToM(n, defaultUnit) {
+  return +(defaultUnit === 'ft' ? ftToM(n) : n).toFixed(1);
+}
+
+function parseIntervalsText(text, defaultUnit = 'm') {
+  const out = { plugs: [], perforations: [], notes: [], warnings: [] };
+  if (!text || !String(text).trim()) return out;
+
+  // Split into candidate clauses on line breaks and `;`.
+  const rawLines = String(text).split(/\n|;/).map(l => l.trim()).filter(Boolean);
+
+  let lastPlugHeader = null; // { num }
+  let lastPlug = null; // most recently pushed plug object — continuation
+                        // lines (sacks/additives/kind with no depth of
+                        // their own) attach to this (spec §4, Finding 3).
+
+  for (const line of rawLines) {
+    const lower = line.toLowerCase();
+
+    // "No plug records on file" / similar negative statements → warning only.
+    if (/^no\s+.*(records?|plugs?)\b/i.test(line) || /no plug records/i.test(line)) {
+      out.warnings.push(`No records: "${line}"`);
+      continue;
+    }
+
+    // Detect explicit unit override on the line ("... ft" / "... m") used
+    // as a fallback default for bare numbers found on this line — but a
+    // number carrying its OWN unit suffix (checked per-number in the range
+    // regex below) always wins over this line-level fallback (Finding 4).
+    let lineUnit = defaultUnit;
+    if (/\bft\b/i.test(line) && !/\bm\b(?!m)/i.test(line)) lineUnit = 'ft';
+    else if (/\bm\b(?!m)/i.test(line) && !/\bft\b/i.test(line)) lineUnit = 'm';
+
+    // Plug header e.g. "Plug #1" — starts a fresh block; the plug it
+    // eventually produces (from a later/trailing range) becomes the new
+    // `lastPlug` continuation target, not whatever plug preceded it.
+    const hdrMatch = line.match(/plug\s*#?\s*(\d+)/i);
+    if (hdrMatch && !new RegExp(`${NUM}\\s*${DASH}\\s*${NUM}`).test(line)) {
+      lastPlugHeader = { num: hdrMatch[1] };
+      lastPlug = null;
+    }
+
+    // Formation names in trailing (...) become notes.
+    const parenMatches = [...line.matchAll(/\(([^)]+)\)/g)];
+
+    // Find interval range(s): "<num>[unit] - <num>[unit]" possibly followed
+    // by "and <num>[unit]". Each side's unit is captured independently so a
+    // mixed-unit range (rare, but possible in free text) never silently
+    // borrows the wrong side's unit — only a number with NO unit of its own
+    // falls back to lineUnit (Finding 4).
+    const rangeRe = new RegExp(`(${NUM})(?:\\s*(m|ft)\\b)?\\s*${DASH}\\s*(${NUM})(?:\\s*(m|ft)\\b)?`, 'gi');
+    const ranges = [...line.matchAll(rangeRe)];
+
+    // "and <num>" continuation — treated as an additional single-depth entry
+    // (e.g. "squeezed 831.7–839.7 and 871.5 m") sharing the same status.
+    const andMatches = [...line.matchAll(new RegExp(`\\band\\s+(${NUM})\\s*(m|ft)?\\b`, 'gi'))];
+
+    const isPerf = /perf|squeez/i.test(line);
+    const isPlugKindLine = /jet|treatment|plug|cibp|bridge/i.test(line);
+
+    // sacks
+    const sacksMatch = line.match(/(\d+)\s*sacks?/i);
+    const sacks = sacksMatch ? parseInt(sacksMatch[1], 10) : undefined;
+
+    // additives, e.g. "2% CaCl2"
+    const addMatch = line.match(/(\d+(?:\.\d+)?%\s*[A-Za-z0-9]+(?:\s+cement)?)/i) || line.match(/(cement[^,.;]*)/i);
+    const additives = addMatch ? addMatch[1].trim() : undefined;
+
+    // status: squeezed
+    const status = /squeez/i.test(line) ? 'squeezed' : undefined;
+
+    // kind: cibp / bridge
+    let kind;
+    if (/cibp/i.test(line)) kind = 'cibp';
+    else if (/bridge/i.test(line)) kind = 'bridge';
+
+    const entries = [];
+
+    if (ranges.length) {
+      for (const r of ranges) {
+        const topUnit = (r[2] || lineUnit).toLowerCase();
+        const bottomUnit = (r[4] || lineUnit).toLowerCase();
+        let a = numToM(toNum(r[1]), topUnit);
+        let b = numToM(toNum(r[3]), bottomUnit);
+        const top_m = Math.min(a, b);
+        const bottom_m = Math.max(a, b);
+        entries.push({ top_m, bottom_m });
+      }
+    }
+
+    if (andMatches.length) {
+      for (const a of andMatches) {
+        const unit = (a[2] || lineUnit).toLowerCase();
+        const d = numToM(toNum(a[1]), unit);
+        entries.push({ top_m: d, bottom_m: d });
+      }
+    }
+
+    // Single depth like "CIBP at 1200 m" or "felt plug at 3219 ft"
+    if (!entries.length) {
+      const atMatch = line.match(new RegExp(`(?:at|@)\\s*(${NUM})\\s*(m|ft)?`, 'i'));
+      if (atMatch) {
+        const unit = (atMatch[2] || lineUnit).toLowerCase();
+        const d = numToM(toNum(atMatch[1]), unit);
+        entries.push({ top_m: d, bottom_m: d });
+      }
+    }
+
+    // "felt plug" note (may or may not carry its own depth already captured above)
+    if (/felt plug/i.test(line)) {
+      const atMatch = line.match(new RegExp(`felt plug\\s*(?:at|@)?\\s*(${NUM})?\\s*(m|ft)?`, 'i'));
+      const depth = atMatch && atMatch[1] ? numToM(toNum(atMatch[1]), (atMatch[2] || lineUnit).toLowerCase()) : (entries[0] ? entries[0].top_m : null);
+      out.notes.push({ depth_m: depth, text: `Felt plug noted: "${line}"` });
+    }
+
+    if (entries.length) {
+      for (const e of entries) {
+        if (isPerf) {
+          out.perforations.push({ top_m: e.top_m, bottom_m: e.bottom_m, ...(status ? { status } : {}) });
+        } else if (isPlugKindLine || lastPlugHeader) {
+          const plug = { top_m: e.top_m, bottom_m: e.bottom_m };
+          if (kind) plug.kind = kind;
+          if (sacks !== undefined) plug.sacks = sacks;
+          if (additives) plug.additives = additives;
+          // Plug number: prefer a header on THIS line (e.g. "Plug #3 100–200 m",
+          // where the guard above deliberately left lastPlugHeader stale/unset
+          // so it can't leak into a later block) and fall back to a header that
+          // was on its own preceding line (the multi-line "Plug #1\n1463–1448 m"
+          // pattern, where lastPlugHeader carries it forward).
+          const plugNum = hdrMatch ? hdrMatch[1] : (lastPlugHeader ? lastPlugHeader.num : undefined);
+          if (plugNum !== undefined) plug.n = Number(plugNum);
+          out.plugs.push(plug);
+          lastPlug = plug;
+        } else {
+          // Unclassified interval — keep as a note so nothing is silently dropped.
+          out.notes.push({ depth_m: e.top_m, text: `Interval noted: "${line}"` });
+        }
+      }
+    } else if (!/felt plug/i.test(line)) {
+      // No depth on this line. Within a Plug #N block, a continuation line
+      // that carries sacks/additive/kind metadata but no depth of its own
+      // (e.g. a "25 sacks" or "2% CaCl2" line following the depth range)
+      // attaches to the most recently opened plug rather than being
+      // reported as unparsed (spec §4 multi-line plug records, Finding 3).
+      const isContinuation = !hdrMatch && lastPlug && (sacks !== undefined || additives || kind);
+      if (isContinuation) {
+        if (sacks !== undefined && lastPlug.sacks === undefined) lastPlug.sacks = sacks;
+        if (additives) lastPlug.additives = lastPlug.additives ? `${lastPlug.additives}; ${additives}` : additives;
+        if (kind && !lastPlug.kind) lastPlug.kind = kind;
+      } else if (!hdrMatch) {
+        // No depth found on a non-empty, non-header, non-continuation line → warning.
+        out.warnings.push(`Unparsed interval line: "${line}"`);
+      }
+    }
+
+    for (const pm of parenMatches) {
+      out.notes.push({ depth_m: entries[0] ? entries[0].top_m : null, text: `Formation: ${pm[1].trim()}` });
+    }
+  }
+
+  return out;
+}
+
+/* ---- casing text parsing ---- */
+
+function parseCasingText(text) {
+  const out = { casings: [], openHole: null, notes: [], warnings: [] };
+  if (!text || !String(text).trim()) return out;
+
+  const rawLines = String(text).split(/\n|;/).map(l => l.trim()).filter(Boolean);
+
+  for (const line of rawLines) {
+    if (/none\s*[—–-]?\s*open hole/i.test(line) || /open hole below/i.test(line)) {
+      out.notes.push(`Open hole: "${line}"`);
+      // Structured signal (not just prose in `notes`): {} means "open hole
+      // below the last casing, depths unknown" so a downstream bridge
+      // builder (Task 6) can detect it without re-parsing text (Finding 2).
+      out.openHole = {};
+      continue;
+    }
+
+    // OD in inches, e.g. 8⅝", 8-5/8", 8 5/8", or "8.625 in"
+    let od_mm;
+    const fracMap = { '⅛':0.125,'¼':0.25,'⅜':0.375,'½':0.5,'⅝':0.625,'¾':0.75,'⅞':0.875 };
+    let inchMatch = line.match(/(\d+)\s*[-\s]?\s*(\d+)\/(\d+)\s*"/); // 8-5/8" or 8 5/8"
+    if (inchMatch) {
+      const whole = parseInt(inchMatch[1], 10);
+      const frac = parseInt(inchMatch[2], 10) / parseInt(inchMatch[3], 10);
+      od_mm = (whole + frac) * 25.4;
+    } else {
+      const fracCharMatch = line.match(/(\d+)([⅛¼⅜½⅝¾⅞])\s*"/);
+      if (fracCharMatch) {
+        const whole = parseInt(fracCharMatch[1], 10);
+        od_mm = (whole + fracMap[fracCharMatch[2]]) * 25.4;
+      } else {
+        const decInMatch = line.match(/(\d+(?:\.\d+)?)\s*"/);
+        if (decInMatch) {
+          od_mm = parseFloat(decInMatch[1]) * 25.4;
+        } else {
+          const mmMatch = line.match(/(\d+(?:\.\d+)?)\s*mm\b/i);
+          if (mmMatch) od_mm = parseFloat(mmMatch[1]);
+        }
+      }
+    }
+
+    // grade, e.g. J55, K55, N80
+    const gradeMatch = line.match(/\b([A-Z]\d{2,3})\b/);
+    const grade = gradeMatch ? gradeMatch[1] : undefined;
+
+    // weight, e.g. "35.7 kg/m"
+    const wtMatch = line.match(/(\d+(?:\.\d+)?)\s*kg\/m/i);
+    const weight_kgm = wtMatch ? parseFloat(wtMatch[1]) : undefined;
+
+    // shoe depth: "@ 610 m" or "@ 1699.5 m"
+    let shoe_m;
+    const shoeMatch = line.match(new RegExp(`@\\s*(${NUM})\\s*(m|ft)?`, 'i'));
+    if (shoeMatch) {
+      const unit = (shoeMatch[2] || 'm').toLowerCase();
+      shoe_m = numToM(toNum(shoeMatch[1]), unit);
+    }
+
+    // Casing keyword/signal context: OD, grade token, weight, an explicit
+    // shoe (`@`), TOC, or a casing/liner/type word. A bare "<num>–<num>"
+    // with NONE of these present is far more likely to be a plug/perf depth
+    // line that leaked into this chunk from a mixed report (Finding 1) —
+    // it must NOT be treated as casing data.
+    const hasCasingContext = od_mm !== undefined || grade !== undefined || weight_kgm !== undefined || shoe_m !== undefined ||
+      /casing|liner/i.test(line) || /\btoc\b/i.test(line) || /@/.test(line) ||
+      /surface|intermediate|production|conductor/i.test(line);
+
+    // range: "0–610 ft" — top and shoe, min/max-normalized like plugs.
+    // Negative lookahead on the second number avoids matching the fraction
+    // in an OD token like `8-5/8"`.
+    let top_m;
+    const rangeMatch = line.match(new RegExp(`(${NUM})\\s*${DASH}\\s*(${NUM})(?!\\s*/)\\s*(m|ft)?`, 'i'));
+    if (rangeMatch && hasCasingContext) {
+      const unit = (rangeMatch[3] || 'm').toLowerCase();
+      const a = numToM(toNum(rangeMatch[1]), unit);
+      const b = numToM(toNum(rangeMatch[2]), unit);
+      top_m = Math.min(a, b);
+      const bottom = Math.max(a, b);
+      if (shoe_m === undefined) shoe_m = bottom;
+    }
+
+    // TOC (top of cement)
+    let toc_m;
+    const tocMatch = line.match(new RegExp(`TOC\\s*(${NUM})\\s*(m|ft)?`, 'i'));
+    if (tocMatch) {
+      const unit = (tocMatch[2] || 'm').toLowerCase();
+      toc_m = numToM(toNum(tocMatch[1]), unit);
+    }
+
+    // casing type keyword
+    let type;
+    if (/surface/i.test(line)) type = 'surface';
+    else if (/intermediate/i.test(line)) type = 'intermediate';
+    else if (/production/i.test(line)) type = 'production';
+    else if (/conductor/i.test(line)) type = 'conductor';
+
+    const hasCasingData = od_mm !== undefined || shoe_m !== undefined || grade !== undefined || top_m !== undefined;
+
+    if (hasCasingData) {
+      const casing = {};
+      if (type) casing.type = type;
+      if (od_mm !== undefined) casing.od_mm = +od_mm.toFixed(2);
+      if (grade) casing.grade = grade;
+      if (weight_kgm !== undefined) casing.weight_kgm = weight_kgm;
+      if (top_m !== undefined) casing.top_m = top_m;
+      if (shoe_m !== undefined) casing.shoe_m = shoe_m;
+      if (toc_m !== undefined) casing.toc_m = toc_m;
+      out.casings.push(casing);
+    } else {
+      out.warnings.push(`Unparsed casing line: "${line}"`);
+    }
+  }
+
+  return out;
+}
+
+/* ---- full report composition ---- */
+
+function parseWellboreReport(text) {
+  const warnings = [];
+  const wellbore = { plugs: [], perforations: [], notes: [], casings: [] };
+  if (!text || !String(text).trim()) return { wellbore, warnings };
+
+  try {
+    const lines = String(text).split(/\n/);
+    let buffer = [];
+    const flush = () => {
+      if (!buffer.length) return;
+      const chunk = buffer.join('\n');
+      buffer = [];
+      const iv = parseIntervalsText(chunk);
+      const cs = parseCasingText(chunk);
+
+      wellbore.plugs.push(...iv.plugs);
+      wellbore.perforations.push(...iv.perforations);
+      wellbore.notes.push(...iv.notes);
+      warnings.push(...iv.warnings);
+
+      if (cs.casings.length) wellbore.casings.push(...cs.casings);
+      if (cs.openHole) wellbore.openHole = cs.openHole;
+      // Casing notes (e.g. open-hole prose) are plain strings from
+      // parseCasingText — carry them into wellbore.notes as structured
+      // entries so they survive end-to-end (Finding 2).
+      for (const n of cs.notes) wellbore.notes.push({ depth_m: null, text: n });
+      // Never suppress a whole parser's warnings just because the other
+      // parser found something in the same chunk (Finding 6) — every real
+      // warning is signal. Dedupe identical strings instead of dropping.
+      for (const w of cs.warnings) { if (!warnings.includes(w)) warnings.push(w); }
+
+      // A line genuinely unparsed by BOTH parsers (no plug/perf/casing/note
+      // extracted from it by either) gets a note as well as its warning,
+      // per the brief: "unparsed lines → notes + warnings" (Finding 5).
+      const quoted = (arr, prefix) => {
+        const set = new Set();
+        const re = new RegExp(`^${prefix}: "([\\s\\S]*)"$`);
+        for (const w of arr) { const m = w.match(re); if (m) set.add(m[1]); }
+        return set;
+      };
+      const ivUnparsed = quoted(iv.warnings, 'Unparsed interval line');
+      const csUnparsed = quoted(cs.warnings, 'Unparsed casing line');
+      for (const rawLine of ivUnparsed) {
+        if (csUnparsed.has(rawLine)) wellbore.notes.push({ depth_m: null, text: rawLine });
+      }
+    };
+
+    // Group lines that look like they belong together (a header + its
+    // depth/sacks/additive detail lines) into a single chunk so
+    // parseIntervalsText can associate them via lastPlugHeader / same-line
+    // sacks & additive matching. A blank line or a new "Plug #" header
+    // starts a new group.
+    for (const raw of lines) {
+      const line = raw.trim();
+      if (!line) { flush(); continue; }
+      if (/plug\s*#?\s*\d+/i.test(line) && buffer.length) { flush(); }
+      buffer.push(line);
+    }
+    flush();
+  } catch (e) {
+    warnings.push(`Report parse error: ${e && e.message}`);
+  }
+
+  return { wellbore, warnings };
+}
+
+/* ---- aggregate stats ---- */
+
+function mergeIntervals(intervals) {
+  if (!intervals.length) return [];
+  const sorted = intervals.slice().sort((a, b) => a.top_m - b.top_m);
+  const merged = [{ top_m: sorted[0].top_m, bottom_m: sorted[0].bottom_m }];
+  for (let i = 1; i < sorted.length; i++) {
+    const last = merged[merged.length - 1];
+    const cur = sorted[i];
+    if (cur.top_m <= last.bottom_m) {
+      last.bottom_m = Math.max(last.bottom_m, cur.bottom_m);
+    } else {
+      merged.push({ top_m: cur.top_m, bottom_m: cur.bottom_m });
+    }
+  }
+  return merged;
+}
+
+function wellboreStats(wb) {
+  wb = wb || {};
+  const td = typeof wb.td === 'number' ? wb.td : null;
+  const casings = Array.isArray(wb.casings) ? wb.casings : [];
+  const plugs = Array.isArray(wb.plugs) ? wb.plugs : [];
+  const perforations = Array.isArray(wb.perforations) ? wb.perforations : [];
+  const formations = Array.isArray(wb.formations) ? wb.formations : [];
+
+  const casingCount = casings.length;
+  const plugCount = plugs.length;
+  const perfCount = perforations.length;
+  const formationCount = formations.length;
+
+  const validPlugs = plugs.filter(p => typeof p.top_m === 'number' && typeof p.bottom_m === 'number');
+  const deepestPlug = validPlugs.length ? Math.max(...validPlugs.map(p => p.bottom_m)) : null;
+  const shallowestPlug = validPlugs.length ? Math.min(...validPlugs.map(p => p.top_m)) : null;
+  const longestPlug = validPlugs.length ? Math.max(...validPlugs.map(p => p.bottom_m - p.top_m)) : null;
+
+  const merged = mergeIntervals(validPlugs);
+  // merged.length is 0 iff validPlugs.length is 0 (mergeIntervals never
+  // drops a non-overlapping interval), so the "no plugs but somehow merged
+  // is empty" case can't happen — null is the only reachable "else".
+  const pluggedTotal = merged.length ? +merged.reduce((sum, iv) => sum + (iv.bottom_m - iv.top_m), 0).toFixed(1) : null;
+
+  const coveragePct = (td && td > 0 && pluggedTotal !== null) ? +((pluggedTotal / td) * 100).toFixed(1) : null;
+
+  let openHoleLen = null;
+  if (wb.openHole && typeof wb.openHole.top_m === 'number' && typeof wb.openHole.bottom_m === 'number') {
+    openHoleLen = +(wb.openHole.bottom_m - wb.openHole.top_m).toFixed(1);
+  }
+
+  return {
+    td: td,
+    casingCount,
+    plugCount,
+    deepestPlug,
+    shallowestPlug,
+    longestPlug,
+    pluggedTotal,
+    coveragePct,
+    openHoleLen,
+    perfCount,
+    formationCount
+  };
+}
+
+/* ---- depth scale ---- */
+
+function depthScale(td, pxHeight) {
+  const yOf = m => (td > 0 ? (m / td) * pxHeight : 0);
+  const MAX_TICKS = 200; // cap tick count so a corrupt/absurd td can't hang the tab
+  const ticks = (unit) => {
+    const out = [];
+    if (unit === 'ft') {
+      let stepFt = 100;
+      while (td > 0 && td / (stepFt * 0.3048) > MAX_TICKS) stepFt *= 2;
+      const stepM = stepFt * 0.3048;
+      for (let m = 0; m <= td + 1e-9; m += stepM) {
+        out.push({ m: +m.toFixed(2), label: String(Math.round(mToFt(m))) });
+      }
+    } else {
+      let stepM = 50;
+      while (td > 0 && td / stepM > MAX_TICKS) stepM *= 2;
+      for (let m = 0; m <= td + 1e-9; m += stepM) {
+        out.push({ m: +m.toFixed(2), label: String(Math.round(m)) });
+      }
+    }
+    return out;
+  };
+  return { yOf, ticks };
+}
+
+/* ---- SVG renderer (pure, DOM-free — string concatenation only) ---- */
+
+// XML/HTML text escaping for anything interpolated into markup or attributes.
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, ch => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[ch]));
+}
+
+// Format a metres depth for on-screen labels in the caller's display unit.
+function fmtDepth(m, unit) {
+  if (typeof m !== 'number' || !Number.isFinite(m)) return '—';
+  const v = unit === 'ft' ? mToFt(m) : m;
+  return (+v.toFixed(1)).toString() + (unit === 'ft' ? ' ft' : ' m');
+}
+
+function renderWellboreSVG(wb, opts) {
+  opts = opts || {};
+  if (!wb || !(wb.td > 0)) return '';
+
+  const unit = opts.unit === 'ft' ? 'ft' : 'm';
+  const W = opts.width || 760;
+  const H = opts.height || 920;
+  const highlightId = opts.highlightId || null;
+  const rc = opts.resolvedColors || {};
+  const cLine = rc.line || 'var(--line)';
+  const cMuted = rc.muted || 'var(--muted)';
+  const cInk = rc.ink || 'var(--ink, currentColor)';
+
+  const GUTTER_L = 64;   // left depth-axis gutter
+  const GUTTER_R = 140;  // right gutter for formation names / notes
+  const TOP = 56;        // top margin (ground surface + KB marker room)
+  const BOTTOM = 24;
+  const plotH = Math.max(1, H - TOP - BOTTOM);
+  const plotW = Math.max(1, W - GUTTER_L - GUTTER_R);
+  const cx = GUTTER_L + plotW / 2; // bore centerline x
+
+  const td = wb.td;
+  const scale = depthScale(td, plotH);
+  const y = m => TOP + scale.yOf(typeof m === 'number' ? m : 0);
+
+  const casings = Array.isArray(wb.casings) ? wb.casings.slice() : [];
+  const plugs = Array.isArray(wb.plugs) ? wb.plugs : [];
+  const perforations = Array.isArray(wb.perforations) ? wb.perforations : [];
+  const formations = Array.isArray(wb.formations) ? wb.formations : [];
+  const zones = Array.isArray(wb.zones) ? wb.zones : [];
+  const packers = Array.isArray(wb.packers) ? wb.packers : [];
+  const notes = Array.isArray(wb.notes) ? wb.notes : [];
+
+  const parts = [];
+
+  // Highlight helper — applied to any component element sharing data-id.
+  const hl = id => (highlightId && id === highlightId) ? ' stroke="#3aa0ff" stroke-width="2.5"' : '';
+
+  parts.push(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" font-family="system-ui, sans-serif" font-size="11">`);
+
+  // Diagonal-hatch pattern for open hole.
+  parts.push(`<defs><pattern id="wb-openhole-hatch" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)"><rect width="6" height="6" fill="none"/><line x1="0" y1="0" x2="0" y2="6" stroke="#8a6b4f" stroke-width="2"/></pattern></defs>`);
+
+  // ---- depth axis (left gutter) ----
+  const ticks = scale.ticks(unit);
+  parts.push(`<g data-kind="axis">`);
+  parts.push(`<line x1="${GUTTER_L}" y1="${TOP}" x2="${GUTTER_L}" y2="${TOP + plotH}" stroke="${cLine}" stroke-width="1"/>`);
+  for (const t of ticks) {
+    const ty = y(t.m);
+    parts.push(`<line x1="${GUTTER_L - 6}" y1="${ty}" x2="${GUTTER_L}" y2="${ty}" stroke="${cLine}" stroke-width="1"/>`);
+    parts.push(`<text x="${GUTTER_L - 9}" y="${ty + 3}" text-anchor="end" fill="${cMuted}">${esc(t.label)}</text>`);
+  }
+  const axisTitle = unit === 'ft' ? 'Depth (ft)' : 'Depth (m)';
+  parts.push(`<text x="${GUTTER_L}" y="${TOP - 34}" text-anchor="start" fill="${cMuted}" font-size="11">${esc(axisTitle)}</text>`);
+  parts.push(`</g>`);
+
+  // ---- ground surface + KB marker ----
+  const surfY = y(0);
+  parts.push(`<g data-kind="surface"><line x1="${GUTTER_L}" y1="${surfY}" x2="${W - GUTTER_R}" y2="${surfY}" stroke="${cLine}" stroke-width="1.5"/>`);
+  parts.push(`<text x="${GUTTER_L + 4}" y="${surfY - 6}" fill="${cInk}">Ground Surface</text>`);
+  if (typeof wb.kbElev === 'number') {
+    const kbY = surfY - 16;
+    parts.push(`<polygon points="${cx - 6},${surfY} ${cx + 6},${surfY} ${cx},${kbY}" fill="${cInk}"/>`);
+    parts.push(`<text x="${cx + 9}" y="${kbY + 10}" fill="${cInk}">KB ${esc(fmtDepth(wb.kbElev, unit))}</text>`);
+  }
+  parts.push(`</g>`);
+
+  // ---- casings (sorted by shoe_m ascending; outermost = widest) ----
+  const sortedCasings = casings
+    .map((c, i) => ({ c, i }))
+    .filter(x => x.c && typeof x.c.shoe_m === 'number')
+    .sort((a, b) => a.c.shoe_m - b.c.shoe_m);
+  // Outermost = deepest-drawn-first in nesting terms: the LAST casing run
+  // (largest shoe_m, typically the longest/production string) is narrowest;
+  // shallower strings (surface casing) are wider. Rank by shoe_m descending
+  // for half-width so shallower shoe_m (surface) gets the widest wall.
+  const nCasings = sortedCasings.length;
+  const baseHalf = Math.min(plotW / 2 - 8, 90);
+  const stepHalf = nCasings > 1 ? (baseHalf * 0.5) / nCasings : 0;
+
+  sortedCasings.forEach((entry, rank) => {
+    const c = entry.c;
+    const origIdx = entry.i;
+    const id = `casing:${origIdx}`;
+    // rank 0 = shallowest shoe_m = outermost/widest.
+    const half = baseHalf - rank * stepHalf;
+    const wallW = 4;
+    const top_m = typeof c.top_m === 'number' ? c.top_m : 0;
+    const shoe_m = c.shoe_m;
+    const yTop = y(top_m), yShoe = y(shoe_m);
+    const odStr = typeof c.od_mm === 'number' ? `${(+c.od_mm).toFixed(1)}mm` : '—';
+    const label = `${c.name || c.type || 'Casing'} — top ${fmtDepth(top_m, unit)}, shoe ${fmtDepth(shoe_m, unit)}, OD ${odStr}, grade ${c.grade || '—'}`;
+
+    // cement (drawn first, so casing walls sit on top)
+    let cemTop_m = null;
+    if (typeof c.toc_m === 'number') {
+      cemTop_m = c.toc_m;
+    } else {
+      cemTop_m = Math.max(top_m, shoe_m - 0.05 * td);
+    }
+    const cemYTop = y(cemTop_m), cemYShoe = y(shoe_m);
+    const cemLabel = `Cement (${c.name || c.type || 'casing'}) — ${fmtDepth(cemTop_m, unit)} to ${fmtDepth(shoe_m, unit)}${typeof c.toc_m !== 'number' ? ' (TOC unknown, shoe patch)' : ''}`;
+    const cemId = `cement:${origIdx}`;
+    parts.push(`<g data-kind="cement" data-id="${cemId}" aria-label="${esc(cemLabel)}"${hl(cemId)}>`);
+    parts.push(`<title>${esc(cemLabel)}</title>`);
+    // left side
+    parts.push(`<rect x="${cx - half - wallW}" y="${cemYTop}" width="${wallW}" height="${Math.max(0, cemYShoe - cemYTop)}" fill="#a8cdea" fill-opacity="0.55"/>`);
+    // right side
+    parts.push(`<rect x="${cx + half}" y="${cemYTop}" width="${wallW}" height="${Math.max(0, cemYShoe - cemYTop)}" fill="#a8cdea" fill-opacity="0.55"/>`);
+    parts.push(`</g>`);
+
+    // casing walls
+    parts.push(`<g data-kind="casing" data-id="${id}" aria-label="${esc(label)}"${hl(id)}>`);
+    parts.push(`<title>${esc(label)}</title>`);
+    parts.push(`<rect x="${cx - half}" y="${yTop}" width="${wallW}" height="${Math.max(0, yShoe - yTop)}" fill="#8a93a1"/>`);
+    parts.push(`<rect x="${cx + half - wallW}" y="${yTop}" width="${wallW}" height="${Math.max(0, yShoe - yTop)}" fill="#8a93a1"/>`);
+    // shoe triangles (both walls)
+    parts.push(`<polygon points="${cx - half - 3},${yShoe} ${cx - half + wallW + 3},${yShoe} ${cx - half + wallW / 2},${yShoe + 8}" fill="#8a93a1"/>`);
+    parts.push(`<polygon points="${cx + half - wallW - 3},${yShoe} ${cx + half + 3},${yShoe} ${cx + half - wallW / 2},${yShoe + 8}" fill="#8a93a1"/>`);
+    parts.push(`</g>`);
+  });
+
+  // innermost bore half-width, used by plugs/perforations/packers/open hole
+  const innerHalf = nCasings ? (baseHalf - (nCasings - 1) * stepHalf) - 4 : baseHalf;
+  const boreHalf = Math.max(6, innerHalf);
+
+  // ---- open hole ----
+  const deepestShoe = sortedCasings.length ? Math.max(...sortedCasings.map(x => x.c.shoe_m)) : null;
+  let oh = wb.openHole && typeof wb.openHole.top_m === 'number' && typeof wb.openHole.bottom_m === 'number'
+    ? wb.openHole
+    : (deepestShoe !== null && td > deepestShoe ? { top_m: deepestShoe, bottom_m: td } : null);
+  if (oh) {
+    const id = 'openhole:0';
+    const yTop = y(oh.top_m), yBot = y(oh.bottom_m);
+    const label = `Open hole — ${fmtDepth(oh.top_m, unit)} to ${fmtDepth(oh.bottom_m, unit)}`;
+    parts.push(`<g data-kind="openhole" data-id="${id}" aria-label="${esc(label)}"${hl(id)}>`);
+    parts.push(`<title>${esc(label)}</title>`);
+    parts.push(`<rect x="${cx - boreHalf}" y="${yTop}" width="${boreHalf * 2}" height="${Math.max(0, yBot - yTop)}" fill="url(#wb-openhole-hatch)"/>`);
+    parts.push(`</g>`);
+  }
+
+  // ---- zones (full-width translucent bands) ----
+  zones.forEach((z, i) => {
+    if (!z) return;
+    const id = `zone:${i}`;
+    const yTop = y(z.top_m), yBot = y(z.bottom_m);
+    const color = z.kind === 'hydrocarbon' ? '#e6c78a' : '#b9a7e6';
+    const label = `Zone (${z.kind || '—'}) — ${fmtDepth(z.top_m, unit)} to ${fmtDepth(z.bottom_m, unit)}`;
+    parts.push(`<g data-kind="zone" data-id="${id}" aria-label="${esc(label)}"${hl(id)}>`);
+    parts.push(`<title>${esc(label)}</title>`);
+    parts.push(`<rect x="${GUTTER_L}" y="${yTop}" width="${plotW}" height="${Math.max(0, yBot - yTop)}" fill="${color}" fill-opacity="0.18"/>`);
+    parts.push(`</g>`);
+  });
+
+  // ---- formations (dashed line + name to the right of the bore) ----
+  formations.forEach((f, i) => {
+    if (!f) return;
+    const id = `formation:${i}`;
+    const fy = y(f.top_m);
+    const label = `Formation top: ${f.name || '—'} at ${fmtDepth(f.top_m, unit)}`;
+    parts.push(`<g data-kind="formation" data-id="${id}" aria-label="${esc(label)}"${hl(id)}>`);
+    parts.push(`<title>${esc(label)}</title>`);
+    parts.push(`<line x1="${GUTTER_L}" y1="${fy}" x2="${cx + boreHalf}" y2="${fy}" stroke="#e08a2e" stroke-width="1.5" stroke-dasharray="4,3"/>`);
+    parts.push(`<text x="${cx + boreHalf + 6}" y="${fy + 3}" fill="${cInk}">${esc(f.name || '—')}</text>`);
+    parts.push(`</g>`);
+  });
+
+  // ---- plugs ----
+  plugs.forEach((p, i) => {
+    if (!p) return;
+    const id = `plug:${i}`;
+    const yTop = y(p.top_m), yBot = y(p.bottom_m);
+    const label = `Plug ${p.n != null ? 'P' + p.n : '—'} (${p.kind || 'cement'}) — ${fmtDepth(p.top_m, unit)} to ${fmtDepth(p.bottom_m, unit)}, sacks: ${p.sacks != null ? p.sacks : '—'}`;
+    parts.push(`<g data-kind="plug" data-id="${id}" aria-label="${esc(label)}"${hl(id)}>`);
+    parts.push(`<title>${esc(label)}</title>`);
+    if (p.kind === 'bridge' || p.kind === 'cibp') {
+      const midY = y(p.top_m);
+      const halfH = 8;
+      parts.push(`<polygon points="${cx - boreHalf},${midY - halfH} ${cx},${midY} ${cx - boreHalf},${midY + halfH}" fill="#1d6b47"/>`);
+      parts.push(`<polygon points="${cx + boreHalf},${midY - halfH} ${cx},${midY} ${cx + boreHalf},${midY + halfH}" fill="#1d6b47"/>`);
+    } else {
+      parts.push(`<rect x="${cx - boreHalf}" y="${yTop}" width="${boreHalf * 2}" height="${Math.max(2, yBot - yTop)}" fill="#1d6b47"/>`);
+      if (p.n != null) {
+        parts.push(`<text x="${cx}" y="${(yTop + Math.max(yTop + 2, yBot)) / 2 + 3}" text-anchor="middle" fill="#ffffff" font-size="10">P${esc(p.n)}</text>`);
+      }
+    }
+    parts.push(`</g>`);
+  });
+
+  // ---- perforations (rows of small outward triangles on both walls) ----
+  perforations.forEach((pf, i) => {
+    if (!pf) return;
+    const id = `perf:${i}`;
+    const yTop = y(pf.top_m), yBot = y(pf.bottom_m);
+    const opacity = pf.status === 'squeezed' ? 0.45 : 1;
+    const label = `Perforations — ${fmtDepth(pf.top_m, unit)} to ${fmtDepth(pf.bottom_m, unit)}, status: ${pf.status || '—'}`;
+    parts.push(`<g data-kind="perf" data-id="${id}" aria-label="${esc(label)}"${hl(id)} fill-opacity="${opacity}">`);
+    parts.push(`<title>${esc(label)}</title>`);
+    const rowH = 6;
+    const span = Math.max(rowH, yBot - yTop);
+    const rows = Math.max(1, Math.floor(span / (rowH * 2)));
+    for (let r = 0; r < rows; r++) {
+      const ry = yTop + (r + 0.5) * (span / rows);
+      parts.push(`<polygon points="${cx - boreHalf - 7},${ry} ${cx - boreHalf},${ry - 3} ${cx - boreHalf},${ry + 3}" fill="#d4453a"/>`);
+      parts.push(`<polygon points="${cx + boreHalf + 7},${ry} ${cx + boreHalf},${ry - 3} ${cx + boreHalf},${ry + 3}" fill="#d4453a"/>`);
+    }
+    parts.push(`</g>`);
+  });
+
+  // ---- packers (opposed solid black triangles inside bore) ----
+  packers.forEach((pk, i) => {
+    if (!pk) return;
+    const id = `packer:${i}`;
+    const py = y(pk.depth_m);
+    const label = `Packer at ${fmtDepth(pk.depth_m, unit)}`;
+    parts.push(`<g data-kind="packer" data-id="${id}" aria-label="${esc(label)}"${hl(id)}>`);
+    parts.push(`<title>${esc(label)}</title>`);
+    parts.push(`<polygon points="${cx - boreHalf},${py - 6} ${cx},${py} ${cx - boreHalf},${py + 6}" fill="#000000"/>`);
+    parts.push(`<polygon points="${cx + boreHalf},${py - 6} ${cx},${py} ${cx + boreHalf},${py + 6}" fill="#000000"/>`);
+    parts.push(`</g>`);
+  });
+
+  // ---- notes (ⓘ glyph in right gutter) ----
+  notes.forEach((n, i) => {
+    if (!n) return;
+    const id = `note:${i}`;
+    const ny = typeof n.depth_m === 'number' ? y(n.depth_m) : y(0);
+    const label = `Note at ${fmtDepth(n.depth_m, unit)}: ${n.text || '—'}`;
+    parts.push(`<g data-kind="note" data-id="${id}" aria-label="${esc(label)}"${hl(id)}>`);
+    parts.push(`<title>${esc(label)}</title>`);
+    parts.push(`<text x="${W - GUTTER_R + 6}" y="${ny + 3}" fill="${cInk}">ⓘ</text>`);
+    parts.push(`</g>`);
+  });
+
+  parts.push(`</svg>`);
+  return parts.join('');
+}
+
+function wellboreFrom3D(r) {
+  // Return null if no positive td/tvd
+  const td = (typeof r.td === 'number' && r.td > 0) ? r.td : (typeof r.tvd === 'number' && r.tvd > 0) ? r.tvd : null;
+  if (!td) return null;
+
+  // Build wellbore object
+  const wb = {
+    td,
+    source: 'bridge',
+    casings: [],
+    openHole: null,
+    plugs: [],
+    perforations: [],
+    zones: [],
+    packers: [],
+    notes: []
+  };
+
+  // Track deepest shoe across all casings and open-hole signal (Finding 1)
+  let deepestShoe = 0;
+  let openHoleSignal = false;
+
+  // Surface casing from surfaceCasingDepth
+  if (typeof r.surfaceCasingDepth === 'number' && r.surfaceCasingDepth > 0) {
+    wb.casings.push({
+      type: 'surface',
+      top_m: 0,
+      shoe_m: r.surfaceCasingDepth
+    });
+    deepestShoe = Math.max(deepestShoe, r.surfaceCasingDepth);
+  }
+
+  // Parse production casing
+  if (r.productionCasing) {
+    const pc = parseCasingText(r.productionCasing);
+    wb.casings.push(...pc.casings);
+    if (pc.openHole) {
+      openHoleSignal = true;
+    }
+    // Convert casing notes from strings to {depth_m: null, text} format
+    pc.notes.forEach(note => {
+      wb.notes.push({ depth_m: null, text: note });
+    });
+    // Track deepest casing shoe (Finding 1 — use ALL casings)
+    if (pc.casings.length > 0) {
+      deepestShoe = Math.max(deepestShoe, ...pc.casings.map(c => c.shoe_m || 0));
+    }
+    // Fold warnings into notes (Finding 2)
+    pc.warnings.forEach(warning => {
+      wb.notes.push({ depth_m: null, text: '[bridge] ' + warning });
+    });
+  }
+
+  // Parse intermediate casing (Finding 1 — read ic.openHole too)
+  if (r.intermediateCasing) {
+    const ic = parseCasingText(r.intermediateCasing);
+    wb.casings.push(...ic.casings);
+    if (ic.openHole) {
+      openHoleSignal = true;
+    }
+    ic.notes.forEach(note => {
+      wb.notes.push({ depth_m: null, text: note });
+    });
+    if (ic.casings.length > 0) {
+      deepestShoe = Math.max(deepestShoe, ...ic.casings.map(c => c.shoe_m || 0));
+    }
+    // Fold warnings into notes (Finding 2)
+    ic.warnings.forEach(warning => {
+      wb.notes.push({ depth_m: null, text: '[bridge] ' + warning });
+    });
+  }
+
+  // CONCRETIZE openHole when it's empty {} but we have open-hole signal (Finding 1)
+  if (openHoleSignal) {
+    // top_m = deepest shoe across ALL casings (else 0), bottom_m = td
+    // Only set if top < td
+    if (deepestShoe < td) {
+      wb.openHole = { top_m: deepestShoe, bottom_m: td };
+    }
+  }
+
+  // Parse plugs and perforations (Finding 2 — fold warnings)
+  if (r.plugIntervals) {
+    const iv = parseIntervalsText(r.plugIntervals);
+    wb.plugs.push(...iv.plugs);
+    wb.perforations.push(...iv.perforations);
+    // Notes are already {depth_m, text} format from parseIntervalsText
+    wb.notes.push(...(iv.notes || []));
+    // Fold warnings into notes (Finding 2)
+    iv.warnings.forEach(warning => {
+      wb.notes.push({ depth_m: null, text: '[bridge] ' + warning });
+    });
+  }
+
+  // Parse perforations (if separate from plugIntervals, Finding 2 — fold warnings)
+  if (r.perfIntervals) {
+    const iv = parseIntervalsText(r.perfIntervals);
+    wb.perforations.push(...iv.perforations);
+    wb.notes.push(...(iv.notes || []));
+    iv.warnings.forEach(warning => {
+      wb.notes.push({ depth_m: null, text: '[bridge] ' + warning });
+    });
+  }
+
+  // Apply cementTop to deepest casing
+  if (typeof r.cementTop === 'number' && r.cementTop >= 0 && wb.casings.length > 0) {
+    // Find the deepest casing (highest shoe_m)
+    let deepestCasing = wb.casings[0];
+    for (const c of wb.casings) {
+      if ((c.shoe_m || 0) > (deepestCasing.shoe_m || 0)) {
+        deepestCasing = c;
+      }
+    }
+    deepestCasing.toc_m = r.cementTop;
+  }
+
+  // Formation as note (not a formation object)
+  if (r.formationPenetrated) {
+    wb.notes.push({ depth_m: null, text: r.formationPenetrated });
+  }
+
+  return wb;
+}
+
+globalThis.Wellbore = { mToFt, ftToM, parseDepth, parseIntervalsText, parseCasingText, parseWellboreReport, wellboreStats, depthScale, renderWellboreSVG, wellboreFrom3D };
+/* ===== WELLBORE PURE END ===== */
+
+/* ===== WELLBORE UI ===== */
+
+const WB_KIND_LABELS = { casing:'Casing', cement:'Cement', openhole:'Open Hole', zone:'Zone', formation:'Formation', plug:'Plug', perf:'Perforations', packer:'Packer', note:'Note' };
+const WB_KIND_COLORS = { casing:'#8a93a1', cement:'#a8cdea', openhole:'#8a6b4f', zone:'#b9a7e6', formation:'#e08a2e', plug:'#1d6b47', perf:'#d4453a', packer:'#5c6470', note:'var(--muted)' };
+const WB_FIELD_LABELS = { top_m:'Top', bottom_m:'Bottom', shoe_m:'Shoe', toc_m:'TOC', depth_m:'Depth', od_mm:'OD', weight_kgm:'Weight', name:'Name', type:'Type', grade:'Grade', kind:'Kind', n:'Plug #', sacks:'Sacks', status:'Status', text:'Note' };
+
+// Active display unit for the mounted schematic — persisted across sessions/tabs.
+let schemUnit = (function(){ try { return localStorage.getItem('lwms:schemUnit') === 'ft' ? 'ft' : 'm'; } catch(e){ return 'm'; } })();
+
+// Mount state for the single wellbore schematic shown on the detail tab at a time.
+// {host, wb, licence, highlightId, hoverKind, lockedKinds:Set}
+let wbState = null;
+
+function mountWellboreSchematic(host, wb, licence){
+  const tip = document.getElementById('tooltip'); if (tip) tip.style.display = 'none';
+  wbState = null;
+  if(!host) return;
+  if(!wb || !(wb.td > 0)){
+    host.innerHTML = `<div class="panel"><h2>Wellbore Schematic</h2><div class="empty">No construction records — paste an abandonment report in Edit, or push this well from the 3D Reviewer.</div></div>`;
+    return;
+  }
+  wbState = { host, wb, licence, highlightId:null, hoverKind:null, lockedKinds:new Set(), vb:null, suppressNextClick:false };
+  wbRenderCard();
+}
+
+function wbRenderCard(){
+  const st = wbState; if(!st) return;
+  const svgHtml = Wellbore.renderWellboreSVG(st.wb, {unit:schemUnit});
+  const kinds = wbKindsPresent(svgHtml);
+  const stats = Wellbore.wellboreStats(st.wb);
+  st.host.innerHTML = `
+    <div class="panel">
+      <div class="row spread" style="margin-bottom:4px">
+        <h2 style="margin:0">Wellbore Schematic</h2>
+        <div id="wbToolbar" class="wb-toolbar">
+          <input type="text" id="wbJump" placeholder="Go to depth…" style="width:140px;font-size:13px">
+          <div class="wb-unit-toggle">
+            <button type="button" data-unit="m" class="${schemUnit==='m'?'on':''}" onclick="wbSetUnit('m')">m</button>
+            <button type="button" data-unit="ft" class="${schemUnit==='ft'?'on':''}" onclick="wbSetUnit('ft')">ft</button>
+          </div>
+          <button type="button" id="wbExportSvg" class="ghost">SVG</button>
+          <button type="button" id="wbExportPng" class="ghost">PNG</button>
+          <button type="button" id="wbExportPrint" class="ghost">Print</button>
+        </div>
+      </div>
+      <div class="wb-grid">
+        <div id="wbSvgHost">${svgHtml.replace('<svg ', '<svg id="wbSvg" ')}</div>
+        <div>
+          <div class="rec-card">
+            <h4 style="margin:0 0 8px 0">Legend</h4>
+            <div class="wb-legend" id="wbLegend">${kinds.map(k=>wbLegendRow(k)).join('') || '<div class="muted" style="padding:4px 0">No components</div>'}</div>
+          </div>
+          <div class="rec-card">
+            <h4 style="margin:0 0 8px 0">Statistics</h4>
+            <div id="wbStats">${wbStatsHtml(stats)}</div>
+          </div>
+          <div class="rec-card">
+            <h4 style="margin:0 0 8px 0">Selection</h4>
+            <div id="wbSel" class="muted">Click a component…</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+  // Capture the freshly-rendered SVG's full viewBox once, before any zoom/pan
+  // touches it — wbWireJumpInput needs the ORIGINAL height to clamp against,
+  // not the current (possibly zoomed) window height.
+  const freshSvg = document.getElementById('wbSvg');
+  if(freshSvg){
+    const vb0_attr = freshSvg.getAttribute('viewBox');
+    const vb0_parts = vb0_attr ? vb0_attr.split(/\s+/).map(Number) : [0, 0, 760, 920];
+    st.vb0 = [0, 0, vb0_parts[2], vb0_parts[3]];
+  }
+  wbWireSvgEvents();
+  wbWireJumpInput();
+  wbWireExportButtons();
+}
+
+// Component kinds actually drawn in a rendered SVG string, in first-seen order,
+// excluding the structural "axis"/"surface" groups (those aren't legend items).
+function wbKindsPresent(svgHtml){
+  const seen = new Set(); const order = [];
+  const re = /data-kind="([a-z]+)"/g; let m;
+  while((m = re.exec(svgHtml))){
+    const k = m[1];
+    if(k==='axis' || k==='surface') continue;
+    if(!seen.has(k)){ seen.add(k); order.push(k); }
+  }
+  return order;
+}
+
+function wbLegendRow(kind){
+  const label = WB_KIND_LABELS[kind] || kind;
+  const color = WB_KIND_COLORS[kind] || 'var(--muted)';
+  return `<div data-kind="${kind}" tabindex="0" onmouseenter="wbHoverLegend('${kind}',true)" onmouseleave="wbHoverLegend('${kind}',false)" onclick="wbToggleLegend('${kind}')" onkeydown="event.key==='Enter'&&wbToggleLegend('${kind}')">`
+    + `<span class="sw" style="background:${color}"></span><span>${escapeHtml(label)}</span></div>`;
+}
+
+// Format a metres value for on-screen display in the active schematic unit.
+function wbFmt(m, unit){
+  if(typeof m !== 'number' || !Number.isFinite(m)) return '—';
+  const v = unit==='ft' ? Wellbore.mToFt(m) : m;
+  return (+v.toFixed(1)) + (unit==='ft' ? ' ft' : ' m');
+}
+
+function wbStatsHtml(stats){
+  const fmt = v => wbFmt(v, schemUnit);
+  const rows = [
+    ['Total Depth', fmt(stats.td)],
+    ['Casing Strings', stats.casingCount ?? '—'],
+    ['Plugs', stats.plugCount ?? '—'],
+    ['Deepest Plug', fmt(stats.deepestPlug)],
+    ['Shallowest Plug', fmt(stats.shallowestPlug)],
+    ['Longest Plug', fmt(stats.longestPlug)],
+    ['Total Plugged Interval', fmt(stats.pluggedTotal)],
+    ['Plugged Coverage', stats.coveragePct!=null ? stats.coveragePct.toFixed(1)+'%' : '—'],
+    ['Open Hole Length', fmt(stats.openHoleLen)],
+    ['Perforation Intervals', stats.perfCount ?? '—'],
+    ['Formation Tops', stats.formationCount ?? '—']
+  ];
+  return `<table class="wells"><tbody>${rows.map(([k,v])=>`<tr><td>${k}</td><td style="text-align:right">${v}</td></tr>`).join('')}</tbody></table>`;
+}
+
+function wbWireSvgEvents(){
+  const st = wbState; if(!st) return;
+  const svg = document.getElementById('wbSvg');
+  if(!svg) return;
+
+  // Attach basic hover/click handlers
+  svg.addEventListener('mouseover', wbHandleSvgHover);
+  svg.addEventListener('mousemove', wbHandleSvgHover);
+  svg.addEventListener('mouseout', wbHandleSvgOut);
+  svg.addEventListener('click', wbHandleSvgClick);
+
+  // Parse viewBox to get dimensions
+  const vb_attr = svg.getAttribute('viewBox');
+  const vb_parts = vb_attr ? vb_attr.split(/\s+/).map(Number) : [0, 0, 760, 920];
+  const VBW = vb_parts[2], VBH = vb_parts[3];
+
+  // Initialize vb state on fresh mount (vb is null after selectWbElement, re-init here)
+  if(!st.vb) st.vb = [0, 0, VBW, VBH];
+
+  // Apply the current viewBox
+  const applyVB = () => svg.setAttribute('viewBox', st.vb.join(' '));
+  applyVB();
+
+  // Wheel zoom
+  svg.addEventListener('wheel', e => {
+    e.preventDefault();
+    const f = e.deltaY < 0 ? 0.85 : 1/0.85;
+    const r = svg.getBoundingClientRect();
+    const mx = st.vb[0] + (e.clientX - r.left) / r.width * st.vb[2];
+    const my = st.vb[1] + (e.clientY - r.top) / r.height * st.vb[3];
+    st.vb = [mx - (mx - st.vb[0]) * f, my - (my - st.vb[1]) * f, st.vb[2] * f, st.vb[3] * f];
+    applyVB();
+  }, { passive: false });
+
+  // Pointer pan
+  let pan = null;
+  svg.addEventListener('pointerdown', e => {
+    pan = { x: e.clientX, y: e.clientY, vb: [...st.vb] };
+    svg.setPointerCapture(e.pointerId);
+  });
+  svg.addEventListener('pointermove', e => {
+    if(!pan) return;
+    const r = svg.getBoundingClientRect();
+    st.vb[0] = pan.vb[0] - (e.clientX - pan.x) / r.width * st.vb[2];
+    st.vb[1] = pan.vb[1] - (e.clientY - pan.y) / r.height * st.vb[3];
+    applyVB();
+  });
+  svg.addEventListener('pointerup', e => {
+    const moved = pan && Math.hypot(e.clientX - pan.x, e.clientY - pan.y) > 5;
+    pan = null;
+    if(moved) st.suppressNextClick = true;
+  });
+  svg.addEventListener('pointercancel', () => { pan = null; });
+
+  // Double-click reset
+  svg.addEventListener('dblclick', () => {
+    st.vb = [0, 0, VBW, VBH];
+    applyVB();
+  });
+
+  // Keyboard navigation
+  svg.addEventListener('keydown', e => {
+    if(e.key.startsWith('Arrow')){
+      e.preventDefault();
+      const step = st.vb[3] * 0.1;
+      if(e.key === 'ArrowUp') st.vb[1] -= step;
+      else if(e.key === 'ArrowDown') st.vb[1] += step;
+      else if(e.key === 'ArrowLeft') st.vb[0] -= step;
+      else if(e.key === 'ArrowRight') st.vb[0] += step;
+      applyVB();
+    }
+    else if(e.key === '+' || e.key === '='){
+      e.preventDefault();
+      const f = 0.85;
+      const mx = st.vb[0] + st.vb[2]/2;
+      const my = st.vb[1] + st.vb[3]/2;
+      st.vb = [mx - (mx - st.vb[0]) * f, my - (my - st.vb[1]) * f, st.vb[2] * f, st.vb[3] * f];
+      applyVB();
+    }
+    else if(e.key === '-' || e.key === '_'){
+      e.preventDefault();
+      const f = 1/0.85;
+      const mx = st.vb[0] + st.vb[2]/2;
+      const my = st.vb[1] + st.vb[3]/2;
+      st.vb = [mx - (mx - st.vb[0]) * f, my - (my - st.vb[1]) * f, st.vb[2] * f, st.vb[3] * f];
+      applyVB();
+    }
+    else if(e.key === '0'){
+      e.preventDefault();
+      st.vb = [0, 0, VBW, VBH];
+      applyVB();
+    }
+  });
+
+  // Set ARIA attributes and make focusable
+  svg.tabIndex = 0;
+  svg.setAttribute('role', 'group');
+  svg.setAttribute('aria-label', 'Interactive wellbore schematic for ' + st.licence);
+
+  wbApplyLegendState();
+}
+
+function wbWireJumpInput(){
+  const st = wbState; if(!st) return;
+  const jumpInput = document.getElementById('wbJump');
+  if(!jumpInput) return;
+
+  // Guard against re-wiring (input is persistent across re-renders)
+  if(jumpInput.dataset.wired) return;
+  jumpInput.dataset.wired = '1';
+
+  jumpInput.addEventListener('keydown', e => {
+    if(e.key !== 'Enter') return;
+    const input = jumpInput.value.trim();
+    if(!input) return;
+
+    // Use canonical parseDepth to handle thousands separators, etc.
+    const m = Wellbore.parseDepth(input, schemUnit);
+    if(m === null || !Number.isFinite(m)) return;
+
+    // Get renderer constants from the pure section
+    const H = 920;
+    const TOP = 56;
+    const BOTTOM = 24;
+    const plotH = H - TOP - BOTTOM;
+
+    // Compute y in original SVG coords using depthScale equivalent
+    const scale = Wellbore.depthScale(st.wb.td, plotH);
+    const yTarget = TOP + scale.yOf(m);
+
+    // Clamp against the ORIGINAL full viewBox height captured at mount
+    // (st.vb0), not the current viewBox attribute — that attribute always
+    // equals st.vb after applyVB(), which made the old clamp a no-op.
+    const VBH0 = (st.vb0 && st.vb0[3]) || H;
+
+    // Jump to depth: set vb[1] to center the depth in view, clamped
+    st.vb[1] = Math.max(0, Math.min(VBH0 - st.vb[3], yTarget - st.vb[3]/2));
+    document.getElementById('wbSvg').setAttribute('viewBox', st.vb.join(' '));
+    jumpInput.value = '';
+    jumpInput.blur();
+  });
+}
+
+function wbExportSvgText(){
+  const st = wbState; if(!st) return '';
+  const colors = getComputedStyle(document.documentElement);
+  const resolved = { line: colors.getPropertyValue('--line').trim() || '#26334a', muted: colors.getPropertyValue('--muted').trim() || '#9fb0cf', ink: colors.getPropertyValue('--text').trim() || '#e7eefc' };
+  return '<?xml version="1.0" encoding="UTF-8"?>\n' + Wellbore.renderWellboreSVG(st.wb, { unit: schemUnit, resolvedColors: resolved });
+}
+
+function wbExportPng(){
+  const st = wbState; if(!st) return;
+  const img = new Image();
+  img.onload = () => {
+    const c = document.createElement('canvas');
+    c.width = img.width * 2; c.height = img.height * 2;
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    const a = document.createElement('a');
+    a.href = c.toDataURL('image/png');
+    a.download = 'wellbore-' + sanitizeFilename(st.licence) + '.png';
+    a.click();
+  };
+  img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(wbExportSvgText());
+}
+
+function sanitizeFilename(str){
+  return str.replace(/[/\\:*?"<>|]/g, '-');
+}
+
+function wbWireExportButtons(){
+  const st = wbState; if(!st) return;
+  const svgBtn = document.getElementById('wbExportSvg');
+  const pngBtn = document.getElementById('wbExportPng');
+  const printBtn = document.getElementById('wbExportPrint');
+  if(!svgBtn || !pngBtn || !printBtn) return;
+
+  // Guard against re-wiring (buttons persist across re-renders)
+  if(svgBtn.dataset.wired) return;
+  svgBtn.dataset.wired = '1';
+
+  svgBtn.addEventListener('click', () => {
+    const svg = wbExportSvgText();
+    if(!svg) return;
+    const a = document.createElement('a');
+    a.href = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+    a.download = 'wellbore-' + sanitizeFilename(st.licence) + '.svg';
+    a.click();
+  });
+
+  pngBtn.addEventListener('click', wbExportPng);
+
+  printBtn.addEventListener('click', () => {
+    const cleanup = () => document.documentElement.classList.remove('wb-printing');
+    window.addEventListener('afterprint', cleanup, { once: true });
+    document.documentElement.classList.add('wb-printing');
+    window.print();
+    setTimeout(cleanup, 1000);  // fallback for browsers that never fire afterprint; runs after the blocking dialog closes
+  });
+}
+
+function wbHandleSvgHover(e){
+  const tip = document.getElementById('tooltip');
+  if(!tip) return;
+  const g = e.target.closest && e.target.closest('[data-id]');
+  if(!g){ tip.style.display='none'; return; }
+  tip.textContent = g.getAttribute('aria-label') || '';
+  tip.style.display = 'block';
+  tip.style.left = (e.clientX + 14) + 'px';
+  tip.style.top = (e.clientY + 14) + 'px';
+}
+
+function wbHandleSvgOut(){
+  const tip = document.getElementById('tooltip');
+  if(tip) tip.style.display = 'none';
+}
+
+function wbHandleSvgClick(e){
+  const st = wbState; if(!st) return;
+  if(st.suppressNextClick){ st.suppressNextClick = false; return; }
+  const g = e.target.closest && e.target.closest('[data-id]');
+  selectWbElement(g ? g.getAttribute('data-id') : null);
+}
+
+// Click-selection resolver — data-id "kind:index" → the underlying wellbore
+// object. cement:i and casing:i both resolve into wb.casings[i] (cement is
+// drawn per casing, using the casing's ORIGINAL array index); openhole:0 is
+// the singleton wb.openHole; perf:i resolves into wb.perforations (the kind
+// string differs from the array name); everything else is wb[kind+'s'][i].
+function wbResolveTarget(wb, id){
+  if(!wb || !id) return null;
+  const idx = id.indexOf(':');
+  if(idx < 0) return null;
+  const kind = id.slice(0, idx);
+  const i = parseInt(id.slice(idx+1), 10);
+  if(kind === 'cement') return (Array.isArray(wb.casings) ? wb.casings[i] : null) || null;
+  if(kind === 'openhole') return wb.openHole || null;
+  if(kind === 'perf') return (Array.isArray(wb.perforations) ? wb.perforations[i] : null) || null;
+  const arr = wb[kind + 's'];
+  return Array.isArray(arr) ? (arr[i] || null) : null;
+}
+
+function selectWbElement(id){
+  const st = wbState; if(!st) return;
+  st.highlightId = id || null;
+  wbRerenderSvgPreserveView();
+  wbUpdateSelectionCard();
+}
+
+// Re-render #wbSvg (new unit and/or highlight) while preserving whatever
+// viewBox is currently set — Task 4's zoom/pan writes that attribute and
+// must survive unit toggles and selection clicks.
+function wbRerenderSvgPreserveView(){
+  const st = wbState; if(!st) return;
+  const svgHtml = Wellbore.renderWellboreSVG(st.wb, {unit:schemUnit, highlightId:st.highlightId});
+  const host = document.getElementById('wbSvgHost');
+  if(!host) return;
+  host.innerHTML = svgHtml.replace('<svg ', '<svg id="wbSvg" ');
+  wbWireSvgEvents();
+}
+
+function wbHumanize(k){
+  return k.replace(/_m$/, '').replace(/_mm$/, ' (mm)').replace(/_kgm$/, ' (kg/m)').replace(/_/g, ' ').replace(/^./, c=>c.toUpperCase());
+}
+
+function wbFieldsDl(obj){
+  const keys = Object.keys(obj);
+  if(!keys.length) return '<div class="muted">(no fields)</div>';
+  const rows = keys.map(k=>{
+    const label = WB_FIELD_LABELS[k] || wbHumanize(k);
+    const v = obj[k];
+    let out;
+    if(v === null || v === undefined || v === '') out = '—';
+    else if(k.endsWith('_m')) out = wbFmt(v, schemUnit);
+    else if(typeof v === 'number') out = (+v.toFixed(2)).toString();
+    else out = escapeHtml(String(v));
+    return `<tr><td>${escapeHtml(label)}</td><td style="text-align:right">${out}</td></tr>`;
+  }).join('');
+  return `<table class="wells"><tbody>${rows}</tbody></table>`;
+}
+
+function wbUpdateSelectionCard(){
+  const st = wbState; if(!st) return;
+  const sel = document.getElementById('wbSel');
+  if(!sel) return;
+  if(!st.highlightId){ sel.className = 'muted'; sel.textContent = 'Click a component…'; return; }
+  const obj = wbResolveTarget(st.wb, st.highlightId);
+  if(!obj){ sel.className = 'muted'; sel.textContent = 'No data for selection.'; return; }
+  sel.className = '';
+  sel.innerHTML = wbFieldsDl(obj);
+}
+
+function wbSetUnit(u){
+  schemUnit = (u === 'ft') ? 'ft' : 'm';
+  try { localStorage.setItem('lwms:schemUnit', schemUnit); } catch(e){}
+  const st = wbState; if(!st) return;
+  const toolbar = document.getElementById('wbToolbar');
+  if(toolbar){
+    toolbar.querySelectorAll('.wb-unit-toggle button').forEach(b=>{
+      b.classList.toggle('on', b.getAttribute('data-unit') === schemUnit);
+    });
+  }
+  wbRerenderSvgPreserveView();
+  const statsEl = document.getElementById('wbStats');
+  if(statsEl) statsEl.innerHTML = wbStatsHtml(Wellbore.wellboreStats(st.wb));
+  wbUpdateSelectionCard();
+}
+
+function wbHoverLegend(kind, entering){
+  const st = wbState; if(!st) return;
+  st.hoverKind = entering ? kind : null;
+  wbApplyLegendState();
+}
+
+function wbToggleLegend(kind){
+  const st = wbState; if(!st) return;
+  if(st.lockedKinds.has(kind)) st.lockedKinds.delete(kind); else st.lockedKinds.add(kind);
+  wbApplyLegendState();
+}
+
+function wbApplyLegendState(){
+  const st = wbState; if(!st) return;
+  const active = st.hoverKind ? new Set([st.hoverKind]) : st.lockedKinds;
+  const legend = document.getElementById('wbLegend');
+  if(legend){
+    legend.querySelectorAll('[data-kind]').forEach(row=>{
+      const k = row.getAttribute('data-kind');
+      row.classList.toggle('on', st.lockedKinds.has(k) || st.hoverKind === k);
+    });
+  }
+  const svg = document.getElementById('wbSvg');
+  if(svg){
+    svg.querySelectorAll('[data-kind]').forEach(g=>{
+      const k = g.getAttribute('data-kind');
+      if(k === 'axis' || k === 'surface' || !active.size){ g.style.opacity = ''; return; }
+      g.style.opacity = active.has(k) ? '1' : '0.15';
+    });
+  }
+}
+
+/* ---- Wellbore Construction rows editor (Add/Edit Well form, §7) ---- */
+
+// Field definitions per list, in the exact order requested by the brief.
+// `numeric:true` fields are parsed with parseFloat and dropped (left
+// undefined) when blank/unparseable; `select:[...]` fields render a <select>
+// with a blank "unset" option plus the given values.
+const WB_LIST_DEFS = {
+  casings: { title: 'Casings', add: '+ Add casing', fields: [
+    { key: 'name', label: 'Name' },
+    { key: 'od_mm', label: 'OD (mm)', numeric: true },
+    { key: 'grade', label: 'Grade' },
+    { key: 'weight_kgm', label: 'Weight (kg/m)', numeric: true },
+    { key: 'top_m', label: 'Top (m)', numeric: true },
+    { key: 'shoe_m', label: 'Shoe (m)', numeric: true },
+    { key: 'toc_m', label: 'TOC (m)', numeric: true },
+  ] },
+  plugs: { title: 'Plugs', add: '+ Add plug', fields: [
+    { key: 'n', label: '#', numeric: true },
+    { key: 'kind', label: 'Kind', select: ['cement', 'bridge', 'cibp'] },
+    { key: 'top_m', label: 'Top (m)', numeric: true },
+    { key: 'bottom_m', label: 'Bottom (m)', numeric: true },
+    { key: 'sacks', label: 'Sacks', numeric: true },
+    { key: 'additives', label: 'Additives' },
+    { key: 'notes', label: 'Notes' },
+  ] },
+  perforations: { title: 'Perforations', add: '+ Add perforation', fields: [
+    { key: 'top_m', label: 'Top (m)', numeric: true },
+    { key: 'bottom_m', label: 'Bottom (m)', numeric: true },
+    { key: 'status', label: 'Status' },
+  ] },
+  formations: { title: 'Formations', add: '+ Add formation', fields: [
+    { key: 'name', label: 'Name' },
+    { key: 'top_m', label: 'Top (m)', numeric: true },
+  ] },
+  packers: { title: 'Packers', add: '+ Add packer', fields: [
+    { key: 'depth_m', label: 'Depth (m)', numeric: true },
+  ] },
+  zones: { title: 'Zones', add: '+ Add zone', fields: [
+    { key: 'kind', label: 'Kind', select: ['salt', 'hydrocarbon'] },
+    { key: 'top_m', label: 'Top (m)', numeric: true },
+    { key: 'bottom_m', label: 'Bottom (m)', numeric: true },
+  ] },
+};
+
+// Fields present in the §2 shape that this rows editor has no per-row UI
+// for. Two kinds, both stashed on load and merged back in on read so an
+// untouched round-trip (editWell → save) never silently drops data the
+// editor doesn't expose — same reasoning as `legacy: prev?.legacy` in
+// readForm():
+//   - top-level `notes` / `openHole` (no editor section at all — passed
+//     through wholesale, unconditionally, since nothing can edit them).
+//   - `rows[listKey][origIndex]` — the ORIGINAL row object for every row
+//     loaded from `wb[listKey]`, keyed by its position in that array at
+//     load time. A row's fields the editor DOESN'T recognize (e.g. a
+//     casing's `type`, set by parseCasingText/mapFrom3D but not exposed
+//     as an input here) are copied from this stash on read; fields the
+//     editor DOES recognize always come from the live DOM input instead,
+//     so clearing a known field in the UI still actually clears it.
+//     Rows the user adds via "+ Add …" carry no stash entry (start blank).
+//     Rows the user removes are simply absent from the DOM at read time,
+//     so their stash entry is never consulted — no separate bookkeeping
+//     needed for deletion. Each rendered row is stamped
+//     data-wb-orig-index="<i>" at load time so a mid-list removal/add
+//     never misaligns which stash entry a surviving row maps to.
+let wbEditorExtra = { notes: undefined, openHole: undefined, rows: {} };
+
+// Builds one repeatable row: one input/select per field (data-wb="<key>"),
+// ending in a ✕ remove button. Values come from teammate-synced well data
+// (bridge/parse/manual), so every value="..." attribute is escaped.
+// `origIndex` (present only for rows rendered straight from loaded data,
+// never for a fresh "+ Add …" row) stamps data-wb-orig-index so
+// wbEditorReadRows can find this row's unknown-field stash back in
+// wbEditorExtra.rows[listKey].
+function wbRowHtml(fields, data, origIndex) {
+  data = data || {};
+  const cells = fields.map(f => {
+    const raw = data[f.key];
+    if (f.select) {
+      const opts = [''].concat(f.select).map(o => {
+        const label = o ? (o.charAt(0).toUpperCase() + o.slice(1)) : '—';
+        const sel = (raw || '') === o ? ' selected' : '';
+        return `<option value="${escapeHtml(o)}"${sel}>${escapeHtml(label)}</option>`;
+      }).join('');
+      return `<select data-wb="${escapeHtml(f.key)}" title="${escapeHtml(f.label)}">${opts}</select>`;
+    }
+    const val = (raw === undefined || raw === null) ? '' : escapeHtml(String(raw));
+    const typeAttr = f.numeric ? ' type="number" step="0.1"' : '';
+    return `<input${typeAttr} data-wb="${escapeHtml(f.key)}" placeholder="${escapeHtml(f.label)}" title="${escapeHtml(f.label)}" value="${val}"/>`;
+  }).join('');
+  const idxAttr = (origIndex === undefined || origIndex === null) ? '' : ` data-wb-orig-index="${origIndex}"`;
+  return `<div class="wb-erow" data-wb-row${idxAttr} style="display:grid;grid-template-columns:repeat(${fields.length},1fr) 26px;gap:6px;margin-bottom:6px;align-items:center">${cells}<button type="button" class="ghost" onclick="wbRemoveRow(this)" title="Remove row" style="padding:4px 6px;font-size:11px;margin:0">✕</button></div>`;
+}
+
+function wbAddRow(key) {
+  const def = WB_LIST_DEFS[key];
+  const container = document.getElementById('wbRows_' + key);
+  if (!def || !container) return;
+  // No origIndex: a user-added row starts with no unknown-field stash.
+  container.insertAdjacentHTML('beforeend', wbRowHtml(def.fields, {}));
+}
+
+function wbRemoveRow(btn) {
+  const row = btn.closest('[data-wb-row]');
+  if (row) row.remove();
+}
+
+// Delegated listener attached once to the static #wbEditor container (its
+// innerHTML is replaced wholesale on every load/parse, but the container
+// node itself never is, so a single delegated 'input' listener survives
+// re-renders). Any real user keystroke inside the editor — and ONLY that —
+// flips the tracked source to 'manual' (spec §7 / task-5 brief step 2).
+function wbEditorAttachListener() {
+  const el = document.getElementById('wbEditor');
+  if (!el || el.dataset.wbListener) return;
+  el.dataset.wbListener = '1';
+  el.addEventListener('input', () => { el.dataset.wbSource = 'manual'; });
+}
+
+// wbEditorLoad(wb) — renders TD/KB + one repeatable-rows block per list.
+// wb may be null/undefined (empty form) or a full/partial §2 object.
+function wbEditorLoad(wb) {
+  const el = document.getElementById('wbEditor');
+  if (!el) return;
+  wbEditorAttachListener();
+  wb = wb || {};
+  wbEditorExtra = {
+    notes: Array.isArray(wb.notes) ? wb.notes : undefined,
+    openHole: (wb.openHole && typeof wb.openHole === 'object') ? wb.openHole : undefined,
+    rows: {},
+  };
+  // Setting innerHTML/value attributes below never fires 'input', so this
+  // load never itself flips the source — only a subsequent keystroke does.
+  el.dataset.wbSource = wb.source || '';
+  const tdVal = typeof wb.td === 'number' ? wb.td : '';
+  const kbVal = typeof wb.kbElev === 'number' ? wb.kbElev : '';
+  const blocks = Object.keys(WB_LIST_DEFS).map(key => {
+    const def = WB_LIST_DEFS[key];
+    const rows = Array.isArray(wb[key]) ? wb[key] : [];
+    wbEditorExtra.rows[key] = rows; // stash originals for unknown-field passthrough on read
+    const rowsHtml = rows.map((r, i) => wbRowHtml(def.fields, r || {}, i)).join('');
+    return `<div style="margin-top:12px">
+      <div style="font-weight:700;font-size:12px;margin-bottom:4px">${escapeHtml(def.title)}</div>
+      <div id="wbRows_${key}">${rowsHtml}</div>
+      <button type="button" class="ghost" style="font-size:11px" onclick="wbAddRow('${key}')">${escapeHtml(def.add)}</button>
+    </div>`;
+  }).join('');
+  el.innerHTML = `
+    <div class="form-grid">
+      <div><label>Total Depth (m)</label><input id="wbTd" type="number" step="0.1" value="${tdVal}"/></div>
+      <div><label>KB Elevation (m)</label><input id="wbKb" type="number" step="0.1" value="${kbVal}"/></div>
+    </div>
+    ${blocks}
+    <div id="wbEditorWarn" class="muted" style="font-size:11px;margin-top:8px"></div>
+  `;
+}
+
+// Reads every row currently under #wbRows_<key> into plain objects, keyed
+// generically off each input/select's data-wb attribute — no per-list
+// special-casing needed here; drop/swap rules are applied by the caller.
+// Fields the editor doesn't recognize are seeded from the row's stashed
+// original (matched via data-wb-orig-index, so add/remove elsewhere in the
+// list can never misalign the merge) BEFORE the known fields are applied
+// from the live DOM — so an editor-recognized field always reflects what's
+// on screen (including an intentional clear-to-blank), while an
+// editor-unrecognized field (e.g. a casing's `type`) survives untouched.
+function wbEditorReadRows(key) {
+  const def = WB_LIST_DEFS[key];
+  const knownKeys = new Set(def.fields.map(f => f.key));
+  const stash = (wbEditorExtra.rows && wbEditorExtra.rows[key]) || [];
+  const container = document.getElementById('wbRows_' + key);
+  const rowEls = container ? [...container.querySelectorAll('[data-wb-row]')] : [];
+  return rowEls.map(row => {
+    const obj = {};
+    const origIdxAttr = row.getAttribute('data-wb-orig-index');
+    const orig = origIdxAttr !== null ? stash[+origIdxAttr] : undefined;
+    if (orig && typeof orig === 'object') {
+      Object.keys(orig).forEach(k => { if (!knownKeys.has(k)) obj[k] = orig[k]; });
+    }
+    def.fields.forEach(f => {
+      const input = row.querySelector(`[data-wb="${f.key}"]`);
+      if (!input) return;
+      const raw = input.value;
+      if (f.numeric) {
+        if (raw === '') return;
+        const n = parseFloat(raw);
+        if (Number.isFinite(n)) obj[f.key] = n;
+      } else {
+        const s = String(raw).trim();
+        if (s) obj[f.key] = s;
+      }
+    });
+    return obj;
+  });
+}
+
+// wbEditorRead() → §2 wellbore object | null. null only when TD is empty
+// AND every list serialized to zero rows (task-5 brief guardrails). Rows
+// missing their required numeric depth are dropped (counted into
+// #wbEditorWarn); top>bottom pairs are swapped rather than rejected.
+function wbEditorRead() {
+  const tdEl = document.getElementById('wbTd');
+  const kbEl = document.getElementById('wbKb');
+  const tdRaw = tdEl ? tdEl.value : '';
+  const kbRaw = kbEl ? kbEl.value : '';
+  const td = tdRaw === '' ? null : parseFloat(tdRaw);
+  const kbElev = kbRaw === '' ? null : parseFloat(kbRaw);
+
+  let dropped = 0;
+  const swapIfInverted = (o, a, b) => {
+    if (typeof o[a] === 'number' && typeof o[b] === 'number' && o[a] > o[b]) {
+      const t = o[a]; o[a] = o[b]; o[b] = t;
+    }
+  };
+
+  const casings = wbEditorReadRows('casings').filter(c => {
+    swapIfInverted(c, 'top_m', 'shoe_m');
+    if (typeof c.shoe_m !== 'number') { dropped++; return false; }
+    return true;
+  });
+
+  const readRangeList = key => wbEditorReadRows(key).filter(o => {
+    if (typeof o.top_m !== 'number' || typeof o.bottom_m !== 'number') { dropped++; return false; }
+    swapIfInverted(o, 'top_m', 'bottom_m');
+    return true;
+  });
+  const plugs = readRangeList('plugs');
+  const perforations = readRangeList('perforations');
+  const zones = readRangeList('zones');
+
+  const formations = wbEditorReadRows('formations').filter(f => {
+    if (typeof f.top_m !== 'number') { dropped++; return false; }
+    return true;
+  });
+  const packers = wbEditorReadRows('packers').filter(p => {
+    if (typeof p.depth_m !== 'number') { dropped++; return false; }
+    return true;
+  });
+
+  const warnEl = document.getElementById('wbEditorWarn');
+  if (warnEl) warnEl.textContent = dropped ? `${dropped} row${dropped === 1 ? '' : 's'} dropped — missing required depth.` : '';
+
+  const hasRows = casings.length || plugs.length || perforations.length || formations.length || packers.length || zones.length;
+  if (td === null && !hasRows) return null;
+
+  const wb = {};
+  if (td !== null) wb.td = td;
+  if (kbElev !== null) wb.kbElev = kbElev;
+  if (casings.length) wb.casings = casings;
+  if (plugs.length) wb.plugs = plugs;
+  if (perforations.length) wb.perforations = perforations;
+  if (formations.length) wb.formations = formations;
+  if (packers.length) wb.packers = packers;
+  if (zones.length) wb.zones = zones;
+  if (wbEditorExtra.notes && wbEditorExtra.notes.length) wb.notes = wbEditorExtra.notes;
+  if (wbEditorExtra.openHole) wb.openHole = wbEditorExtra.openHole;
+
+  const el = document.getElementById('wbEditor');
+  wb.source = (el && el.dataset.wbSource) || 'manual';
+
+  return wb;
+}
+
+// wbParsePaste() — runs the pure parser over #wbPaste and loads the result
+// into the rows editor, tagging it 'parsed'. Confirms before clobbering
+// existing rows (never before clobbering an editor that's already empty).
+function wbParsePaste() {
+  const ta = document.getElementById('wbPaste');
+  const warnEl = document.getElementById('wbParseWarn');
+  if (!ta) return;
+  const hasRows = document.querySelectorAll('#wbEditor [data-wb-row]').length > 0;
+  if (hasRows && !confirm('Replace the current construction rows with the parsed report?')) return;
+  const { wellbore, warnings } = Wellbore.parseWellboreReport(ta.value);
+  wbEditorLoad(wellbore);
+  const el = document.getElementById('wbEditor');
+  if (el) el.dataset.wbSource = 'parsed';
+  if (warnEl) {
+    if (warnings.length) {
+      const shown = warnings.slice(0, 3).join(' · ');
+      warnEl.textContent = `${warnings.length} warning${warnings.length === 1 ? '' : 's'}: ${shown}${warnings.length > 3 ? ' …' : ''}`;
+    } else {
+      warnEl.textContent = '';
+    }
+  }
+}
+
+/* ===== END WELLBORE UI ===== */
+
 /* ============ SCORING MODEL — Appendix D + § 7.2 ============ */
 
 /* Legacy well classifications — Table A-1 / Figure A-4, Enbridge "CO2 Underground
@@ -671,6 +2296,8 @@ function readForm(){
   const t = document.getElementById('f_recAction').value.trim();
   const wasPrefillEngine = prev && !prev.recActionOverride && t === recPlainText(prev).trim();
   w.recActionOverride = (t && !wasPrefillEngine && t !== recPlainText(w).trim()) ? t : '';
+  const wb = wbEditorRead();
+  if (wb) w.wellbore = wb; else delete w.wellbore;
   return w;
 }
 
@@ -705,6 +2332,9 @@ function resetForm(keepScores){
   document.getElementById('f_class').selectedIndex=0; updateClassHint();
   if(!keepScores){ state.currentForm = defaultScores(); }
   updateAllSegs(); updateLiveTotal();
+  wbEditorLoad(null);
+  const wbp = document.getElementById('wbPaste'); if(wbp) wbp.value = '';
+  const wbWarn = document.getElementById('wbParseWarn'); if(wbWarn) wbWarn.textContent = '';
 }
 
 function editWell(id){
@@ -727,6 +2357,9 @@ function editWell(id){
   const nw = WellScoring.normalizeWell(w, METHODOLOGY);
   state.currentForm = {...nw.scores};
   updateAllSegs(); updateLiveTotal();
+  wbEditorLoad(w.wellbore || null);
+  const wbp = document.getElementById('wbPaste'); if(wbp) wbp.value = '';
+  const wbWarn = document.getElementById('wbParseWarn'); if(wbWarn) wbWarn.textContent = '';
   window.scrollTo({top:0,behavior:'smooth'});
 }
 
@@ -1020,11 +2653,14 @@ function openDetail(id){
       </div>
     </div>
 
+    <div id="wbSection" style="margin-top:14px"></div>
+
     <div class="actions-row" style="margin-top:14px">
       <button class="ghost" onclick="editWell('${w2.id}')">Edit</button>
       <button class="primary" onclick="exportPDF('${w2.id}')">⬇ Download Well PDF</button>
     </div>
   `;
+  mountWellboreSchematic(document.getElementById('wbSection'), w2.wellbore, w2.licence);
 }
 
 /* Recommendation engine — first-principles wiring of Appendix D output into § 8 actions */
@@ -1183,6 +2819,7 @@ function mapFrom3D(r, prev){
     needsReview: !native || derivedAny,          // native pushes are already scored on the same rulebook, unless some params are machine-derived
     legacy: prev?.legacy,
     recActionOverride: prev?.recActionOverride || '',
+    wellbore: (prev?.wellbore && prev.wellbore.source !== 'bridge') ? prev.wellbore : (Wellbore.wellboreFrom3D(r) || prev?.wellbore),
     createdAt: prev?.createdAt || now, updatedAt: now,
     updatedBy: (syncName() ? syncName() + ' ' : '') + '(3D Reviewer)',
   };
@@ -2151,6 +3788,7 @@ function initSync(){
 load();           // local cache first (instant paint, offline fallback)
 buildScoring();
 updateLiveTotal();
+wbEditorLoad(null);  // seed the empty-state rows editor so #wbEditor isn't blank before the first editWell()/resetForm()
 render();
 initSync();       // then pull the shared team register and start auto-refresh; must run even if render() above failed
 </script>
