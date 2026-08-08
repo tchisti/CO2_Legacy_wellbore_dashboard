@@ -998,16 +998,19 @@ function wellboreStats(wb) {
 
 function depthScale(td, pxHeight) {
   const yOf = m => (td > 0 ? (m / td) * pxHeight : 0);
+  const MAX_TICKS = 200; // cap tick count so a corrupt/absurd td can't hang the tab
   const ticks = (unit) => {
     const out = [];
     if (unit === 'ft') {
-      const stepFt = 100;
+      let stepFt = 100;
+      while (td > 0 && td / (stepFt * 0.3048) > MAX_TICKS) stepFt *= 2;
       const stepM = stepFt * 0.3048;
       for (let m = 0; m <= td + 1e-9; m += stepM) {
         out.push({ m: +m.toFixed(2), label: String(Math.round(mToFt(m))) });
       }
     } else {
-      const stepM = 50;
+      let stepM = 50;
+      while (td > 0 && td / stepM > MAX_TICKS) stepM *= 2;
       for (let m = 0; m <= td + 1e-9; m += stepM) {
         out.push({ m: +m.toFixed(2), label: String(Math.round(m)) });
       }
@@ -1412,6 +1415,7 @@ let schemUnit = (function(){ try { return localStorage.getItem('lwms:schemUnit')
 let wbState = null;
 
 function mountWellboreSchematic(host, wb, licence){
+  const tip = document.getElementById('tooltip'); if (tip) tip.style.display = 'none';
   wbState = null;
   if(!host) return;
   if(!wb || !(wb.td > 0)){
@@ -1461,6 +1465,15 @@ function wbRenderCard(){
       </div>
     </div>
   `;
+  // Capture the freshly-rendered SVG's full viewBox once, before any zoom/pan
+  // touches it — wbWireJumpInput needs the ORIGINAL height to clamp against,
+  // not the current (possibly zoomed) window height.
+  const freshSvg = document.getElementById('wbSvg');
+  if(freshSvg){
+    const vb0_attr = freshSvg.getAttribute('viewBox');
+    const vb0_parts = vb0_attr ? vb0_attr.split(/\s+/).map(Number) : [0, 0, 760, 920];
+    st.vb0 = [0, 0, vb0_parts[2], vb0_parts[3]];
+  }
   wbWireSvgEvents();
   wbWireJumpInput();
   wbWireExportButtons();
@@ -1641,13 +1654,13 @@ function wbWireJumpInput(){
     const scale = Wellbore.depthScale(st.wb.td, plotH);
     const yTarget = TOP + scale.yOf(m);
 
-    // Get current vb to extract VBH
-    const vb_attr = document.getElementById('wbSvg').getAttribute('viewBox');
-    const vb_parts = vb_attr ? vb_attr.split(/\s+/).map(Number) : [0, 0, 760, 920];
-    const VBH = vb_parts[3];
+    // Clamp against the ORIGINAL full viewBox height captured at mount
+    // (st.vb0), not the current viewBox attribute — that attribute always
+    // equals st.vb after applyVB(), which made the old clamp a no-op.
+    const VBH0 = (st.vb0 && st.vb0[3]) || H;
 
     // Jump to depth: set vb[1] to center the depth in view, clamped
-    st.vb[1] = Math.max(0, Math.min(VBH - st.vb[3], yTarget - st.vb[3]/2));
+    st.vb[1] = Math.max(0, Math.min(VBH0 - st.vb[3], yTarget - st.vb[3]/2));
     document.getElementById('wbSvg').setAttribute('viewBox', st.vb.join(' '));
     jumpInput.value = '';
     jumpInput.blur();

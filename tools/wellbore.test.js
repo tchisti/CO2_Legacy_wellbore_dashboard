@@ -109,6 +109,8 @@ eq('yOf surface', sc.yOf(0), 0);
 eq('yOf td', sc.yOf(1000), 500);
 eq('metric ticks every 50', sc.ticks('m')[1].m, 50);
 eq('imperial ticks every 100ft', +(sc.ticks('ft')[1].m/0.3048).toFixed(0), 100);
+ok('tick count capped for absurd td', W.depthScale(14472000, 900).ticks('m').length <= 201);
+ok('normal td keeps 50m ticks', W.depthScale(1000, 900).ticks('m')[1].m === 50);
 
 // renderer — full fixture
 const wbFull = { td: 1500, kbElev: 800, source: 'manual',
