@@ -105,6 +105,14 @@ table.wells tr:hover{background:var(--thead);cursor:pointer}
 label{font-size:12px;color:var(--muted);display:block;margin-bottom:4px}
 input,select,textarea{width:100%;background:var(--field);border:1px solid var(--line);color:var(--text);padding:8px 10px;border-radius:7px;font-size:13px;outline:none;font-family:inherit}
 input:focus,select:focus,textarea:focus{border-color:var(--accent)}
+
+/* Wellbore Construction rows editor (§7) — one card per row, labelled fields */
+.wb-erow{position:relative;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 34px 8px 8px;margin-bottom:8px}
+.wb-efields{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:6px 8px}
+.wb-efield{display:block;margin:0}
+.wb-efield .wb-elabel{display:block;font-size:10px;font-weight:600;color:var(--muted);letter-spacing:.3px;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wb-efield input,.wb-efield select{padding:6px 8px;font-size:12px}
+.wb-erow .wb-remove{position:absolute;top:6px;right:6px;padding:2px 7px;font-size:11px;margin:0;line-height:1.4}
 .scoring{display:grid;gap:8px;margin-top:8px}
 .score-row{display:grid;grid-template-columns:1.5fr 2.2fr 60px;gap:8px;align-items:center;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--field)}
 .score-row .name{font-size:12px;font-weight:600}
@@ -1871,40 +1879,52 @@ function wbApplyLegendState(){
 // undefined) when blank/unparseable; `select:[...]` fields render a <select>
 // with a blank "unset" option plus the given values.
 const WB_LIST_DEFS = {
-  casings: { title: 'Casings', add: '+ Add casing', fields: [
-    { key: 'name', label: 'Name' },
-    { key: 'od_mm', label: 'OD (mm)', numeric: true },
-    { key: 'grade', label: 'Grade' },
-    { key: 'weight_kgm', label: 'Weight (kg/m)', numeric: true },
-    { key: 'top_m', label: 'Top (m)', numeric: true },
-    { key: 'shoe_m', label: 'Shoe (m)', numeric: true },
-    { key: 'toc_m', label: 'TOC (m)', numeric: true },
+  casings: { title: 'Casings', add: '+ Add casing',
+    hint: 'One row per casing/liner string, depths in metres MD. Shoe (m) is required — rows without it are dropped on save.',
+    fields: [
+    { key: 'name', label: 'Name', ph: 'e.g. Surface' },
+    { key: 'od_mm', label: 'OD (mm)', numeric: true, ph: 'e.g. 244.5' },
+    { key: 'grade', label: 'Grade', ph: 'e.g. J-55' },
+    { key: 'weight_kgm', label: 'Weight (kg/m)', numeric: true, ph: 'e.g. 53.6' },
+    { key: 'top_m', label: 'Top (m)', numeric: true, ph: 'e.g. 0' },
+    { key: 'shoe_m', label: 'Shoe (m)', numeric: true, ph: 'e.g. 312' },
+    { key: 'toc_m', label: 'TOC (m)', numeric: true, ph: 'cement top' },
   ] },
-  plugs: { title: 'Plugs', add: '+ Add plug', fields: [
-    { key: 'n', label: '#', numeric: true },
+  plugs: { title: 'Plugs', add: '+ Add plug',
+    hint: 'Cement / bridge plugs. Top (m) and Bottom (m) are required.',
+    fields: [
+    { key: 'n', label: 'Plug #', numeric: true, ph: 'e.g. 1' },
     { key: 'kind', label: 'Kind', select: ['cement', 'bridge', 'cibp'] },
-    { key: 'top_m', label: 'Top (m)', numeric: true },
-    { key: 'bottom_m', label: 'Bottom (m)', numeric: true },
-    { key: 'sacks', label: 'Sacks', numeric: true },
-    { key: 'additives', label: 'Additives' },
-    { key: 'notes', label: 'Notes' },
+    { key: 'top_m', label: 'Top (m)', numeric: true, ph: 'e.g. 980' },
+    { key: 'bottom_m', label: 'Bottom (m)', numeric: true, ph: 'e.g. 1046' },
+    { key: 'sacks', label: 'Sacks', numeric: true, ph: 'e.g. 170' },
+    { key: 'additives', label: 'Additives', ph: 'e.g. 2% CaCl2' },
+    { key: 'notes', label: 'Notes', ph: 'optional' },
   ] },
-  perforations: { title: 'Perforations', add: '+ Add perforation', fields: [
-    { key: 'top_m', label: 'Top (m)', numeric: true },
-    { key: 'bottom_m', label: 'Bottom (m)', numeric: true },
-    { key: 'status', label: 'Status' },
+  perforations: { title: 'Perforations', add: '+ Add perforation',
+    hint: 'Perforated intervals. Top (m) and Bottom (m) are required.',
+    fields: [
+    { key: 'top_m', label: 'Top (m)', numeric: true, ph: 'e.g. 1210' },
+    { key: 'bottom_m', label: 'Bottom (m)', numeric: true, ph: 'e.g. 1240' },
+    { key: 'status', label: 'Status', ph: 'e.g. squeezed' },
   ] },
-  formations: { title: 'Formations', add: '+ Add formation', fields: [
-    { key: 'name', label: 'Name' },
-    { key: 'top_m', label: 'Top (m)', numeric: true },
+  formations: { title: 'Formations', add: '+ Add formation',
+    hint: 'Formation tops. Top (m) is required.',
+    fields: [
+    { key: 'name', label: 'Name', ph: 'e.g. Belly River' },
+    { key: 'top_m', label: 'Top (m)', numeric: true, ph: 'e.g. 890' },
   ] },
-  packers: { title: 'Packers', add: '+ Add packer', fields: [
-    { key: 'depth_m', label: 'Depth (m)', numeric: true },
+  packers: { title: 'Packers', add: '+ Add packer',
+    hint: 'Packer set depth. Depth (m) is required.',
+    fields: [
+    { key: 'depth_m', label: 'Depth (m)', numeric: true, ph: 'e.g. 1150' },
   ] },
-  zones: { title: 'Zones', add: '+ Add zone', fields: [
+  zones: { title: 'Zones', add: '+ Add zone',
+    hint: 'Salt or hydrocarbon-bearing zones. Top (m) and Bottom (m) are required.',
+    fields: [
     { key: 'kind', label: 'Kind', select: ['salt', 'hydrocarbon'] },
-    { key: 'top_m', label: 'Top (m)', numeric: true },
-    { key: 'bottom_m', label: 'Bottom (m)', numeric: true },
+    { key: 'top_m', label: 'Top (m)', numeric: true, ph: 'e.g. 1400' },
+    { key: 'bottom_m', label: 'Bottom (m)', numeric: true, ph: 'e.g. 1480' },
   ] },
 };
 
@@ -1941,20 +1961,23 @@ function wbRowHtml(fields, data, origIndex) {
   data = data || {};
   const cells = fields.map(f => {
     const raw = data[f.key];
+    let control;
     if (f.select) {
       const opts = [''].concat(f.select).map(o => {
         const label = o ? (o.charAt(0).toUpperCase() + o.slice(1)) : '—';
         const sel = (raw || '') === o ? ' selected' : '';
         return `<option value="${escapeHtml(o)}"${sel}>${escapeHtml(label)}</option>`;
       }).join('');
-      return `<select data-wb="${escapeHtml(f.key)}" title="${escapeHtml(f.label)}">${opts}</select>`;
+      control = `<select data-wb="${escapeHtml(f.key)}" title="${escapeHtml(f.label)}">${opts}</select>`;
+    } else {
+      const val = (raw === undefined || raw === null) ? '' : escapeHtml(String(raw));
+      const typeAttr = f.numeric ? ' type="number" step="0.1"' : '';
+      control = `<input${typeAttr} data-wb="${escapeHtml(f.key)}" placeholder="${escapeHtml(f.ph || '')}" title="${escapeHtml(f.label)}" value="${val}"/>`;
     }
-    const val = (raw === undefined || raw === null) ? '' : escapeHtml(String(raw));
-    const typeAttr = f.numeric ? ' type="number" step="0.1"' : '';
-    return `<input${typeAttr} data-wb="${escapeHtml(f.key)}" placeholder="${escapeHtml(f.label)}" title="${escapeHtml(f.label)}" value="${val}"/>`;
+    return `<label class="wb-efield"><span class="wb-elabel" title="${escapeHtml(f.label)}">${escapeHtml(f.label)}</span>${control}</label>`;
   }).join('');
   const idxAttr = (origIndex === undefined || origIndex === null) ? '' : ` data-wb-orig-index="${origIndex}"`;
-  return `<div class="wb-erow" data-wb-row${idxAttr} style="display:grid;grid-template-columns:repeat(${fields.length},1fr) 26px;gap:6px;margin-bottom:6px;align-items:center">${cells}<button type="button" class="ghost" onclick="wbRemoveRow(this)" title="Remove row" style="padding:4px 6px;font-size:11px;margin:0">✕</button></div>`;
+  return `<div class="wb-erow" data-wb-row${idxAttr}><div class="wb-efields">${cells}</div><button type="button" class="ghost wb-remove" onclick="wbRemoveRow(this)" title="Remove row" aria-label="Remove row">✕</button></div>`;
 }
 
 function wbAddRow(key) {
@@ -2004,8 +2027,9 @@ function wbEditorLoad(wb) {
     const rows = Array.isArray(wb[key]) ? wb[key] : [];
     wbEditorExtra.rows[key] = rows; // stash originals for unknown-field passthrough on read
     const rowsHtml = rows.map((r, i) => wbRowHtml(def.fields, r || {}, i)).join('');
-    return `<div style="margin-top:12px">
-      <div style="font-weight:700;font-size:12px;margin-bottom:4px">${escapeHtml(def.title)}</div>
+    return `<div style="margin-top:14px">
+      <div style="font-weight:700;font-size:12px;margin-bottom:2px">${escapeHtml(def.title)}</div>
+      <div class="muted" style="font-size:11px;line-height:1.4;margin-bottom:6px">${escapeHtml(def.hint || '')}</div>
       <div id="wbRows_${key}">${rowsHtml}</div>
       <button type="button" class="ghost" style="font-size:11px" onclick="wbAddRow('${key}')">${escapeHtml(def.add)}</button>
     </div>`;
