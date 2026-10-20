@@ -44,6 +44,12 @@ test.describe('with the Fort Saskatchewan fixture', () => {
     await expect(first.locator('td[data-column="lc"]')).toHaveText('1.8 × 2.6');
     await expect(page.getByRole('columnheader', { name: /L × C/ })).toHaveAttribute('aria-sort', 'descending');
     await expect(rowFor(page, '100/13-05-056-22W4/00').locator('td[data-column="state"]')).toHaveText('Stale revision');
+    // Stale is the amber state badge (spec §5.1); every other state stays neutral.
+    await expect(rowFor(page, '100/13-05-056-22W4/00').locator('td[data-column="state"] [data-tone]')).toHaveAttribute(
+      'data-tone',
+      'warn',
+    );
+    await expect(first.locator('td[data-column="state"] [data-tone]')).toHaveAttribute('data-tone', 'neutral');
     await expect(page.getByText('5 wells', { exact: true })).toBeVisible();
   });
 

@@ -12,6 +12,7 @@ import {
   type Methodology,
   type MethodologyRecord,
   type ParamKey,
+  type RevisionDelta,
   type Score,
 } from '@lwa/engine';
 import { MISSING, fmtDate } from '@/lib/format';
@@ -75,6 +76,15 @@ export function methodologyForRevision(
 /** "assessed under 2.0.0 by Tahir Chisti on 2026-08-07" (the date in UTC). */
 export function attribution(a: Pick<Assessment, 'methodologyRevision' | 'reviewerName' | 'assessedAt'>): string {
   return `assessed under ${a.methodologyRevision} by ${a.reviewerName} on ${fmtDate(a.assessedAt)}`;
+}
+
+/**
+ * The note for an assessment made under an earlier revision that differs only by a patch (wording
+ * only, spec §5.1): "assessed under 2.0.0 (current 2.0.1, wording only)". Null otherwise: a minor
+ * or major move is a stale revision, and the same revision needs no note.
+ */
+export function revisionNote(assessedRevision: string, currentRevision: string, delta: RevisionDelta): string | null {
+  return delta === 'patch' ? `assessed under ${assessedRevision} (current ${currentRevision}, wording only)` : null;
 }
 
 /* ---------- recommended action ---------- */

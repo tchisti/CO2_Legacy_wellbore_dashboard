@@ -18,6 +18,7 @@ import {
   diffSummary,
   methodologyForRevision,
   priorFinals,
+  revisionNote,
   scoreRows,
   wellHistory,
 } from '@/lib/assessment-view';
@@ -184,6 +185,20 @@ describe('methodologyForRevision', () => {
 describe('attribution', () => {
   it('reads "assessed under <rev> by <reviewer> on <date>"', () => {
     expect(attribution(assessment())).toBe('assessed under 2.0.0 by Tahir Chisti on 2026-08-07');
+  });
+});
+
+/* ---------- revisionNote ---------- */
+
+describe('revisionNote', () => {
+  it('reads "assessed under <a> (current <c>, wording only)" for a patch bump', () => {
+    expect(revisionNote('2.0.0', '2.0.1', 'patch')).toBe('assessed under 2.0.0 (current 2.0.1, wording only)');
+  });
+
+  it('is null when the revision is current, or moved by minor or major (that is stale, not a note)', () => {
+    expect(revisionNote('2.0.0', '2.0.0', 'none')).toBeNull();
+    expect(revisionNote('2.0.0', '2.1.0', 'minor')).toBeNull();
+    expect(revisionNote('1.0.0', '2.0.0', 'major')).toBeNull();
   });
 });
 

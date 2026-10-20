@@ -117,8 +117,32 @@ test.describe('with the Fort Saskatchewan fixture', () => {
     await expect(verdict(page)).toContainText('assessed under 1.0.0 by Tahir Chisti on 2026-07-24');
     const badge = summary(page).getByText('Stale revision', { exact: true });
     await expect(badge).toBeVisible();
+    await expect(badge).toHaveAttribute('data-tone', 'warn');
     await badge.focus();
     await expect(badge).toHaveAccessibleDescription('Assessed under 1.0.0; current 2.0.0');
+  });
+
+  test('a wording-only revision (2.0.1) shows "assessed under 2.0.0 (current 2.0.1, wording only)" and no stale badge', async ({
+    page,
+  }) => {
+    await page.evaluate(async () => {
+      const { store } = window.__lwa!;
+      const m = await store.methodology.current();
+      const params = m.params.map((p, i) => (i === 0 ? { ...p, anchors: { ...p.anchors, '1': `${p.anchors['1']} (reworded)` } } : p));
+      await store.methodology.publish({ ...m, revision: '2.0.1', params }, 'Wording only');
+    });
+    await page.goto(`/wells/view?id=${FT_SASK.id}`);
+    const note = summary(page).getByText('assessed under 2.0.0 (current 2.0.1, wording only)', { exact: true });
+    await expect(note).toBeVisible();
+    await expect(note).toHaveAttribute('data-tone', 'neutral');
+    await expect(summary(page).getByText('Stale revision')).toHaveCount(0);
+    // Still shown under its own revision, whose record the project has: the old wording.
+    await expect(scoreTable(page).locator('tr[data-param="plugQuality"]')).not.toContainText('(reworded)');
+
+    // A major move is still stale, and amber.
+    await page.goto(`/wells/view?id=${REDWATER.id}`);
+    await expect(summary(page).getByText('Stale revision', { exact: true })).toHaveAttribute('data-tone', 'warn');
+    await expect(summary(page).getByText(/wording only/)).toHaveCount(0);
   });
 
   test('a stale well shows the rev note when its revision has no record', async ({ page }) => {

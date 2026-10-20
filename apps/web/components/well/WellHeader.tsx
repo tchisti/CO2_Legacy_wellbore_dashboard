@@ -6,12 +6,13 @@
 // actions: Score / Re-assess / Continue draft (the score flow, `?score=1`), Edit record, Report.
 import type { ReactNode } from 'react';
 import Link from 'next/link';
-import { FilePenLineIcon, FileTextIcon, HistoryIcon, PencilLineIcon, type LucideIcon } from 'lucide-react';
+import { FilePenLineIcon, FileTextIcon, HistoryIcon, InfoIcon, PencilLineIcon, type LucideIcon } from 'lucide-react';
 import type { Assessment, Methodology, Well } from '@lwa/engine';
 import { RankBadge } from '@/components/domain/RankBadge';
+import { StateBadge, type StateTone } from '@/components/domain/StateBadge';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { attribution } from '@/lib/assessment-view';
+import { attribution, revisionNote } from '@/lib/assessment-view';
 import type { AssessmentState } from '@/lib/derived';
 import { MISSING, fmt1, fmtCoord, fmtDate } from '@/lib/format';
 import { wellHref, wellReportHref } from '@/lib/routes';
@@ -28,16 +29,27 @@ function Fact({ label, children, className }: { label: string; children: ReactNo
 
 const Missing = () => <span className="text-muted-foreground">{MISSING}</span>;
 
-/** A derived state (§5.1) as a quiet badge with an icon; the tooltip says why. Focusable, so the reason reaches the keyboard. */
-function StateBadge({ icon: Icon, label, reason }: { icon: LucideIcon; label: string; reason?: string }) {
+/** A derived state (§5.1) as a badge with an icon; the tooltip says why. Focusable, so the reason reaches the keyboard. */
+function ReasonedBadge({
+  icon,
+  label,
+  reason,
+  tone = 'neutral',
+}: {
+  icon: LucideIcon;
+  label: string;
+  reason?: string;
+  tone?: StateTone;
+}) {
   const badge = (
-    <span
+    <StateBadge
+      icon={icon}
+      tone={tone}
       tabIndex={reason ? 0 : undefined}
-      className="inline-flex h-5 items-center gap-1 rounded-sm border border-line bg-subtle px-1.5 text-xs whitespace-nowrap text-ink outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+      className="outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
     >
-      <Icon aria-hidden="true" className="size-3 text-muted-foreground" />
       {label}
-    </span>
+    </StateBadge>
   );
   if (!reason) return badge;
   return (
@@ -74,6 +86,7 @@ export function WellHeader({
   const coordinates =
     well.lat === null || well.lon === null ? null : `${fmtCoord(well.lat)}, ${fmtCoord(well.lon)}`;
   const primary = draft ? 'Continue draft' : current ? 'Re-assess' : 'Score';
+  const note = current ? revisionNote(current.methodologyRevision, currentRevision, state.stale.delta) : null;
 
   return (
     <section aria-label="Well summary" className="grid gap-x-10 gap-y-5 border-b pb-6 lg:grid-cols-[minmax(0,1fr)_auto]">
@@ -131,23 +144,31 @@ export function WellHeader({
           ) : (
             <p className="text-sm text-muted-foreground">Not yet assessed</p>
           )}
-          {state.stale.stale || state.recordChanged || draft ? (
+          {state.stale.stale || note || state.recordChanged || draft ? (
             <div className="flex flex-wrap gap-1.5 lg:justify-end">
               {current && state.stale.stale ? (
-                <StateBadge
+                <ReasonedBadge
                   icon={HistoryIcon}
+                  tone="warn"
                   label="Stale revision"
                   reason={`Assessed under ${current.methodologyRevision}; current ${currentRevision}`}
                 />
               ) : null}
+              {note ? (
+                <ReasonedBadge
+                  icon={InfoIcon}
+                  label={note}
+                  reason={`Revision ${currentRevision} changed wording only: weights, bands and scoring are the same, so this assessment is not stale.`}
+                />
+              ) : null}
               {current && state.recordChanged ? (
-                <StateBadge
+                <ReasonedBadge
                   icon={FilePenLineIcon}
                   label="Record changed since assessment"
                   reason={`The record was edited on ${fmtDate(well.updatedAt)}, after the assessment of ${fmtDate(current.assessedAt)}.`}
                 />
               ) : null}
-              {draft ? <StateBadge icon={PencilLineIcon} label={state.label} /> : null}
+              {draft ? <ReasonedBadge icon={PencilLineIcon} label={state.label} /> : null}
             </div>
           ) : null}
         </div>

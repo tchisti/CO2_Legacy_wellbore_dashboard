@@ -4,8 +4,10 @@
 
 /*
  * One palette (spec §7): neutral greys, one accent for interactive elements, and the four rank
- * colours used only for rank (the methodology band hexes, so reports match v2). Light is the
- * default; dark applies only with data-theme="dark" on <html> (lib/theme.ts), never from the OS.
+ * colours used only for rank (the methodology band hexes, so reports match v2). One warning
+ * colour, amber, marks a stale methodology revision (spec §5.1); it is deliberately not the
+ * Moderate rank hex. Light is the default; dark applies only with data-theme="dark" on <html>
+ * (lib/theme.ts), never from the OS.
  */
 
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
@@ -24,6 +26,9 @@
   --accent: #2557c7; /* the one interactive colour: primary actions, links, focus */
   --accent-ink: #ffffff; /* text on the accent */
   --danger: #b42318; /* errors and destructive actions (never a rank) */
+  --warn-fg: #7a4a00; /* warning text and icon: 6.9:1 on --warn-bg, 7.0:1 on --bg */
+  --warn-bg: #fdf6dc; /* warning fill */
+  --warn-line: #e0bd55; /* warning border */
 
   --rank-low: #1fbf75;
   --rank-mod: #f0a93b;
@@ -69,6 +74,9 @@
   --accent: #79a4ff;
   --accent-ink: #0b1220;
   --danger: #f97066;
+  --warn-fg: #f2cd6b; /* 10.3:1 on --warn-bg, 12.4:1 on --bg */
+  --warn-bg: #2a2210;
+  --warn-line: #7d6220;
 }
 
 @theme inline {
@@ -80,6 +88,9 @@
   --color-line-strong: var(--line-strong);
   --color-ink: var(--ink);
   --color-danger: var(--danger);
+  --color-warn: var(--warn-fg);
+  --color-warn-bg: var(--warn-bg);
+  --color-warn-line: var(--warn-line);
   --color-rank-low: var(--rank-low);
   --color-rank-mod: var(--rank-mod);
   --color-rank-high: var(--rank-high);

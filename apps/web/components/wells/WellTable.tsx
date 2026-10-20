@@ -2,22 +2,15 @@
 
 // The register table (spec §4.2, §7): 13 px text on 32 px rows, licences and numbers in mono with
 // tabular figures, rank as the RankBadge (the only place rank colours appear), the assessment state
-// as a quiet badge. Every row is focusable: Enter or a click opens the well, ↑/↓ move between rows;
+// as a state badge (neutral; amber for a stale revision). Every row is focusable: Enter or a click opens the well, ↑/↓ move between rows;
 // the checkbox and the actions menu do not open it. Rows arrive filtered and sorted (lib/wells-view);
 // clicking a sortable header asks for a new sort. Columns are TanStack Table definitions; the
 // selection, sort and row actions reach the cells through context so the definitions stay static.
 import { createContext, useContext, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react';
 import { createColumnHelper, tableFeatures, useTable } from '@tanstack/react-table';
-import {
-  ArrowDownIcon,
-  ArrowUpIcon,
-  CircleCheckIcon,
-  CircleDashedIcon,
-  EllipsisIcon,
-  HistoryIcon,
-  PencilLineIcon,
-} from 'lucide-react';
+import { ArrowDownIcon, ArrowUpIcon, EllipsisIcon } from 'lucide-react';
 import { RankBadge } from '@/components/domain/RankBadge';
+import { AssessmentStateBadge } from '@/components/domain/StateBadge';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -89,30 +82,6 @@ function SelectRow({ row }: { row: WellRow }) {
   );
 }
 
-const STATE_ICON = {
-  unscored: CircleDashedIcon,
-  draft: PencilLineIcon,
-  final: CircleCheckIcon,
-} as const;
-
-/** The assessment state as a quiet badge: neutral colours, an icon and the label. */
-function StateBadge({ row }: { row: WellRow }) {
-  const { kind, stale, label } = row.state;
-  const Icon = kind === 'final' && stale.stale ? HistoryIcon : STATE_ICON[kind];
-  return (
-    <span
-      data-state-kind={kind}
-      className={cn(
-        'inline-flex h-5 items-center gap-1 rounded-sm border px-1.5 text-xs whitespace-nowrap',
-        kind === 'unscored' ? 'border-dashed border-line-strong text-muted-foreground' : 'border-line bg-subtle text-ink',
-      )}
-    >
-      <Icon aria-hidden="true" className="size-3 text-muted-foreground" />
-      {label}
-    </span>
-  );
-}
-
 function RowActions({ row }: { row: WellRow }) {
   const { onOpen, onEdit, onDelete } = useActions();
   return (
@@ -163,7 +132,7 @@ const columns = col.columns([
     cell: ({ row }) => (row.original.cell === null ? <Missing /> : row.original.cell),
   }),
   col.display({ id: 'rank', header: 'Rank', cell: ({ row }) => <RankBadge label={row.original.rank} /> }),
-  col.display({ id: 'state', header: 'Assessment', cell: ({ row }) => <StateBadge row={row.original} /> }),
+  col.display({ id: 'state', header: 'Assessment', cell: ({ row }) => <AssessmentStateBadge state={row.original.state} /> }),
   col.display({
     id: 'reviewer',
     header: 'Reviewer',
