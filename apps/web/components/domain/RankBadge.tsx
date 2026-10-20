@@ -11,6 +11,11 @@ const RANK_TOKEN: Record<string, string> = {
   'Very High': 'var(--rank-crit)',
 };
 
+/** The colour token of a band label, or undefined for a label that is not one of the four bands. */
+export function rankColour(label: string | null | undefined): string | undefined {
+  return label ? RANK_TOKEN[label] : undefined;
+}
+
 export function RankBadge({
   label,
   cell,
@@ -20,7 +25,7 @@ export function RankBadge({
   cell?: number | null;
   className?: string;
 }) {
-  const colour = label ? RANK_TOKEN[label] : undefined;
+  const colour = rankColour(label);
   const style = colour ? ({ '--rank': colour } as CSSProperties) : undefined;
   return (
     <span

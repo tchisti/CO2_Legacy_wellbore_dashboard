@@ -24,3 +24,8 @@ export function fmtDate(iso: string | null | undefined): string {
   const t = Date.parse(iso);
   return Number.isNaN(t) ? MISSING : new Date(t).toISOString().slice(0, 10);
 }
+
+/** A count with its noun: "1 well", "2 wells", "0 assessments". */
+export function plural(n: number, one: string, many = `${one}s`): string {
+  return `${n} ${n === 1 ? one : many}`;
+}

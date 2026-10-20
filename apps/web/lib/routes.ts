@@ -44,3 +44,7 @@ export function wellsHref(query?: RouteQuery): string {
 export function portfolioReportHref(query?: RouteQuery): string {
   return `/report/portfolio${queryString(query)}`;
 }
+
+export function newWellHref(): string {
+  return `${ROUTES.wells}/new`;
+}

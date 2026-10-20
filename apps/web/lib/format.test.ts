@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fmt1, fmtDate, fmtDepth } from '@/lib/format';
+import { fmt1, fmtDate, fmtDepth, plural } from '@/lib/format';
 
 describe('fmt1', () => {
   it('formats to one decimal', () => {
@@ -54,5 +54,14 @@ describe('fmtDate', () => {
     expect(fmtDate(undefined)).toBe('—');
     expect(fmtDate('')).toBe('—');
     expect(fmtDate('not a date')).toBe('—');
+  });
+});
+
+describe('plural', () => {
+  it('puts the count before the singular or plural noun', () => {
+    expect(plural(1, 'well')).toBe('1 well');
+    expect(plural(0, 'assessment')).toBe('0 assessments');
+    expect(plural(2, 'well')).toBe('2 wells');
+    expect(plural(3, 'child', 'children')).toBe('3 children');
   });
 });

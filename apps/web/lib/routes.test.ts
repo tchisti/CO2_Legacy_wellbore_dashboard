@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ROUTES, portfolioReportHref, wellHref, wellReportHref, wellsHref } from '@/lib/routes';
+import { ROUTES, newWellHref, portfolioReportHref, wellHref, wellReportHref, wellsHref } from '@/lib/routes';
 
 describe('routes', () => {
   it('ROUTES holds the four top-level pages', () => {
@@ -43,5 +43,11 @@ describe('routes', () => {
     expect(portfolioReportHref({ rank: ['Very High'], Lr: '4', Cr: '5' })).toBe(
       '/report/portfolio?Cr=5&Lr=4&rank=Very%20High',
     );
+  });
+});
+
+describe('newWellHref', () => {
+  it('is the new-well page', () => {
+    expect(newWellHref()).toBe('/wells/new');
   });
 });

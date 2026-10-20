@@ -6,12 +6,17 @@ import MethodologyPage from '@/app/methodology/page';
 import PortfolioPage from '@/app/portfolio/page';
 import SettingsPage from '@/app/settings/page';
 import WellsPage from '@/app/wells/page';
+import { TooltipProvider } from '@/components/ui/tooltip';
 import { ProjectProvider } from '@/lib/project-context';
 import { createLocalStore } from '@/lib/store/local-store';
 import { StoreProvider } from '@/lib/store/provider';
 
 const router = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn() }));
-vi.mock('next/navigation', () => ({ useRouter: () => router, usePathname: () => '/' }));
+vi.mock('next/navigation', () => ({
+  useRouter: () => router,
+  usePathname: () => '/',
+  useSearchParams: () => new URLSearchParams(),
+}));
 
 beforeEach(() => vi.clearAllMocks());
 afterEach(cleanup);
@@ -24,7 +29,9 @@ async function renderPage(Page: ComponentType, withProject = true) {
   render(
     <StoreProvider createStore={(actor) => createLocalStore({ dbName, actor })}>
       <ProjectProvider>
-        <Page />
+        <TooltipProvider>
+          <Page />
+        </TooltipProvider>
       </ProjectProvider>
     </StoreProvider>,
   );
