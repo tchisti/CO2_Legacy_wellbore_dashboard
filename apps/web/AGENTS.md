@@ -7,3 +7,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
+
+## shadcn components
+
+After `shadcn add`, change any `import { cn } from "cn"` to `import { cn } from "@/lib/utils"`. The app uses clsx + tailwind-merge, not the `cn` package.
