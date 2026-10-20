@@ -24,10 +24,13 @@ function clauseNote(line: string): WellboreNote {
 const isClauseNote = (n: WellboreNote): boolean => n.depth_m === null && n.text === n.verbatim;
 
 // Deviation from v2: NUM also matches a lone comma (toNum(',') is NaN) and a
-// long digit run overflows to Infinity; v2 emitted those values as depths.
-// The port treats a clause holding any such number as unparsed: a warning
-// plus a clauseNote, and no row (and no plug-header state) from it.
+// long digit run overflows to Infinity; v2 emitted those values as they were.
+// In the port, a non-finite number that feeds a row (plug, perforation or
+// casing field) makes the whole clause unparsed: a warning plus a clauseNote,
+// and no row (and no plug-header state) from it. A non-finite depth that only
+// feeds a note becomes null; the note and the clause's rows are kept.
 const allFinite = (xs: readonly number[]): boolean => xs.every((x) => Number.isFinite(x));
+const finiteOrNull = (x: number | null): number | null => (x !== null && Number.isFinite(x) ? x : null);
 
 // Candidate clauses: split on line breaks and `;`, trimmed, blanks dropped.
 function clauses(text: string): string[] {
@@ -128,22 +131,30 @@ export function parseIntervalsText(text: string | null | undefined, defaultUnit:
       }
     }
 
-    // "felt plug" depth: its own number if it has one, else the first entry's top.
+    // "felt plug" note depth: its own number if it has one, else the first
+    // entry's top. Note-only, so a non-finite value becomes null (see allFinite).
     const isFeltPlug = /felt plug/i.test(line);
     let feltDepth: number | null = null;
     if (isFeltPlug) {
       const atMatch = line.match(new RegExp(`felt plug\\s*(?:at|@)?\\s*(${NUM})?\\s*(m|ft)?`, 'i'));
-      feltDepth = atMatch && atMatch[1] ? numToM(toNum(atMatch[1]), (atMatch[2] || lineUnit).toLowerCase()) : entries[0] ? entries[0].top_m : null;
+      feltDepth = finiteOrNull(atMatch && atMatch[1] ? numToM(toNum(atMatch[1]), (atMatch[2] || lineUnit).toLowerCase()) : entries[0] ? entries[0].top_m : null);
     }
 
-    // Every number this clause read must be finite (deviation from v2, see allFinite).
-    const numbersRead = [
-      ...(hdrMatch ? [Number(hdrMatch[1])] : []),
-      ...entries.flatMap((e) => [e.top_m, e.bottom_m]),
-      ...(sacks !== undefined ? [sacks] : []),
-      ...(feltDepth !== null ? [feltDepth] : []),
+    // The numbers that feed rows must be finite (deviation from v2, see allFinite):
+    // - entries become perforations or plugs on a perf / plug-kind line or
+    //   inside a Plug #N block (otherwise they only feed notes);
+    // - a header number becomes plug `n` (now, or for the block it opens);
+    // - sacks become a plug field when this clause makes or continues a plug.
+    const opensBlock = hdrMatch !== null && !new RegExp(`${NUM}\\s*${DASH}\\s*${NUM}`).test(line);
+    const entriesMakeRows = isPerf || isPlugKindLine || lastPlugHeader !== null;
+    const makesPlugs = entries.length > 0 && !isPerf && entriesMakeRows;
+    const continuesPlug = !entries.length && !isFeltPlug && !hdrMatch && lastPlug !== null && (sacks !== undefined || !!additives || !!kind);
+    const rowNumbers = [
+      ...(entriesMakeRows ? entries.flatMap((e) => [e.top_m, e.bottom_m]) : []),
+      ...(hdrMatch && (opensBlock || makesPlugs) ? [Number(hdrMatch[1])] : []),
+      ...(sacks !== undefined && (makesPlugs || (continuesPlug && lastPlug?.sacks === undefined)) ? [sacks] : []),
     ];
-    if (!allFinite(numbersRead)) {
+    if (!allFinite(rowNumbers)) {
       out.warnings.push(`Unparsed interval line: "${line}"`);
       out.notes.push(clauseNote(line));
       continue;
@@ -151,7 +162,7 @@ export function parseIntervalsText(text: string | null | undefined, defaultUnit:
 
     // A plug header with no range on the same line starts a fresh block; the
     // plug it eventually produces becomes the new `lastPlug` continuation target.
-    if (hdrMatch && !new RegExp(`${NUM}\\s*${DASH}\\s*${NUM}`).test(line)) {
+    if (opensBlock) {
       lastPlugHeader = { num: hdrMatch[1] ?? '' };
       lastPlug = null;
     }
@@ -181,14 +192,14 @@ export function parseIntervalsText(text: string | null | undefined, defaultUnit:
           lastPlug = plug;
         } else {
           // Unclassified interval — keep as a note so nothing is silently dropped.
-          out.notes.push({ depth_m: e.top_m, text: `Interval noted: "${line}"`, source: 'parsed', verbatim: line });
+          out.notes.push({ depth_m: finiteOrNull(e.top_m), text: `Interval noted: "${line}"`, source: 'parsed', verbatim: line });
         }
       }
     } else if (!isFeltPlug) {
       // No depth on this line. Within a Plug #N block, a continuation line
       // carrying sacks/additive/kind but no depth attaches to the most
       // recently opened plug instead of being reported as unparsed (Finding 3).
-      if (!hdrMatch && lastPlug && (sacks !== undefined || additives || kind)) {
+      if (continuesPlug && lastPlug) {
         if (sacks !== undefined && lastPlug.sacks === undefined) lastPlug.sacks = sacks;
         if (additives) lastPlug.additives = lastPlug.additives ? `${lastPlug.additives}; ${additives}` : additives;
         if (kind && !lastPlug.kind) lastPlug.kind = kind;
@@ -198,7 +209,7 @@ export function parseIntervalsText(text: string | null | undefined, defaultUnit:
     }
 
     for (const pm of parenMatches) {
-      out.notes.push({ depth_m: entries[0] ? entries[0].top_m : null, text: `Formation: ${(pm[1] ?? '').trim()}`, source: 'parsed', verbatim: line });
+      out.notes.push({ depth_m: finiteOrNull(entries[0] ? entries[0].top_m : null), text: `Formation: ${(pm[1] ?? '').trim()}`, source: 'parsed', verbatim: line });
     }
   }
 

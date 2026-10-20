@@ -597,7 +597,7 @@ describe('non-finite numbers are never emitted (v3 fix round 1)', () => {
   });
 
   it('a clause unreadable to both parsers is noted once', () => {
-    const text = 'x @ , m casing';
+    const text = 'plug @ , m casing';
     const { wellbore } = W.parseWellboreReport(text);
     expect(wellbore.casings).toEqual([]);
     expect(wellbore.notes).toEqual([{ depth_m: null, text, source: 'parsed', verbatim: text }]);
@@ -649,5 +649,73 @@ describe('non-finite numbers are never emitted (v3 fix round 1)', () => {
     // The generator exercises both the unreadable-clause path and real rows.
     expect(clauseNotes).toBeGreaterThan(50);
     expect(rows).toBeGreaterThan(100);
+  });
+});
+
+// Fix round 2: only numbers that feed rows decide whether a clause is
+// unparsed; a depth that only feeds a note becomes null and the clause's
+// finite rows are kept (expected rows below are v2's, plus provenance).
+describe('note-only depths that do not read become null; finite rows are kept (v3 fix round 2)', () => {
+  const roundTrip = (wb: W.ParsedReportWellbore | W.BridgeWellbore): W.Wellbore => W.WellboreSchema.parse(JSON.parse(JSON.stringify(wb)));
+  const feltNote = (text: string) => ({ depth_m: null, text: `Felt plug noted: "${text}"`, source: 'parsed', verbatim: text });
+
+  it('CIBP at 1200 m, felt plug, top → CIBP plug at 1200 m + a felt note with depth_m null', () => {
+    const text = 'CIBP at 1200 m, felt plug, top';
+    const { wellbore, warnings } = W.parseWellboreReport(text);
+    expect(wellbore.plugs).toEqual([{ top_m: 1200, bottom_m: 1200, kind: 'cibp', source: 'parsed', verbatim: text }]);
+    expect(wellbore.notes).toEqual([feltNote(text)]);
+    expect(warnings).toEqual([`Unparsed casing line: "${text}"`]);
+    expect(roundTrip(wellbore)).toMatchObject({ plugs: wellbore.plugs, notes: wellbore.notes });
+  });
+
+  it('Plug #1 100-200 m, felt plug, 150 m → plug 1 at 100–200 m + a felt note with depth_m null', () => {
+    const text = 'Plug #1 100-200 m, felt plug, 150 m';
+    const { wellbore } = W.parseWellboreReport(text);
+    expect(wellbore.plugs).toEqual([{ top_m: 100, bottom_m: 200, n: 1, source: 'parsed', verbatim: text }]);
+    expect(wellbore.notes).toEqual([feltNote(text)]);
+    expect(roundTrip(wellbore)).toMatchObject({ plugs: wellbore.plugs, notes: wellbore.notes });
+  });
+
+  it('Felt plug, at 3219 ft → the plug v2 produced (981.2 m) is kept', () => {
+    const text = 'Felt plug, at 3219 ft';
+    const { wellbore } = W.parseWellboreReport(text);
+    expect(wellbore.plugs).toEqual([{ top_m: 981.2, bottom_m: 981.2, source: 'parsed', verbatim: text }]);
+    expect(wellbore.notes).toEqual([feltNote(text)]);
+    expect(roundTrip(wellbore)).toMatchObject({ plugs: wellbore.plugs, notes: wellbore.notes });
+  });
+
+  it('wellboreFrom3D keeps the 1200 m CIBP when only the felt-plug note depth is unreadable', () => {
+    const text = 'CIBP at 1200 m, felt plug, top';
+    const wb = W.wellboreFrom3D({ td: 1500, plugIntervals: text })!;
+    expect(wb.plugs).toEqual([{ top_m: 1200, bottom_m: 1200, kind: 'cibp', source: 'bridge', verbatim: text }]);
+    expect(wb.notes).toEqual([{ ...feltNote(text), source: 'bridge' }]);
+    expect(roundTrip(wb)).toMatchObject({ plugs: wb.plugs, notes: wb.notes });
+  });
+
+  it('interval and formation note depths that do not read become null, with no warning (as v2, which emitted NaN)', () => {
+    const text = 'foo, - 200 m (Nisku)';
+    const iv = W.parseIntervalsText(text);
+    expect(iv).toEqual({
+      plugs: [],
+      perforations: [],
+      notes: [
+        { depth_m: null, text: `Interval noted: "${text}"`, source: 'parsed', verbatim: text },
+        { depth_m: null, text: 'Formation: Nisku', source: 'parsed', verbatim: text },
+      ],
+      warnings: [],
+    });
+    expect(storable(W.parseWellboreReport(text).wellbore)).toBe(true);
+  });
+
+  it('a note-only NaN on the interval side and a row NaN on the casing side are handled independently', () => {
+    const text = 'x @ , m casing';
+    const { wellbore, warnings } = W.parseWellboreReport(text);
+    expect(wellbore.casings).toEqual([]);
+    expect(wellbore.notes).toEqual([
+      { depth_m: null, text: `Interval noted: "${text}"`, source: 'parsed', verbatim: text },
+      { depth_m: null, text, source: 'parsed', verbatim: text },
+    ]);
+    expect(warnings).toEqual([`Unparsed casing line: "${text}"`]);
+    expect(storable(wellbore)).toBe(true);
   });
 });
