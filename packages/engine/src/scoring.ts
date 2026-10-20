@@ -168,6 +168,9 @@ export function validateMethodology(m: unknown): ValidationResult {
   }
   const covered = Array.from({ length: 26 }, () => 0);
   for (const b of meth.matrix.bands) {
+    // v2 stepped v = min, min+1, ... so a non-integer min never landed on a cell and counted
+    // nothing (a non-integer max just stops at its floor). Keep that exactly.
+    if (!Number.isInteger(b.min)) continue;
     // Only 1..25 is counted, so bound the loop to that window: a structurally valid band such as
     // max: 1e12 (imported from a user file) must not make validation spin.
     const last = Math.min(25, b.max);
