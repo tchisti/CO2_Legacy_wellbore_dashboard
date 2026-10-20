@@ -258,6 +258,61 @@ describe('migrateV2Data on the v2 register', () => {
     expect(r.mismatches.map((p) => p.licence)).toEqual([MANNING]);
   });
 
+  it('a needsReview well scored under the current revision arrives as a draft, with a warning and parity "needs-review (draft)"', () => {
+    const wells = v2Wells();
+    const target = find(wells, (w) => w.licence === PHOENIX, PHOENIX);
+    Object.assign(target, { needsReview: true, scoredUnder: '2.0.0', recActionOverride: ' Check SCVF first. ' });
+    const r = migrateV2Data(args({ wells }));
+    const well = wellOf(r.export.wells, PHOENIX);
+    const a = assessmentOf(r.export.assessments, well);
+    expect(a).toEqual({
+      id: `asm_v2_${target.id}_${Date.parse(target.updatedAt)}`,
+      wellId: well.id,
+      methodologyRevision: '2.0.0',
+      scores: target.scores,
+      justifications: {},
+      suggestions: {},
+      computed: null,
+      recommendedAction: { auto: '', override: 'Check SCVF first.' },
+      status: 'draft',
+      reviewerName: 'Unknown (v2)',
+      assessedAt: null,
+      supersedesId: null,
+      approvedByName: null,
+      approvedAt: null,
+      createdAt: target.updatedAt,
+      updatedAt: target.updatedAt,
+    });
+    expect(r.export.assessments.filter((x) => x.status === 'final')).toHaveLength(4);
+    expect(r.warnings.some((w) => w.includes(PHOENIX) && /needsReview/.test(w) && /draft/.test(w))).toBe(true);
+    const row = find(r.parity, (p) => p.licence === PHOENIX, PHOENIX);
+    expect(row.status).toBe('needs-review (draft)');
+    expect(row.v2).toEqual(row.v3); // still compared: the stored block matches the recompute
+    expect(r.mismatches).toEqual([]);
+  });
+
+  it('a needsReview draft whose stored computed block differs is still a parity mismatch', () => {
+    const wells = v2Wells();
+    const target = find(wells, (w) => w.licence === PHOENIX, PHOENIX);
+    if (!target.computed) throw new Error('fixture well has no computed block');
+    Object.assign(target, { needsReview: true, scoredUnder: '2.0.0' });
+    target.computed.riskIndex = 9.99;
+    const r = migrateV2Data(args({ wells }));
+    expect(r.mismatches.map((p) => [p.licence, p.status])).toEqual([[PHOENIX, 'mismatch']]);
+  });
+
+  it('a needsReview well scored under an older revision (W-LX242Q, 1.0.0) stays final, with a parity note', () => {
+    expect(v2Of('100/13-05-056-22W4/00')).toMatchObject({ id: 'W-LX242Q', needsReview: true, scoredUnder: '1.0.0' });
+    const r = migrateV2Data(args());
+    const well = find(r.export.wells, (w) => w.id === 'wel_v2_W-LX242Q', 'W-LX242Q');
+    expect(assessmentOf(r.export.assessments, well)).toMatchObject({ status: 'final', methodologyRevision: '1.0.0' });
+    expect(find(r.parity, (p) => p.licence === well.licence, well.licence)).toMatchObject({
+      status: 'ok',
+      note: 'flagged for re-review in v2; scored under 1.0.0 — v3 shows it as stale',
+    });
+    expect(r.warnings).toEqual([]);
+  });
+
   it('dry run with a forced mismatch returns mismatches and writes nothing', () => {
     const wells = v2Wells();
     const target = find(wells, (w) => w.licence === MANNING, MANNING);
@@ -514,6 +569,31 @@ describe('migrateV2Data with browser exports', () => {
     expect(migrated.map((w) => w.type)).toEqual(['Oil Producer', 'Gas Producer', 'Injection', 'Disposal', 'Observation', 'Unknown']);
     // No explicit scores: no draft.
     expect(r.export.assessments).toHaveLength(5);
+  });
+
+  it('skips 3D scenario (what-if) wells with a warning and parity "3d-skipped (scenario)"; real ones still import', () => {
+    const base = { status: 'Abandoned', wellType: 'Oil', s_age: 3, createdAt: 1753200000000 };
+    const real = { ...base, uwi: '100/01-02-060-22W4/00', isScenario: false, updatedAt: 1753200000000 };
+    const scenario = { ...base, uwi: '100/09-09-060-22W4/00', isScenario: true, updatedAt: 1753200000000 };
+    // A what-if copy of the real well, newer than it: it must not displace the real record.
+    const scenarioCopy = { ...real, isScenario: true, wellName: 'WHAT IF', updatedAt: 1753300000000 };
+    const r = migrateV2Data(args({ browserExports: [{ schemaVersion: 1, wells: [real, scenario, scenarioCopy] }] }));
+
+    expect(r.export.wells.some((w) => w.licence === scenario.uwi)).toBe(false);
+    expect(r.export.wells).toHaveLength(6);
+    const imported = wellOf(r.export.wells, real.uwi);
+    expect(imported.name).toBe('');
+    expect(assessmentOf(r.export.assessments, imported).status).toBe('draft');
+    expect(r.export.assessments).toHaveLength(6);
+    expect(r.parity.filter((p) => p.status === '3d-skipped (scenario)').map((p) => p.licence)).toEqual([
+      scenario.uwi,
+      real.uwi,
+    ]);
+    expect(find(r.parity, (p) => p.licence === real.uwi && p.status !== '3d-skipped (scenario)', real.uwi).status).toBe(
+      'browser-only (3D, draft)',
+    );
+    expect(r.warnings.some((w) => w.includes(scenario.uwi) && /scenario/i.test(w))).toBe(true);
+    expect(r.mismatches).toEqual([]);
   });
 
   it('rejects a browser export it does not recognise, with a readable error', () => {

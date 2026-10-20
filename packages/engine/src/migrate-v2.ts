@@ -63,6 +63,8 @@ export type ParityStatus =
   | 'browser-only'
   | 'browser-only (3D, draft)'
   | '3d-skipped (register wins)'
+  | '3d-skipped (scenario)'
+  | 'needs-review (draft)'
   | 'unscored';
 
 /** One line of the parity table: the stored v2 computed block against the v3 recompute. */
@@ -343,11 +345,16 @@ function storedMetrics(block: unknown): ParityMetrics | 'none' | 'incomplete' {
 const sameMetrics = (a: ParityMetrics, b: ParityMetrics): boolean =>
   a.L === b.L && a.C === b.C && a.cell === b.cell && a.riskIndex === b.riskIndex && a.rank === b.rank;
 
-function v2ParityRow(entry: V2Entry, stored: unknown, v3: ParityMetrics | null): ParityRow {
+/** How a v2 needsReview flag was carried over, for the parity row. */
+type ReviewFlag = { asDraft: boolean; note: string } | null;
+
+function v2ParityRow(entry: V2Entry, stored: unknown, v3: ParityMetrics | null, review: ReviewFlag): ParityRow {
   const notes: string[] = [];
   if (entry.origin === 'browser') notes.push(`only in ${entry.from}`);
   if (entry.note) notes.push(entry.note);
+  if (review) notes.push(review.note);
   let status: ParityStatus = entry.origin === 'browser' ? 'browser-only' : 'ok';
+  if (review?.asDraft) status = 'needs-review (draft)'; // a browser-only origin stays in the note
   let v2: ParityMetrics | null = null;
   if (v3 === null) {
     if (entry.origin === 'register') status = 'unscored';
@@ -417,40 +424,67 @@ function migrateV2Well(entry: V2Entry, ctx: Context, actor: string): Migrated {
 
   let assessment: Assessment | null = null;
   let v3: ParityMetrics | null = null;
+  let review: ReviewFlag = null;
   const v2Scores = n.scores;
   if (isRecord(v2Scores)) {
     const { scores, dropped } = scoresFrom((key) => v2Scores[key]);
     warnDropped(ctx, licence, dropped);
     const c = computeWell(scores, m);
     v3 = { L: c.L, C: c.C, cell: c.cell, riskIndex: c.riskIndex, rank: c.rank.label };
-    assessment = {
+    const scoredUnder = trimmed(n.scoredUnder) || m.revision;
+    // needsReview under the current revision means v2 may have derived the scores itself (a 3D
+    // push through deriveScoresFromReviewer): a draft for a reviewer to finalise, never a final.
+    // Under an older revision it is a human-scored v1 well; it stays final and shows as stale in v3.
+    if (n.needsReview === true) {
+      const asDraft = scoredUnder === m.revision;
+      review = asDraft
+        ? { asDraft, note: 'flagged for re-review in v2; imported as a draft' }
+        : { asDraft, note: `flagged for re-review in v2; scored under ${scoredUnder} — v3 shows it as stale` };
+      if (asDraft) {
+        ctx.warnings.push(
+          `${licence}: needsReview in v2 (its scores may be derived, not reviewed); ` +
+            'imported as a draft assessment to review and finalise in v3',
+        );
+      }
+    }
+    const override = trimmed(raw.recActionOverride) || null;
+    const common = {
       id: `asm_v2_${suffix}_${Date.parse(updatedAt)}`,
       wellId: well.id,
-      methodologyRevision: trimmed(n.scoredUnder) || m.revision,
       scores,
       justifications: {},
       suggestions: {},
-      computed: { L: c.L, C: c.C, Lr: c.Lr, Cr: c.Cr, cell: c.cell, riskIndex: c.riskIndex, rank: c.rank.label },
-      recommendedAction: {
-        auto: recommendationText(recommend(scores, m)),
-        override: trimmed(raw.recActionOverride) || null,
-      },
-      status: 'final',
       reviewerName: trimmed(raw.reviewer) || 'Unknown (v2)',
-      assessedAt: updatedAt,
       supersedesId: null,
       approvedByName: null,
       approvedAt: null,
       createdAt: updatedAt,
       updatedAt,
     };
+    assessment = review?.asDraft
+      ? {
+          ...common,
+          methodologyRevision: m.revision,
+          computed: null,
+          recommendedAction: { auto: '', override },
+          status: 'draft',
+          assessedAt: null,
+        }
+      : {
+          ...common,
+          methodologyRevision: scoredUnder,
+          computed: { L: c.L, C: c.C, Lr: c.Lr, Cr: c.Cr, cell: c.cell, riskIndex: c.riskIndex, rank: c.rank.label },
+          recommendedAction: { auto: recommendationText(recommend(scores, m)), override },
+          status: 'final',
+          assessedAt: updatedAt,
+        };
   }
   return {
     well,
     assessment,
     event: importEvent(well, suffix, 'v2', actor),
     // Against the block v2 stored, not the one normalizeWell just recomputed.
-    parity: v2ParityRow(entry, raw.computed, v3),
+    parity: v2ParityRow(entry, raw.computed, v3, review),
   };
 }
 
@@ -563,12 +597,23 @@ export function migrateV2Data(args: MigrateV2Args): MigrateV2Result {
   const register = new Map<string, V2Entry>();
   mergeV2(register, args.wells, 'wells.json', 'register', warnings);
   const threeD = new Map<string, SourceEntry>();
+  const scenarios: ParityRow[] = [];
   (args.browserExports ?? []).forEach((file, i) => {
     const from = `browser export ${i + 1}`;
     if (Array.isArray(file)) {
       mergeV2(register, file, from, 'browser', warnings);
     } else if (isRecord(file) && file.schemaVersion === 1 && Array.isArray(file.wells)) {
-      file.wells.forEach((item, j) => keepNewest(threeD, sourceEntry(item, j, from, 'uwi'), warnings));
+      file.wells.forEach((item, j) => {
+        // A scenario is a what-if well (the viewer's own Push to Register leaves them out). Skipped
+        // before the newest-wins merge, so a newer what-if copy cannot displace the real record.
+        if (isRecord(item) && item.isScenario === true) {
+          const uwi = trimmed(item.uwi) || `(no UWI, well ${j + 1})`;
+          warnings.push(`${uwi} (${from}): a 3D scenario (what-if) well; not imported`);
+          scenarios.push({ licence: uwi, status: '3d-skipped (scenario)', v2: null, v3: null, note: `in ${from}` });
+          return;
+        }
+        keepNewest(threeD, sourceEntry(item, j, from, 'uwi'), warnings);
+      });
     } else {
       throw new Error(
         `${from}: format not recognised. Expected a v2 register "Export JSON" (an array of wells) ` +
@@ -599,6 +644,7 @@ export function migrateV2Data(args: MigrateV2Args): MigrateV2Result {
       add(migrate3DWell(entry, ctx, args.actor));
     }
   }
+  parity.push(...scenarios);
   const wells = migrated.map((x) => x.well);
 
   // Project timestamps come from the data, not the clock, so re-runs give the same project. The
