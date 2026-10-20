@@ -69,9 +69,14 @@ const ParamSchema = z.object({
   refs: z.array(z.string()),
 });
 
+// Band bounds are cell numbers on the 1..25 matrix, so they must be whole numbers.
+// Deliberate deviation from v2: v2's coverage loop (for v = min; v <= max; v++) accepted some
+// fractional bounds by accident (e.g. a min within float rounding of an integer such as 1e-17,
+// where 1e-17 + 1 === 1) and rejected others. v3 rejects every non-integer bound with one stable
+// message. computeWell and the golden vectors are unaffected: bandFor only sees the shipped bands.
 const BandSchema = z.object({
-  min: z.number(),
-  max: z.number(),
+  min: z.number().int(),
+  max: z.number().int(),
   label: z.string(),
   cls: z.string(),
   color: z.string(),
@@ -126,6 +131,8 @@ function paramLabel(input: Record<string, unknown>, idx: number): string {
   return isRecord(p) && typeof p.key === 'string' ? p.key : `params[${idx}]`;
 }
 
+const BAND_BOUNDS_MESSAGE = 'matrix band bounds must be whole numbers';
+
 /** Turn a structural Zod issue into one error line, using v2's wording where v2 had a check. */
 function describeIssue(issue: z.ZodError['issues'][number], input: Record<string, unknown>): string {
   const [root, idx, field, sub] = issue.path;
@@ -135,6 +142,10 @@ function describeIssue(issue: z.ZodError['issues'][number], input: Record<string
     if (field === 'anchors' && (sub === undefined || sub === '1' || sub === '3' || sub === '5')) {
       return `${label}: anchors for 1/3/5 are required`;
     }
+  }
+  // path is matrix.bands.<i>.min|max; the same text for every band, so it appears once per methodology
+  if (root === 'matrix' && idx === 'bands' && typeof field === 'number' && (sub === 'min' || sub === 'max')) {
+    return BAND_BOUNDS_MESSAGE;
   }
   const where = issue.path.map(String).join('.') || 'methodology';
   return `${where}: ${issue.message}`;
@@ -168,10 +179,8 @@ export function validateMethodology(m: unknown): ValidationResult {
   }
   const covered = Array.from({ length: 26 }, () => 0);
   for (const b of meth.matrix.bands) {
-    // v2 stepped v = min, min+1, ... so a non-integer min never landed on a cell and counted
-    // nothing (a non-integer max just stops at its floor). Keep that exactly.
-    if (!Number.isInteger(b.min)) continue;
-    // Only 1..25 is counted, so bound the loop to that window: a structurally valid band such as
+    // Bounds are whole numbers (BandSchema), so this visits exactly the cells v2's loop did. Only
+    // 1..25 is counted, so bound the loop to that window: a structurally valid band such as
     // max: 1e12 (imported from a user file) must not make validation spin.
     const last = Math.min(25, b.max);
     for (let v = Math.max(1, b.min); v <= last; v++) covered[v] = (covered[v] ?? 0) + 1;

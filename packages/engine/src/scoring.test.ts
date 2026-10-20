@@ -155,6 +155,20 @@ describe('methodology', () => {
     expect(result).toEqual({ ok: false, errors: ['matrix bands must cover 1–25 exactly once (value 4 covered 0×)'] });
   });
 
+  it.each([
+    ['2**53', 2 ** 53],
+    ['1e300', 1e300],
+  ])('validateMethodology rejects an unsafe-integer band max (%s) promptly with the whole-numbers message', (_name, max) => {
+    const unsafe = mutable();
+    const last = unsafe.matrix.bands[3];
+    if (!last) throw new Error('no bands');
+    last.max = max;
+    const started = Date.now();
+    const result = validateMethodology(unsafe);
+    expect(Date.now() - started).toBeLessThan(1000);
+    expect(result).toEqual({ ok: false, errors: ['matrix band bounds must be whole numbers'] });
+  });
+
   it('validateMethodology accepts a valid methodology whose outer bands overshoot 1..25', () => {
     const wide = mutable();
     const first = wide.matrix.bands[0];
@@ -178,33 +192,55 @@ describe('methodology', () => {
     expect(validateMethodology(below)).toEqual({ ok: true, errors: [] });
   });
 
+  // Deliberate deviation from v2 (see BandSchema): v2's loop accepted some fractional bounds by
+  // accident (a min within float rounding of an integer, like 1e-17, steps onto 1), so v3 rejects
+  // every non-integer band bound with one stable message.
+  const WHOLE_NUMBERS = 'matrix band bounds must be whole numbers';
+
   it.each([
     ['0.5', 0.5],
     ['1.5', 1.5],
-  ])('validateMethodology matches v2 for a single band with fractional min %s: nothing is counted, value 1 is uncovered', (_name, min) => {
+    ['1e-17', 1e-17],
+    ['-1e-17', -1e-17],
+    ['2**-53', 2 ** -53],
+    ['1e-16', 1e-16],
+  ])('validateMethodology rejects a fractional band min (%s) with the whole-numbers message', (_name, min) => {
     const fractional = mutable();
     const first = fractional.matrix.bands[0];
     if (!first) throw new Error('no bands');
     first.min = min;
     first.max = 25;
     fractional.matrix.bands.length = 1;
-    expect(validateMethodology(fractional)).toEqual({
-      ok: false,
-      errors: ['matrix bands must cover 1–25 exactly once (value 1 covered 0×)'],
-    });
+    expect(validateMethodology(fractional)).toEqual({ ok: false, errors: [WHOLE_NUMBERS] });
   });
 
-  it('validateMethodology matches v2 for a fractional band max: bands 1–4.5, 5–9, 10–16, 17–25 count as 1–4, 5–9, 10–16, 17–25 and validate', () => {
+  it('validateMethodology rejects the 1–4.5, 5–9, 10–16, 17–25 tiling with the whole-numbers message', () => {
     const fractionalMax = mutable();
     const first = fractionalMax.matrix.bands[0];
     if (!first) throw new Error('no bands');
     first.max = 4.5;
-    expect(validateMethodology(fractionalMax)).toEqual({ ok: true, errors: [] });
-    // and a fractional max still stops at its floor: 1–3.5 leaves 4 uncovered
-    first.max = 3.5;
-    expect(validateMethodology(fractionalMax).errors).toEqual([
-      'matrix bands must cover 1–25 exactly once (value 4 covered 0×)',
-    ]);
+    expect(validateMethodology(fractionalMax)).toEqual({ ok: false, errors: [WHOLE_NUMBERS] });
+  });
+
+  it('validateMethodology reports the whole-numbers message once, however many bounds are fractional', () => {
+    const many = mutable();
+    for (const band of many.matrix.bands) {
+      band.min += 0.5;
+      band.max += 0.5;
+    }
+    expect(validateMethodology(many).errors).toEqual([WHOLE_NUMBERS]);
+  });
+
+  it('validateMethodology rejects a non-numeric or non-finite band bound without throwing', () => {
+    for (const bad of ['4', null, Number.POSITIVE_INFINITY, Number.NaN]) {
+      const m = mutable();
+      const first = m.matrix.bands[0];
+      if (!first) throw new Error('no bands');
+      (first as { max: unknown }).max = bad;
+      const result = validateMethodology(m);
+      expect(result.ok).toBe(false);
+      expect(result.errors).toEqual([WHOLE_NUMBERS]);
+    }
   });
 
   it.each([
