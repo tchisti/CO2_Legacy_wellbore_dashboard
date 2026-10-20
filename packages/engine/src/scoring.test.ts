@@ -142,6 +142,42 @@ describe('methodology', () => {
     expect(validateMethodology(badUnknown).errors).toEqual(['cement: unknownScore must be 1–5']);
   });
 
+  it('validateMethodology bounds the band-coverage loop: a huge band max returns promptly with the v2 coverage error', () => {
+    const huge = mutable();
+    const first = huge.matrix.bands[0];
+    const last = huge.matrix.bands[3];
+    if (!first || !last) throw new Error('no bands');
+    first.max = 3; // leaves a gap at 4
+    last.max = 1e12;
+    const started = Date.now();
+    const result = validateMethodology(huge);
+    expect(Date.now() - started).toBeLessThan(1000);
+    expect(result).toEqual({ ok: false, errors: ['matrix bands must cover 1–25 exactly once (value 4 covered 0×)'] });
+  });
+
+  it('validateMethodology accepts a valid methodology whose outer bands overshoot 1..25', () => {
+    const wide = mutable();
+    const first = wide.matrix.bands[0];
+    const last = wide.matrix.bands[3];
+    if (!first || !last) throw new Error('no bands');
+    first.min = -1e12;
+    last.max = 1e12;
+    expect(validateMethodology(wide)).toEqual({ ok: true, errors: [] });
+  });
+
+  it('validateMethodology does not count band values below 1 (min -5) and still reports coverage correctly', () => {
+    const below = mutable();
+    const first = below.matrix.bands[0];
+    if (!first) throw new Error('no bands');
+    first.min = -5;
+    first.max = 3; // -5..3 covers 1..3 only; 4 is uncovered
+    expect(validateMethodology(below).errors).toEqual([
+      'matrix bands must cover 1–25 exactly once (value 4 covered 0×)',
+    ]);
+    first.max = 4; // back to a complete cover: only 1..4 count
+    expect(validateMethodology(below)).toEqual({ ok: true, errors: [] });
+  });
+
   it.each([
     ['null', null],
     ['undefined', undefined],
@@ -259,12 +295,36 @@ describe('v1 migration', () => {
     expect(pen({})).toBeNull();
   });
 
-  it('migrateV1 maps prox to plume and ignores non-numeric or out-of-range legacy values', () => {
+  it('migrateV1 maps prox to plume and migrates non-numeric and out-of-range legacy values as unknown', () => {
     const mig = migrateV1({ scores: { plug: '5', prox: 2, cement: 9, age: 4 } }, M);
     expect(mig.scores.plume).toBe(2);
     expect(mig.scores.plugQuality).toBeNull();
     expect(mig.scores.cement).toBeNull();
     expect(mig.scores.age).toBe(4);
+  });
+
+  // Deliberate deviation from v2 (see the migrateV1 doc comment): v2 would have scored the in-range
+  // fractions 2.5 / 4.5 as given (L 3.59, C 2.85, riskIndex 10.23, integrity 62 for this well); v3
+  // migrates any legacy value that is not an integer 1..5 as Unknown and keeps the raw value in
+  // legacy.scores.
+  it('migrateV1 migrates fractional in-range legacy values (2.5, 4.5) as unknown and keeps them verbatim in legacy.scores', () => {
+    const fractional: V2WellLike = { id: 'W-FRAC', scores: { plug: 2.5, cement: 4.5, depthR: 2.5 }, total: 20 };
+    const mig = migrateV1(fractional, M);
+    expect(mig.scores.plugQuality).toBeNull();
+    expect(mig.scores.cement).toBeNull();
+    expect(mig.scores).toEqual(emptyScores());
+    // everything unknown, so the computed block is the unknown-heavy golden vector
+    expect({ L: mig.computed.L, C: mig.computed.C, riskIndex: mig.computed.riskIndex, integrity: mig.computed.integrity })
+      .toEqual({ L: 4.24, C: 3.6, riskIndex: 15.26, integrity: 41 });
+    expect(mig.legacy.scores).toEqual({ plug: 2.5, cement: 4.5, depthR: 2.5 });
+    expect(mig.legacy.total).toBe(20);
+  });
+
+  it('migrateV1 penetration is unknown when max(depthR, depthC) is fractional, and the max when it is an integer', () => {
+    const pen = (scores: Record<string, unknown>) => migrateV1({ scores: { plug: 1, ...scores } }, M).scores.penetration;
+    expect(pen({ depthR: 2.5 })).toBeNull(); // max(2.5, 1) = 2.5, not an integer 1..5
+    expect(pen({ depthR: 2.5, depthC: 4 })).toBe(4); // max(2.5, 4) = 4, an integer 1..5
+    expect(pen({ depthR: 2.5, depthC: 2.5 })).toBeNull();
   });
 
   it('isV1Well is true only for a scores object carrying the v1 "plug" key', () => {

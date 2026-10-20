@@ -168,7 +168,10 @@ export function validateMethodology(m: unknown): ValidationResult {
   }
   const covered = Array.from({ length: 26 }, () => 0);
   for (const b of meth.matrix.bands) {
-    for (let v = b.min; v <= b.max; v++) if (v >= 1 && v <= 25) covered[v] = (covered[v] ?? 0) + 1;
+    // Only 1..25 is counted, so bound the loop to that window: a structurally valid band such as
+    // max: 1e12 (imported from a user file) must not make validation spin.
+    const last = Math.min(25, b.max);
+    for (let v = Math.max(1, b.min); v <= last; v++) covered[v] = (covered[v] ?? 0) + 1;
   }
   for (let v = 1; v <= 25; v++) {
     if (covered[v] !== 1) {
@@ -282,15 +285,21 @@ function computedBlock(scores: LooseScores, m: Methodology): ComputedBlock {
 }
 
 /**
- * v1 → v2: new params start unknown (the engine applies unknownScore); a legacy value that is not
- * an integer 1..5 is stored as unknown, which scores identically to v2's out-of-range handling.
+ * v1 → v2: new params start unknown (the engine applies unknownScore).
+ *
+ * Deliberate deviation from v2: v2 copied any legacy number through, and resolveScore then used it
+ * if it fell in 1..5, so a fractional legacy score such as 2.5 was scored as 2.5. Here a legacy
+ * value that is not an integer 1..5 (fractional or out of range) migrates as Unknown (null), so it
+ * scores at the param's unknownScore. Scores are typed 1|2|3|4|5|null and v1 used a 1/3/5 scale, so
+ * an in-between fraction is treated conservatively as unknown rather than trusted. The raw value
+ * is never lost: it is kept verbatim in legacy.scores. Integer 1..5 data migrates exactly as v2.
  */
 export function migrateV1(w: V2WellLike, m: Methodology = DEFAULT_METHODOLOGY): MigratedWell {
   const s = w.scores ?? {};
   const scores = emptyScores();
   for (const [oldKey, newKey] of Object.entries(V1_MAP)) {
     const v = s[oldKey];
-    if (isScore(v)) scores[newKey] = v;
+    if (isScore(v)) scores[newKey] = v; // non-integer or out-of-range → stays null (see above)
   }
   const dr = typeof s.depthR === 'number' ? s.depthR : null;
   const dc = typeof s.depthC === 'number' ? s.depthC : null;
