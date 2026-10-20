@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fmt1, fmtDate, fmtDepth, plural } from '@/lib/format';
+import { fmt1, fmtCoord, fmtDate, fmtDateTime, fmtDepth, plural } from '@/lib/format';
 
 describe('fmt1', () => {
   it('formats to one decimal', () => {
@@ -63,5 +63,35 @@ describe('plural', () => {
     expect(plural(0, 'assessment')).toBe('0 assessments');
     expect(plural(2, 'well')).toBe('2 wells');
     expect(plural(3, 'child', 'children')).toBe('3 children');
+  });
+});
+
+describe('fmtDateTime', () => {
+  it('shows the UTC date and time to the minute, labelled UTC', () => {
+    expect(fmtDateTime('2026-08-07T16:16:21.843Z')).toBe('2026-08-07 16:16 UTC');
+    expect(fmtDateTime('2026-10-20T23:59:59.999-06:00')).toBe('2026-10-21 05:59 UTC');
+    expect(fmtDateTime('2026-01-05T00:00:00Z')).toBe('2026-01-05 00:00 UTC');
+  });
+
+  it('shows an em dash for a missing or unreadable timestamp', () => {
+    expect(fmtDateTime(null)).toBe('—');
+    expect(fmtDateTime(undefined)).toBe('—');
+    expect(fmtDateTime('')).toBe('—');
+    expect(fmtDateTime('soon')).toBe('—');
+  });
+});
+
+describe('fmtCoord', () => {
+  it('shows decimal degrees to six places', () => {
+    expect(fmtCoord(53.764946)).toBe('53.764946');
+    expect(fmtCoord(-113.2)).toBe('-113.200000');
+    expect(fmtCoord(0)).toBe('0.000000');
+  });
+
+  it('shows an em dash for a missing or non-finite coordinate, never "-0.000000"', () => {
+    expect(fmtCoord(null)).toBe('—');
+    expect(fmtCoord(undefined)).toBe('—');
+    expect(fmtCoord(Number.NaN)).toBe('—');
+    expect(fmtCoord(-0.0000001)).toBe('0.000000');
   });
 });

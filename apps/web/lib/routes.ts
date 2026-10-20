@@ -29,8 +29,22 @@ function queryString(query: RouteQuery | undefined): string {
   return pairs.length > 0 ? `?${pairs.join('&')}` : '';
 }
 
-export function wellHref(id: string): string {
-  return `/wells/view${queryString({ id })}`;
+/** The well page's tabs (spec §4.3), in display order. The first is the default and stays out of links. */
+export const WELL_TABS = ['assessment', 'construction', 'history'] as const;
+export type WellTab = (typeof WELL_TABS)[number];
+
+/** The tab a `tab=` query value names; anything else (missing, misspelt, another case) is the default. */
+export function parseWellTab(value: string | null | undefined): WellTab {
+  return WELL_TABS.find((t) => t === value) ?? WELL_TABS[0];
+}
+
+/**
+ * The well page. `tab` is left out for the default (assessment) tab; `score: true` adds `score=1`,
+ * which opens the score flow over the page.
+ */
+export function wellHref(id: string, opts: { tab?: WellTab; score?: boolean } = {}): string {
+  const tab = opts.tab && opts.tab !== WELL_TABS[0] ? opts.tab : undefined;
+  return `/wells/view${queryString({ id, tab, score: opts.score ? '1' : undefined })}`;
 }
 
 export function wellReportHref(id: string): string {
