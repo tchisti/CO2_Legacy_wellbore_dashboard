@@ -2,12 +2,14 @@
 
 // The well page (spec §4.3), reached as /wells/view?id=… because the app is a static export. It
 // leads with the verdict (WellHeader) and keeps the evidence one click away in three tabs whose
-// choice lives in the URL (`tab=`). `score=1` is where the score flow opens (Task 11). A well that
-// is not stored here, or belongs to another project than the active one, is "not found".
+// choice lives in the URL (`tab=`). `score=1` opens the score flow over the page; closing it drops
+// `score` and keeps the tab. A well that is not stored here, or belongs to another project than the
+// active one, is "not found" (and never opens the score flow).
 import { Suspense, useState } from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeftIcon, FileQuestionIcon, LayersIcon } from 'lucide-react';
+import { ScoreSheet } from '@/components/score/ScoreSheet';
 import { EmptyState } from '@/components/shell/EmptyState';
 import { PageBody } from '@/components/shell/PageHeader';
 import { Button } from '@/components/ui/button';
@@ -18,23 +20,27 @@ import { WellTabs } from '@/components/well/WellTabs';
 import { EditWellDialog } from '@/components/wells/EditWellDialog';
 import { assessmentState } from '@/lib/derived';
 import { useProjects } from '@/lib/project-context';
-import { wellsHref } from '@/lib/routes';
+import { wellHref, wellsHref } from '@/lib/routes';
 import { useStoreQuery } from '@/lib/store/provider';
 import type { Store } from '@/lib/store/store';
 import { useWellTab } from '@/lib/use-well-tab';
 
-/** The well with its assessments and the methodologies needed to show them; null when there is no such well. */
+/**
+ * The well with its project (injectors, for the score flow), its assessments and the methodologies
+ * needed to show them; null when there is no such well.
+ */
 async function loadWell(s: Store, id: string) {
   const well = await s.wells.get(id);
   if (!well) return null;
-  const [current, draft, assessments, records, methodology] = await Promise.all([
+  const [project, current, draft, assessments, records, methodology] = await Promise.all([
+    s.projects.get(well.projectId),
     s.assessments.current(id),
     s.assessments.draft(id),
     s.assessments.listForWell(id),
     s.methodology.list(),
     s.methodology.current(),
   ]);
-  return { well, current, draft, assessments, records, methodology };
+  return { well, project, current, draft, assessments, records, methodology };
 }
 
 const BackToWells = () => (
@@ -85,6 +91,8 @@ function ConstructionPlaceholder() {
 
 function WellView({ id }: { id: string }) {
   const { activeProject } = useProjects();
+  const router = useRouter();
+  const scoring = useSearchParams().get('score') === '1';
   const [tab, setTab] = useWellTab(id);
   const [editing, setEditing] = useState(false);
   const page = useStoreQuery((s) => (id ? loadWell(s, id) : Promise.resolve(null)), [id]);
@@ -93,7 +101,7 @@ function WellView({ id }: { id: string }) {
   if (page.error) return <NotFound reason={`The well could not be read: ${page.error.message}`} />;
   if (!page.data) return <NotFound reason="No well with this link is stored in this browser. It may have been deleted." />;
 
-  const { well, current, draft, assessments, records, methodology } = page.data;
+  const { well, project, current, draft, assessments, records, methodology } = page.data;
   if (activeProject && well.projectId !== activeProject.id) {
     return <NotFound reason="This well belongs to another project. Switch to that project to open it." />;
   }
@@ -137,6 +145,16 @@ function WellView({ id }: { id: string }) {
         onOpenChange={setEditing}
         wellTypes={methodology.wellTypes}
       />
+      {scoring ? (
+        <ScoreSheet
+          well={well}
+          project={project}
+          methodology={methodology}
+          current={current}
+          draft={draft}
+          onClosed={() => router.replace(wellHref(well.id, { tab }), { scroll: false })}
+        />
+      ) : null}
     </PageBody>
   );
 }
