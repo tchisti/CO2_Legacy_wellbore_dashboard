@@ -17,6 +17,18 @@ function numToM(n: number, unit: string): number {
   return +(unit === 'ft' ? ftToM(n) : n).toFixed(1);
 }
 
+// A note whose text is a whole clause the parsers could not read (text = verbatim).
+function clauseNote(line: string): WellboreNote {
+  return { depth_m: null, text: line, source: 'parsed', verbatim: line };
+}
+const isClauseNote = (n: WellboreNote): boolean => n.depth_m === null && n.text === n.verbatim;
+
+// Deviation from v2: NUM also matches a lone comma (toNum(',') is NaN) and a
+// long digit run overflows to Infinity; v2 emitted those values as depths.
+// The port treats a clause holding any such number as unparsed: a warning
+// plus a clauseNote, and no row (and no plug-header state) from it.
+const allFinite = (xs: readonly number[]): boolean => xs.every((x) => Number.isFinite(x));
+
 // Candidate clauses: split on line breaks and `;`, trimmed, blanks dropped.
 function clauses(text: string): string[] {
   return text
@@ -58,13 +70,9 @@ export function parseIntervalsText(text: string | null | undefined, defaultUnit:
     if (/\bft\b/i.test(line) && !/\bm\b(?!m)/i.test(line)) lineUnit = 'ft';
     else if (/\bm\b(?!m)/i.test(line) && !/\bft\b/i.test(line)) lineUnit = 'm';
 
-    // Plug header e.g. "Plug #1" — starts a fresh block; the plug it
-    // eventually produces becomes the new `lastPlug` continuation target.
+    // Plug header e.g. "Plug #1" (block state is updated below, once the
+    // clause's numbers are known to be readable).
     const hdrMatch = line.match(/plug\s*#?\s*(\d+)/i);
-    if (hdrMatch && !new RegExp(`${NUM}\\s*${DASH}\\s*${NUM}`).test(line)) {
-      lastPlugHeader = { num: hdrMatch[1] ?? '' };
-      lastPlug = null;
-    }
 
     // Formation names in trailing (...) become notes.
     const parenMatches = [...line.matchAll(/\(([^)]+)\)/g)];
@@ -120,11 +128,37 @@ export function parseIntervalsText(text: string | null | undefined, defaultUnit:
       }
     }
 
-    // "felt plug" note (may or may not carry its own depth already captured above)
-    if (/felt plug/i.test(line)) {
+    // "felt plug" depth: its own number if it has one, else the first entry's top.
+    const isFeltPlug = /felt plug/i.test(line);
+    let feltDepth: number | null = null;
+    if (isFeltPlug) {
       const atMatch = line.match(new RegExp(`felt plug\\s*(?:at|@)?\\s*(${NUM})?\\s*(m|ft)?`, 'i'));
-      const depth = atMatch && atMatch[1] ? numToM(toNum(atMatch[1]), (atMatch[2] || lineUnit).toLowerCase()) : entries[0] ? entries[0].top_m : null;
-      out.notes.push({ depth_m: depth, text: `Felt plug noted: "${line}"`, source: 'parsed', verbatim: line });
+      feltDepth = atMatch && atMatch[1] ? numToM(toNum(atMatch[1]), (atMatch[2] || lineUnit).toLowerCase()) : entries[0] ? entries[0].top_m : null;
+    }
+
+    // Every number this clause read must be finite (deviation from v2, see allFinite).
+    const numbersRead = [
+      ...(hdrMatch ? [Number(hdrMatch[1])] : []),
+      ...entries.flatMap((e) => [e.top_m, e.bottom_m]),
+      ...(sacks !== undefined ? [sacks] : []),
+      ...(feltDepth !== null ? [feltDepth] : []),
+    ];
+    if (!allFinite(numbersRead)) {
+      out.warnings.push(`Unparsed interval line: "${line}"`);
+      out.notes.push(clauseNote(line));
+      continue;
+    }
+
+    // A plug header with no range on the same line starts a fresh block; the
+    // plug it eventually produces becomes the new `lastPlug` continuation target.
+    if (hdrMatch && !new RegExp(`${NUM}\\s*${DASH}\\s*${NUM}`).test(line)) {
+      lastPlugHeader = { num: hdrMatch[1] ?? '' };
+      lastPlug = null;
+    }
+
+    // "felt plug" note (may or may not carry its own depth already captured above)
+    if (isFeltPlug) {
+      out.notes.push({ depth_m: feltDepth, text: `Felt plug noted: "${line}"`, source: 'parsed', verbatim: line });
     }
 
     if (entries.length) {
@@ -150,7 +184,7 @@ export function parseIntervalsText(text: string | null | undefined, defaultUnit:
           out.notes.push({ depth_m: e.top_m, text: `Interval noted: "${line}"`, source: 'parsed', verbatim: line });
         }
       }
-    } else if (!/felt plug/i.test(line)) {
+    } else if (!isFeltPlug) {
       // No depth on this line. Within a Plug #N block, a continuation line
       // carrying sacks/additive/kind but no depth attaches to the most
       // recently opened plug instead of being reported as unparsed (Finding 3).
@@ -282,7 +316,12 @@ export function parseCasingTextDetail(text: string | null | undefined): ParsedCa
 
     const hasCasingData = od_mm !== undefined || shoe_m !== undefined || grade !== undefined || top_m !== undefined;
 
-    if (hasCasingData) {
+    const casingNumbers = [od_mm, weight_kgm, top_m, shoe_m, toc_m].filter((v): v is number => v !== undefined);
+    if (hasCasingData && !allFinite(casingNumbers)) {
+      // Deviation from v2 (see allFinite): unparsed, with the clause kept as a note.
+      out.warnings.push(`Unparsed casing line: "${line}"`);
+      out.notes.push({ text: line, verbatim: line });
+    } else if (hasCasingData) {
       const casing: WellboreCasing = {};
       if (type) casing.type = type;
       if (od_mm !== undefined) casing.od_mm = +od_mm.toFixed(2);
@@ -352,11 +391,23 @@ export function parseWellboreReport(text: string | null | undefined): ParsedRepo
       wellbore.notes.push(...iv.notes);
       warnings.push(...iv.warnings);
 
+      // A clause the parsers could not read is noted once per chunk, whichever
+      // parser (or both) flagged it.
+      const notedClauses = new Set(iv.notes.filter(isClauseNote).map((n) => n.verbatim));
+      const noteClause = (line: string): void => {
+        if (notedClauses.has(line)) return;
+        notedClauses.add(line);
+        wellbore.notes.push(clauseNote(line));
+      };
+
       if (cs.casings.length) wellbore.casings.push(...cs.casings);
       if (cs.openHole) wellbore.openHole = cs.openHole;
       // Casing notes (open-hole prose) become structured note rows so they
       // survive end-to-end (Finding 2).
-      for (const n of cs.notes) wellbore.notes.push({ depth_m: null, text: n.text, source: 'parsed', verbatim: n.verbatim });
+      for (const n of cs.notes) {
+        if (n.text === n.verbatim) noteClause(n.verbatim);
+        else wellbore.notes.push({ depth_m: null, text: n.text, source: 'parsed', verbatim: n.verbatim });
+      }
       // Never suppress one parser's warnings because the other found
       // something in the same chunk (Finding 6); dedupe identical strings.
       for (const w of cs.warnings) {
@@ -367,7 +418,7 @@ export function parseWellboreReport(text: string | null | undefined): ParsedRepo
       const ivUnparsed = quotedLines(iv.warnings, 'Unparsed interval line');
       const csUnparsed = quotedLines(cs.warnings, 'Unparsed casing line');
       for (const rawLine of ivUnparsed) {
-        if (csUnparsed.has(rawLine)) wellbore.notes.push({ depth_m: null, text: rawLine, source: 'parsed', verbatim: rawLine });
+        if (csUnparsed.has(rawLine)) noteClause(rawLine);
       }
     };
 

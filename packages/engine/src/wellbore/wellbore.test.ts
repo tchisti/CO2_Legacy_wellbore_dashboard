@@ -548,3 +548,106 @@ describe('WellboreSchema (v3)', () => {
     expect(W.WellboreSchema.safeParse({ plugs: [{ top_m: 1, bottom_m: 2, source: 'guess' }] }).success).toBe(false);
   });
 });
+
+// Fix round 1: v2's NUM pattern also matches a lone comma (NaN) and a long
+// digit run overflows (Infinity). The parsers treat such a clause as
+// unparsed instead of emitting a non-finite depth the schema would reject.
+const nonFinite = (x: unknown): number[] => {
+  if (typeof x === 'number') return Number.isFinite(x) ? [] : [x];
+  if (Array.isArray(x)) return x.flatMap(nonFinite);
+  if (x && typeof x === 'object') return Object.values(x).flatMap(nonFinite);
+  return [];
+};
+const storable = (wb: W.ParsedReportWellbore | W.BridgeWellbore): boolean =>
+  W.WellboreSchema.safeParse(wb).success && W.WellboreSchema.safeParse(JSON.parse(JSON.stringify(wb))).success;
+
+describe('non-finite numbers are never emitted (v3 fix round 1)', () => {
+  const NINES = '9'.repeat(400);
+  it.each([
+    ['Perf 1200 m, - 1300 m', 'Perf 1200 m, - 1300 m'],
+    ['Plug #1 3658 ft, - 3277 ft', 'Plug #1 3658 ft, - 3277 ft'],
+    ['foo, - 200 m', 'foo, - 200 m'],
+    ['x @ , m casing', 'x @ , m casing'],
+    ['casing TOC , m', 'casing TOC , m'],
+    ['plug 100–<400 nines> m', `plug 100–${NINES} m`],
+    ['casing @ 100 m TOC , m', 'casing @ 100 m TOC , m'],
+  ])('%s → no non-finite field, a warning, a note with the clause, storable', (_label, text) => {
+    const { wellbore, warnings } = W.parseWellboreReport(text);
+    expect(nonFinite(wellbore)).toEqual([]);
+    expect(warnings.length).toBeGreaterThanOrEqual(1);
+    expect(wellbore.notes.some((n) => (n.text ?? '').includes(text))).toBe(true);
+    expect(storable(wellbore)).toBe(true);
+    expect(() => W.WellboreSchema.parse(JSON.parse(JSON.stringify(wellbore)))).not.toThrow();
+
+    // The parsers the bridge calls directly are covered too.
+    expect(nonFinite(W.parseIntervalsText(text))).toEqual([]);
+    expect(nonFinite(W.parseIntervalsText(text, 'ft'))).toEqual([]);
+    expect(nonFinite(W.parseCasingText(text))).toEqual([]);
+    const bridged = W.wellboreFrom3D({ td: 2000, productionCasing: text, intermediateCasing: text, plugIntervals: text, perfIntervals: text })!;
+    expect(nonFinite(bridged)).toEqual([]);
+    expect(storable(bridged)).toBe(true);
+  });
+
+  it('an unreadable range keeps the clause as one note (not three) and emits no plug', () => {
+    const text = 'Plug #1 3658 ft, - 3277 ft';
+    const { wellbore, warnings } = W.parseWellboreReport(text);
+    expect(wellbore.plugs).toEqual([]);
+    expect(wellbore.notes).toEqual([{ depth_m: null, text, source: 'parsed', verbatim: text }]);
+    expect(warnings).toEqual([`Unparsed interval line: "${text}"`, `Unparsed casing line: "${text}"`]);
+  });
+
+  it('a clause unreadable to both parsers is noted once', () => {
+    const text = 'x @ , m casing';
+    const { wellbore } = W.parseWellboreReport(text);
+    expect(wellbore.casings).toEqual([]);
+    expect(wellbore.notes).toEqual([{ depth_m: null, text, source: 'parsed', verbatim: text }]);
+    expect(W.parseCasingText(text)).toEqual({ casings: [], openHole: null, notes: [text], warnings: [`Unparsed casing line: "${text}"`] });
+  });
+
+  it('a casing clause with one unreadable value is unparsed as a whole', () => {
+    const c = W.parseCasingText('casing @ 100 m TOC , m');
+    expect([c.casings.length, c.notes, c.warnings.length]).toEqual([0, ['casing @ 100 m TOC , m'], 1]);
+  });
+
+  it('an unreadable clause inside a plug block does not break the block, like a v2 unparsed line', () => {
+    const { wellbore } = W.parseWellboreReport('Plug #1\n1463–1448 m\n1200 m, - 1300 m\n25 sacks');
+    expect(wellbore.plugs.map((p) => [p.n, p.top_m, p.bottom_m, p.sacks])).toEqual([[1, 1448, 1463, 25]]);
+    expect(wellbore.notes.filter((n) => n.text === '1200 m, - 1300 m')).toHaveLength(1);
+  });
+
+  it('an overflowing plug number or sacks count is not emitted', () => {
+    const hdr = W.parseIntervalsText(`Plug #${NINES}\n100–200 plug m`);
+    expect(nonFinite(hdr)).toEqual([]);
+    expect(hdr.notes.some((n) => n.text === `Plug #${NINES}`)).toBe(true);
+    expect(hdr.plugs.map((p) => p.n)).toEqual([undefined]);
+
+    const sacks = W.parseIntervalsText(`Plug #1\n100–200 m\n${NINES} sacks`);
+    expect(sacks.plugs.map((p) => [p.n, p.sacks])).toEqual([[1, undefined]]);
+    expect(sacks.notes.some((n) => n.text === `${NINES} sacks`)).toBe(true);
+  });
+
+  // Overflow (Infinity) is covered by the explicit cases above; long digit
+  // runs are kept out of the generator because v2's inch-OD regex is slow on them.
+  it('property: every report and bridge output from 500 seeded texts with stray commas, dashes and units is storable', () => {
+    let seed = 20261020;
+    const rnd = (): number => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+    const TOKENS = ['1', '12', '100', '1463', '3658.5', '1,463', ',', ', ', ' ,', '-', '–', '—', ' - ', 'm', 'ft', ' m', ' ft', 'mm', '@', 'at', 'and', 'TOC', 'Plug #', 'plug', 'perfs', 'squeezed', 'casing', 'surface', 'sacks', '"', '5/8', 'kg/m', 'J55', 'felt plug', 'CIBP', ';', '\n', '\n\n'];
+    const pick = (): string => TOKENS[Math.floor(rnd() * TOKENS.length)]!;
+    let clauseNotes = 0;
+    let rows = 0;
+    for (let i = 0; i < 500; i++) {
+      const text = Array.from({ length: 2 + Math.floor(rnd() * 12) }, () => pick()).join(rnd() < 0.5 ? ' ' : '');
+      const { wellbore } = W.parseWellboreReport(text);
+      expect(nonFinite(wellbore), text).toEqual([]);
+      expect(storable(wellbore), text).toBe(true);
+      const bridged = W.wellboreFrom3D({ td: 5000, productionCasing: text, plugIntervals: text, perfIntervals: text })!;
+      expect(nonFinite(bridged), text).toEqual([]);
+      expect(storable(bridged), text).toBe(true);
+      clauseNotes += wellbore.notes.filter((n) => n.depth_m === null && n.text === n.verbatim).length;
+      rows += wellbore.plugs.length + wellbore.perforations.length + wellbore.casings.length;
+    }
+    // The generator exercises both the unreadable-clause path and real rows.
+    expect(clauseNotes).toBeGreaterThan(50);
+    expect(rows).toBeGreaterThan(100);
+  });
+});
