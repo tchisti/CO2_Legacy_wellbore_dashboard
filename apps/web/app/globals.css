@@ -1,26 +1,143 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+/*
+ * One palette (spec §7): neutral greys, one accent for interactive elements, and the four rank
+ * colours used only for rank (the methodology band hexes, so reports match v2). Light is the
+ * default; dark applies only with data-theme="dark" on <html> (lib/theme.ts), never from the OS.
+ */
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: light;
+
+  --bg: #f7f8f9; /* page */
+  --surface: #ffffff; /* top bar, tables, dialogs, menus */
+  --subtle: #f1f3f5; /* quiet fills: tab strips, table headers */
+  --hover: #eaedf1; /* hovered and highlighted menu items */
+  --line: #e1e5ea; /* borders that separate */
+  --line-strong: #b4bcc6; /* form control borders */
+  --ink: #15191e; /* text */
+  --muted: #5d6773; /* secondary text */
+  --accent: #2557c7; /* the one interactive colour: primary actions, links, focus */
+  --accent-ink: #ffffff; /* text on the accent */
+  --danger: #b42318; /* errors and destructive actions (never a rank) */
+
+  --rank-low: #1fbf75;
+  --rank-mod: #f0a93b;
+  --rank-high: #e85a4f;
+  --rank-crit: #a8324a;
+
+  --radius: 0.375rem;
+
+  /*
+   * shadcn/ui variable names, mapped onto the palette above. `--muted` and `--accent` are ours
+   * (text colours); shadcn's muted and accent *surfaces* are --subtle and --hover, wired in
+   * @theme below, so `bg-muted` / `bg-accent` in shadcn components stay quiet greys.
+   */
+  --background: var(--bg);
+  --foreground: var(--ink);
+  --card: var(--surface);
+  --card-foreground: var(--ink);
+  --popover: var(--surface);
+  --popover-foreground: var(--ink);
+  --primary: var(--accent);
+  --primary-foreground: var(--accent-ink);
+  --secondary: var(--subtle);
+  --secondary-foreground: var(--ink);
+  --muted-foreground: var(--muted);
+  --accent-foreground: var(--ink);
+  --destructive: var(--danger);
+  --border: var(--line);
+  --input: var(--line-strong);
+  --ring: var(--accent);
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg: #0f1114;
+  --surface: #16191d;
+  --subtle: #1c2026;
+  --hover: #252a31;
+  --line: #2a3038;
+  --line-strong: #46505b;
+  --ink: #e5e8ec;
+  --muted: #9aa4b0;
+  --accent: #79a4ff;
+  --accent-ink: #0b1220;
+  --danger: #f97066;
 }
 
 @theme inline {
+  /* Palette utilities: bg-bg, bg-surface, border-line, text-ink, bg-rank-low… (muted text: text-muted-foreground) */
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-subtle: var(--subtle);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-ink: var(--ink);
+  --color-danger: var(--danger);
+  --color-rank-low: var(--rank-low);
+  --color-rank-mod: var(--rank-mod);
+  --color-rank-high: var(--rank-high);
+  --color-rank-crit: var(--rank-crit);
+
+  /* shadcn/ui utilities (primary = the accent; muted/accent = quiet surfaces, see :root) */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--subtle);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--hover);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* Inter for the interface, JetBrains Mono for licences, depths and numbers (app/layout.tsx). */
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-heading: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, "SFMono-Regular", Menlo, monospace;
+
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* Numbers that line up in columns: the mono face with tabular figures (`tabular-nums` alone is Tailwind's). */
+@utility num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
   }
-}
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  html {
+    @apply font-sans;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  body {
+    background-color: var(--bg);
+    color: var(--ink);
+    font-size: 0.875rem; /* body text and forms at 14 px; tables set 13 px themselves */
+    line-height: 1.25rem;
+  }
 }
