@@ -7,3 +7,5 @@ export * from './suggest';
 export * from './stale';
 export * from './geo';
 export * from './wellbore';
+export * from './domain';
+export * from './ids';
