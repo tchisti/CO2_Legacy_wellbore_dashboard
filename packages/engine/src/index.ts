@@ -9,3 +9,4 @@ export * from './geo';
 export * from './wellbore';
 export * from './domain';
 export * from './ids';
+export * from './migrate-v2';

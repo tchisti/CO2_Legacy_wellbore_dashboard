@@ -1,0 +1,123 @@
+{
+  "name": "Nisku Enbridge POC AOR",
+  "source": "legacy-well-management-system/src/data-enbridge.js (ENBRIDGE_SITE, ENBRIDGE_WELLS)",
+  "injectors": [
+    {
+      "id": "INJ-PINE",
+      "name": "Pine (proposed)",
+      "lat": 53.788997,
+      "lon": -113.249007,
+      "aorRadius_m": 5000
+    },
+    {
+      "id": "INJ-OAK",
+      "name": "Oak (proposed)",
+      "lat": 53.774499,
+      "lon": -113.249007,
+      "aorRadius_m": 5000
+    },
+    {
+      "id": "INJ-CEDAR",
+      "name": "Cedar (proposed)",
+      "lat": 53.76,
+      "lon": -113.273398,
+      "aorRadius_m": 5000
+    }
+  ],
+  "formations": [
+    {
+      "id": "fm-leapark",
+      "name": "Lea Park",
+      "top_m": 290,
+      "base_m": 450,
+      "role": "other",
+      "order": 0
+    },
+    {
+      "id": "fm-colorado",
+      "name": "Colorado Grp",
+      "top_m": 450,
+      "base_m": 746,
+      "role": "other",
+      "order": 1
+    },
+    {
+      "id": "fm-viking",
+      "name": "Viking",
+      "top_m": 746,
+      "base_m": 790,
+      "role": "other",
+      "order": 2
+    },
+    {
+      "id": "fm-mannville",
+      "name": "Mannville Grp",
+      "top_m": 790,
+      "base_m": 1030,
+      "role": "other",
+      "order": 3
+    },
+    {
+      "id": "fm-wabamun",
+      "name": "Wabamun",
+      "top_m": 1030,
+      "base_m": 1050,
+      "role": "other",
+      "order": 4
+    },
+    {
+      "id": "fm-calmar",
+      "name": "Calmar (seal)",
+      "top_m": 1050,
+      "base_m": 1080,
+      "role": "seal",
+      "order": 5
+    },
+    {
+      "id": "fm-nisku",
+      "name": "Nisku (reservoir)",
+      "top_m": 1080,
+      "base_m": 1160,
+      "role": "reservoir",
+      "order": 6
+    },
+    {
+      "id": "fm-ireton",
+      "name": "Ireton",
+      "top_m": 1160,
+      "base_m": 1330,
+      "role": "other",
+      "order": 7
+    },
+    {
+      "id": "fm-cookinglake",
+      "name": "Cooking Lake",
+      "top_m": 1330,
+      "base_m": 1450,
+      "role": "other",
+      "order": 8
+    }
+  ],
+  "wellsByUwi": {
+    "100/13-06-055-22W4/00": {
+      "name": "MANNING 13-6 WILDCAT",
+      "td_m": 1447.2
+    },
+    "100/08-19-055-22W4/00": {
+      "name": "ENBRIDGE WABAMUN HUB 8-19",
+      "td_m": 2337
+    },
+    "100/07-21-055-22W4/00": {
+      "name": "IMPERIAL FT SASK 7-21",
+      "td_m": 1463.3
+    },
+    "100/13-05-056-22W4/00": {
+      "name": "SINOPEC REDWATER 13-5",
+      "td_m": 1160.5
+    },
+    "100/03-17-056-22W4/00": {
+      "name": "PHOENIX REDWATER 3-17",
+      "td_m": 1115.6
+    }
+  }
+}
