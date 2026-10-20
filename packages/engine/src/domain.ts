@@ -103,44 +103,59 @@ const ProjectFormationSchema = z
   })
   .refine((f) => f.base_m >= f.top_m, { message: 'base_m must be at or below top_m', path: ['base_m'] });
 
+// Stored records carry no defaults: a field the record never had must fail validation, not be
+// filled with a plausible value (a missing requireApproval is not "no approval required").
+// Defaults exist only on the *Input schemas below, where a form or an import fills in blanks.
 export const ProjectSchema = z.object({
   id: IdSchema,
   name: NameSchema,
-  jurisdiction: z.enum(['AER', 'EPA', 'both']).default('both'),
-  description: z.string().default(''),
-  injectors: z.array(ProjectInjectorSchema).default([]),
-  formations: z.array(ProjectFormationSchema).default([]),
-  requireApproval: z.boolean().default(false),
+  jurisdiction: z.enum(['AER', 'EPA', 'both']),
+  description: z.string(),
+  injectors: z.array(ProjectInjectorSchema),
+  formations: z.array(ProjectFormationSchema),
+  requireApproval: z.boolean(),
   ...auditFields,
 });
 
-/** What the project form produces: a name, and defaults for everything else. */
+/**
+ * What the project form produces: a name, and defaults for everything else. The validators are
+ * the stored schema's own (via `.shape`); only the defaults are added here.
+ */
 export const ProjectInputSchema = ProjectSchema.omit({
   id: true,
   createdAt: true,
   createdBy: true,
   updatedAt: true,
   updatedBy: true,
+}).extend({
+  jurisdiction: ProjectSchema.shape.jurisdiction.default('both'),
+  description: ProjectSchema.shape.description.default(''),
+  injectors: ProjectSchema.shape.injectors.default([]),
+  formations: ProjectSchema.shape.formations.default([]),
+  requireApproval: ProjectSchema.shape.requireApproval.default(false),
 });
 
 /* ---------- well ---------- */
 
+// Every field is required as stored (nullable ones must be present, as null). A well that never
+// had a classification fails here instead of being stamped "Type 1", which suggest() would turn
+// into the maximum-risk penetration score. Defaults live on WellInputSchema only.
 export const WellSchema = z.object({
   id: IdSchema,
   projectId: IdSchema,
   licence: z.string().trim().min(1),
-  name: z.string().default(''),
-  operator: z.string().default(''), // never invented: an unknown operator is the empty string
-  lat: LatSchema.nullable().default(null),
-  lon: LonSchema.nullable().default(null),
-  spudYear: z.number().int().min(1850).max(2100).nullable().default(null),
-  type: z.enum(WELL_TYPES).default('Unknown'),
-  trajectory: z.enum(TRAJECTORIES).default('Unknown'),
-  status: z.enum(STATUSES).default('Unknown'),
-  classification: z.enum(CLASSIFICATIONS).default('Type 1'),
-  td_m: z.number().min(0).nullable().default(null),
-  notes: z.string().default(''),
-  construction: WellboreSchema.nullable().default(null),
+  name: z.string(),
+  operator: z.string(), // never invented: an unknown operator is the empty string
+  lat: LatSchema.nullable(),
+  lon: LonSchema.nullable(),
+  spudYear: z.number().int().min(1850).max(2100).nullable(),
+  type: z.enum(WELL_TYPES),
+  trajectory: z.enum(TRAJECTORIES),
+  status: z.enum(STATUSES),
+  classification: z.enum(CLASSIFICATIONS),
+  td_m: z.number().min(0).nullable(),
+  notes: z.string(),
+  construction: WellboreSchema.nullable(),
   // The v2 `legacy` block (v1 scores), kept on migrated wells for traceability.
   legacyV1: z
     .object({ scores: z.record(z.string(), z.number()), total: z.number() })
@@ -149,7 +164,11 @@ export const WellSchema = z.object({
   ...auditFields,
 });
 
-/** What the well form and the CSV import produce: no id, project or audit fields. */
+/**
+ * What the well form and the CSV import produce: no id, project or audit fields, and a default
+ * for every optional field. The validators are the stored schema's own (via `.shape`), so range
+ * rules are defined once; only the defaults are added here.
+ */
 export const WellInputSchema = WellSchema.omit({
   id: true,
   projectId: true,
@@ -157,6 +176,19 @@ export const WellInputSchema = WellSchema.omit({
   createdBy: true,
   updatedAt: true,
   updatedBy: true,
+}).extend({
+  name: WellSchema.shape.name.default(''),
+  operator: WellSchema.shape.operator.default(''),
+  lat: WellSchema.shape.lat.default(null),
+  lon: WellSchema.shape.lon.default(null),
+  spudYear: WellSchema.shape.spudYear.default(null),
+  type: WellSchema.shape.type.default('Unknown'),
+  trajectory: WellSchema.shape.trajectory.default('Unknown'),
+  status: WellSchema.shape.status.default('Unknown'),
+  classification: WellSchema.shape.classification.default('Type 1'),
+  td_m: WellSchema.shape.td_m.default(null),
+  notes: WellSchema.shape.notes.default(''),
+  construction: WellSchema.shape.construction.default(null),
 });
 
 /* ---------- assessment ---------- */
@@ -270,7 +302,7 @@ export const ProjectExportSchema = z.object({
 
 /* ---------- types ---------- */
 
-// Stored records are the schema outputs (defaults applied). Inputs are what callers pass.
+// Stored records are the schema outputs. Inputs are what callers pass (defaults optional).
 export type Project = z.output<typeof ProjectSchema>;
 export type ProjectInput = z.input<typeof ProjectInputSchema>;
 export type Well = z.output<typeof WellSchema>;

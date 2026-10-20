@@ -337,6 +337,63 @@ describe('WellSchema', () => {
   });
 });
 
+describe('WellSchema stores no defaults', () => {
+  const omit = <T extends object, K extends keyof T>(obj: T, key: K): Omit<T, K> => {
+    const { [key]: _removed, ...rest } = obj;
+    return rest;
+  };
+
+  it('rejects a stored well that is missing any field, naming the field', () => {
+    const fields = [
+      'name',
+      'operator',
+      'lat',
+      'lon',
+      'spudYear',
+      'type',
+      'trajectory',
+      'status',
+      'classification',
+      'td_m',
+      'notes',
+      'construction',
+    ] as const;
+    for (const field of fields) {
+      const bad = omit(well, field);
+      expect(ok(WellSchema, bad), field).toBe(false);
+      expect(issuePaths(WellSchema, bad), field).toContain(field);
+    }
+  });
+
+  it('does not stamp a bare well (id, projectId, licence, audit fields) with Type 1 or anything else', () => {
+    const bare = {
+      id: 'wel_bare',
+      projectId: 'prj_1',
+      licence: '0012345',
+      createdAt: T0,
+      createdBy: ACTOR,
+      updatedAt: T0,
+      updatedBy: ACTOR,
+    };
+    expect(ok(WellSchema, bare)).toBe(false);
+    expect(issuePaths(WellSchema, bare)).toContain('classification');
+    // ...while the same facts through the input schema are filled in on purpose.
+    expect(WellInputSchema.parse({ licence: '0012345' }).classification).toBe('Type 1');
+  });
+
+  it('rejects an export whose well is missing its classification', () => {
+    const bad = { ...fullExport, wells: [omit(well, 'classification')] };
+    expect(ok(ProjectExportSchema, bad)).toBe(false);
+    expect(issuePaths(ProjectExportSchema, bad)).toContain('wells.0.classification');
+  });
+
+  it('still accepts null for the nullable fields when they are present', () => {
+    expect(
+      ok(WellSchema, { ...well, lat: null, lon: null, spudYear: null, td_m: null, construction: null }),
+    ).toBe(true);
+  });
+});
+
 describe('WellInputSchema', () => {
   it('applies defaults: Unknown type/trajectory/status, Type 1, empty text, null geometry and construction', () => {
     expect(WellInputSchema.parse({ licence: '0012345' })).toEqual({
@@ -386,6 +443,16 @@ describe('ProjectSchema and ProjectInputSchema', () => {
   it('round-trips a complete project', () => {
     expect(ProjectSchema.parse(project)).toEqual(project);
     expect(ProjectSchema.parse(roundTrip(project))).toEqual(project);
+  });
+
+  it('rejects a stored project that is missing requireApproval or any other defaulted field', () => {
+    for (const field of ['jurisdiction', 'description', 'injectors', 'formations', 'requireApproval'] as const) {
+      const { [field]: _removed, ...bad } = project;
+      expect(ok(ProjectSchema, bad), field).toBe(false);
+      expect(issuePaths(ProjectSchema, bad), field).toContain(field);
+    }
+    const { requireApproval: _drop, ...noApproval } = project;
+    expect(ok(ProjectExportSchema, { ...fullExport, project: noApproval })).toBe(false);
   });
 
   it('ProjectInputSchema requires a name and applies defaults', () => {
