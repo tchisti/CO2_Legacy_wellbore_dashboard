@@ -45,6 +45,8 @@ v2 is preserved on branch `v2-static`.
   route in both themes, phone (390 px) and tablet (1024 px) layout tests, and a 500-well performance
   smoke test.
 - **Docs**: this changelog, the README and [`docs/runbook.md`](docs/runbook.md).
+- **Vercel config** ([`vercel.json`](vercel.json)): builds the web app and serves `apps/web/out` with
+  clean URLs.
 
 ### Changed (from v2)
 
