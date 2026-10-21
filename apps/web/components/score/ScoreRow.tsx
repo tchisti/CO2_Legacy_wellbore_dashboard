@@ -173,7 +173,7 @@ export function ScoreRow({
         data-anchor
         data-decided={decided}
         className={cn(
-          'border-l-2 pl-2.5 text-[13px] text-pretty',
+          'border-l-2 pl-2.5 text-[13px] text-pretty wrap-anywhere',
           score === null ? 'text-muted-foreground' : 'border-primary/60 text-ink',
           score === null && (decided ? 'border-line-strong' : 'border-dashed border-line-strong'),
         )}

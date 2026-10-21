@@ -6,6 +6,8 @@
 // in print only the sheet, on the named page `report` (app/report/report.css: letter, 18 mm
 // margins, page numbers), with the report's own running header and footer written into the page
 // margins. The root carries .report-root, which also forces the light palette whatever the theme.
+// Everything on screen sits in the page's <main> landmark, and the browser tab carries the report's
+// own title, which "Save as PDF" proposes as the file name.
 import { useEffect, useState, type ReactNode } from 'react';
 import { flushSync } from 'react-dom';
 import Link from 'next/link';
@@ -13,6 +15,7 @@ import { ArrowLeftIcon, PrinterIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useReportError } from '@/lib/log';
 import { pageMarginCss, type MarginBoxes } from '@/lib/report';
+import { useDocumentTitle } from '@/lib/use-document-title';
 
 /** The page background, light palette forced (report.css), filling the window. */
 const ROOT = 'report-root min-h-dvh bg-bg text-ink print:min-h-0 print:bg-surface';
@@ -35,9 +38,11 @@ export function usePrintedAt(): string {
 export function ReportStatus({ children = 'Opening the report…' }: { children?: ReactNode }) {
   return (
     <div data-report-root className={`${ROOT} grid place-items-center`}>
-      <p role="status" className="text-sm text-muted-foreground">
-        {children}
-      </p>
+      <main>
+        <p role="status" className="text-sm text-muted-foreground">
+          {children}
+        </p>
+      </main>
     </div>
   );
 }
@@ -91,20 +96,24 @@ export function ProjectReadError({ error, backHref }: { error: Error; backHref: 
 
 export function ReportFrame({
   title,
+  documentTitle,
   back,
   margins,
   children,
 }: {
   /** The report's accessible name: "Well dossier 100/07-21-055-22W4/00". */
   title: string;
+  /** The browser tab's title while the report is open: "Well dossier 100/07-21-055-22W4/00 — <project>". */
+  documentTitle: string;
   /** Where the toolbar's back link goes, and what it is called ("well", "Wells"). */
   back: { href: string; label: string };
   /** The running header and footer printed in the page margins (the page number is report.css's). */
   margins: MarginBoxes;
   children: ReactNode;
 }) {
+  useDocumentTitle(documentTitle);
   return (
-    <div data-report-root className={ROOT}>
+    <main data-report-root className={ROOT}>
       <style>{pageMarginCss(margins)}</style>
       <div
         role="group"
@@ -129,6 +138,6 @@ export function ReportFrame({
       >
         {children}
       </article>
-    </div>
+    </main>
   );
 }

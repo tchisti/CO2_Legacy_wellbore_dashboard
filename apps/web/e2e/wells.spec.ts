@@ -213,6 +213,29 @@ test.describe('with the Fort Saskatchewan fixture', () => {
     await expect(page).toHaveURL(/\/wells$/);
   });
 
+  test('the licence is a link to the well: it opens in a new tab, and a click opens the well once', async ({ page, context }) => {
+    const link = rowFor(page, '100/13-06-055-22W4/00').getByRole('link', { name: '100/13-06-055-22W4/00' });
+    await expect(link).toHaveAttribute('href', '/wells/view?id=wel_v2_W-W8QB2S');
+    // Out of the tab order: the row is the keyboard stop (Enter opens it).
+    await expect(link).toHaveAttribute('tabindex', '-1');
+
+    // A modifier click opens a new tab and leaves this page where it is.
+    const [popup] = await Promise.all([
+      context.waitForEvent('page'),
+      link.click({ modifiers: [process.platform === 'darwin' ? 'Meta' : 'Control'] }),
+    ]);
+    await expect(popup).toHaveURL(/\/wells\/view(?:\.html)?\?id=wel_v2_W-W8QB2S$/);
+    await popup.close();
+    await expect(page).toHaveURL(/\/wells$/);
+
+    await link.click();
+    await expect(page).toHaveURL(/\/wells\/view\?id=wel_v2_W-W8QB2S$/);
+    await expect(page.getByRole('heading', { level: 1, name: '100/13-06-055-22W4/00' })).toBeVisible();
+    // One navigation, not the link's and the row's: Back returns to the register.
+    await page.goBack();
+    await expect(page).toHaveURL(/\/wells$/);
+  });
+
   test('filter state survives reload', async ({ page }) => {
     await pickFilter(page, 'Rank', /^Low/);
     await page.getByRole('searchbox', { name: 'Search wells' }).fill('Redwater');

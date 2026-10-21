@@ -26,7 +26,7 @@ import { Button } from '@/components/ui/button';
 import { fmtDate, plural } from '@/lib/format';
 import { portfolioStats } from '@/lib/portfolio';
 import { useProjects } from '@/lib/project-context';
-import { filterDescription } from '@/lib/report';
+import { filterDescription, reportDocumentTitle } from '@/lib/report';
 import { wellsHref } from '@/lib/routes';
 import { useRegister } from '@/lib/use-register';
 import {
@@ -95,6 +95,7 @@ function PortfolioReport() {
   return (
     <ReportFrame
       title={`Portfolio report ${activeProject.name}`}
+      documentTitle={reportDocumentTitle('Portfolio report', activeProject.name)}
       back={{ href: backHref, label: 'Wells' }}
       margins={{
         'top-left': activeProject.name,
@@ -106,7 +107,6 @@ function PortfolioReport() {
         project={activeProject.name}
         kind="Portfolio report"
         title="Portfolio report"
-        subtitle={<span className="text-muted-foreground">{activeProject.name}</span>}
         meta={[
           { key: 'revision', label: 'Methodology rev', value: revision, mono: true },
           { key: 'wells', label: 'Wells', value: plural(rows.length, 'well') },

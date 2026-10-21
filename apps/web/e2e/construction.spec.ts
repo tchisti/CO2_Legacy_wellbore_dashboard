@@ -100,11 +100,11 @@ test.describe('construction tab', () => {
 
     await expect(dataRows(page, 'Plugs')).toHaveCount(1);
     const plug = dataRows(page, 'Plugs').first();
-    await expect(plug.getByLabel('Plug 1: Plug number')).toHaveValue('1');
-    await expect(plug.getByLabel('Plug 1: Top (m)')).toHaveValue('1448');
-    await expect(plug.getByLabel('Plug 1: Bottom (m)')).toHaveValue('1463');
-    await expect(plug.getByLabel('Plug 1: Sacks')).toHaveValue('25');
-    await expect(plug.getByLabel('Plug 1: Additives')).toHaveValue('2% CaCl2');
+    await expect(plug.getByLabel('Plug #1 (row 1): Plug number')).toHaveValue('1');
+    await expect(plug.getByLabel('Plug #1 (row 1): Top (m)')).toHaveValue('1448');
+    await expect(plug.getByLabel('Plug #1 (row 1): Bottom (m)')).toHaveValue('1463');
+    await expect(plug.getByLabel('Plug #1 (row 1): Sacks')).toHaveValue('25');
+    await expect(plug.getByLabel('Plug #1 (row 1): Additives')).toHaveValue('2% CaCl2');
     await expect(plug.locator('[data-source]')).toHaveText('Parsed');
     await expect(plug.locator('[data-verbatim]')).toContainText('1463–1448 m');
     await expect(page.getByLabel('TD (m)')).toHaveValue('1463.3'); // from the well record
@@ -134,7 +134,7 @@ test.describe('construction tab', () => {
     await expect(svg(page)).toContainText('Depth (ft)');
     expect(await viewBox(svg(page))).toBe(metres);
     await expect(stat(page, 'td')).toHaveText('4800.9 ft');
-    await expect(page.getByLabel('Plug 1: Top (m)')).toHaveValue('1448'); // the rows stay in metres
+    await expect(page.getByLabel('Plug #1 (row 1): Top (m)')).toHaveValue('1448'); // the rows stay in metres
   });
 
   test('hovering a plug row highlights it in the SVG (stroke-width 2.5)', async ({ page }) => {
@@ -155,7 +155,7 @@ test.describe('construction tab', () => {
 
     // Focus does the same from the keyboard.
     await page.getByRole('heading', { name: 'Statistics' }).hover();
-    await page.getByLabel('Plug 1: Sacks').focus();
+    await page.getByLabel('Plug #1 (row 1): Sacks').focus();
     await expect(shape).toHaveAttribute('stroke-width', '2.5');
   });
 
@@ -195,7 +195,7 @@ test.describe('construction tab', () => {
 
     await page.reload();
     await expect(dataRows(page, 'Plugs')).toHaveCount(1);
-    await expect(page.getByLabel('Plug 1: Top (m)')).toHaveValue('1448');
+    await expect(page.getByLabel('Plug #1 (row 1): Top (m)')).toHaveValue('1448');
     await expect(dataRows(page, 'Plugs').first().locator('[data-verbatim]')).toContainText('1463–1448 m');
     await expect(svg(page).locator('[data-kind="plug"]')).toHaveCount(1);
     const stored = await page.evaluate(async (id) => (await window.__lwa!.store.wells.get(id))!.construction, FT_SASK.id);
@@ -212,7 +212,7 @@ test.describe('construction tab', () => {
   test('discard restores the stored copy', async ({ page }) => {
     await storeConstruction(page, FT_SASK.id, STORED);
     await openConstruction(page, FT_SASK.id);
-    const top = page.getByLabel('Plug 1: Top (m)');
+    const top = page.getByLabel('Plug #1 (row 1): Top (m)');
     await expect(top).toHaveValue('1400');
     await expect(unsaved(page)).toHaveCount(0);
 
@@ -239,7 +239,7 @@ test.describe('construction tab', () => {
     await openConstruction(page, FT_SASK.id);
     const plug = dataRows(page, 'Plugs').first();
     await expect(plug.locator('[data-source]')).toHaveText('Parsed');
-    await plug.getByLabel('Plug 1: Bottom (m)').fill('1455');
+    await plug.getByLabel('Plug #1 (row 1): Bottom (m)').fill('1455');
     await expect(plug.locator('[data-source]')).toHaveText('Manual');
     await expect(plug.locator('[data-verbatim]')).toContainText('1400–1450 m');
 
@@ -261,7 +261,7 @@ test.describe('construction tab', () => {
   test('a value that is not a plain decimal is refused on the field and blocks saving', async ({ page }) => {
     await storeConstruction(page, FT_SASK.id, STORED);
     await openConstruction(page, FT_SASK.id);
-    const top = page.getByLabel('Plug 1: Top (m)');
+    const top = page.getByLabel('Plug #1 (row 1): Top (m)');
     await top.fill('1400,5');
     await expect(top).toHaveAttribute('aria-invalid', 'true');
     await expect(page.getByText('Use digits only, with a point as the decimal separator (for example 1463.5).')).toBeVisible();
@@ -402,7 +402,7 @@ test.describe('construction tab', () => {
     await page.getByRole('tab', { name: 'Construction' }).click();
     await expect(page).toHaveURL(/[?&]tab=construction(&|$)/);
     await pasteReport(page, PLUG_REPORT);
-    await page.getByLabel('Plug 1: Sacks').fill('30');
+    await page.getByLabel('Plug #1 (row 1): Sacks').fill('30');
 
     await page.goBack();
     await expect(page).toHaveURL(/\/wells$/);
@@ -410,7 +410,7 @@ test.describe('construction tab', () => {
     await expect(page.getByText('Unsaved construction changes were restored')).toBeVisible();
     await expect(page.getByText(CONFLICT)).toHaveCount(0); // made from the record still saved: no warning
     await expect(page.getByRole('button', { name: 'Save anyway' })).toHaveCount(0);
-    await expect(page.getByLabel('Plug 1: Sacks')).toHaveValue('30');
+    await expect(page.getByLabel('Plug #1 (row 1): Sacks')).toHaveValue('30');
     await expect(dataRows(page, 'Plugs').first().locator('[data-verbatim]')).toContainText('1463–1448 m');
     await expect(unsaved(page)).toBeVisible();
     const stored = await page.evaluate(async (id) => (await window.__lwa!.store.wells.get(id))!.construction, FT_SASK.id);
@@ -421,7 +421,7 @@ test.describe('construction tab', () => {
     await expect(page.getByText('Construction saved')).toBeVisible();
     await expect(page.getByText('Unsaved construction changes were restored')).toHaveCount(0);
     await page.reload();
-    await expect(page.getByLabel('Plug 1: Sacks')).toHaveValue('30');
+    await expect(page.getByLabel('Plug #1 (row 1): Sacks')).toHaveValue('30');
     await expect(page.getByText('Unsaved construction changes were restored')).toHaveCount(0);
   });
 
@@ -445,22 +445,23 @@ test.describe('construction tab', () => {
     await openConstruction(page, FT_SASK.id);
     await page.getByRole('button', { name: 'Add rows' }).click();
     await section(page, 'Plugs').getByRole('button', { name: 'Add row to Plugs' }).click();
-    await page.getByLabel('Plug 1: Top (m)').fill('1463');
-    await page.getByLabel('Plug 1: Bottom (m)').fill('1448');
+    // A row added by hand has no plug number yet: its fields are named by its row alone.
+    await page.getByLabel('Plug (row 1): Top (m)').fill('1463');
+    await page.getByLabel('Plug (row 1): Bottom (m)').fill('1448');
     await expect(page.getByText('Top (m) is deeper than Bottom (m).')).toBeVisible();
-    await expect(page.getByLabel('Plug 1: Top (m)')).toHaveAttribute('aria-invalid', 'true');
-    await expect(page.getByLabel('Plug 1: Bottom (m)')).toHaveAttribute('aria-invalid', 'true');
+    await expect(page.getByLabel('Plug (row 1): Top (m)')).toHaveAttribute('aria-invalid', 'true');
+    await expect(page.getByLabel('Plug (row 1): Bottom (m)')).toHaveAttribute('aria-invalid', 'true');
     await expect(saveButton(page)).toBeDisabled();
     await expect(svg(page).locator('[data-kind="plug"]')).toHaveCount(0);
     await expect(stat(page, 'longest')).toHaveText('—'); // never a negative length
 
     await dataRows(page, 'Plugs').first().getByRole('button', { name: 'Swap top and bottom' }).click();
-    await expect(page.getByLabel('Plug 1: Top (m)')).toHaveValue('1448');
-    await expect(page.getByLabel('Plug 1: Bottom (m)')).toHaveValue('1463');
+    await expect(page.getByLabel('Plug (row 1): Top (m)')).toHaveValue('1448');
+    await expect(page.getByLabel('Plug (row 1): Bottom (m)')).toHaveValue('1463');
     await expect(page.getByText('Top (m) is deeper than Bottom (m).')).toHaveCount(0);
     await expect(svg(page).locator('[data-kind="plug"]')).toHaveCount(1);
 
-    await page.getByLabel('Plug 1: Bottom (m)').fill('1500');
+    await page.getByLabel('Plug (row 1): Bottom (m)').fill('1500');
     await expect(dataRows(page, 'Plugs').first()).toContainText('Bottom (m) is below TD (1463.3 m).');
     await expect(saveButton(page)).toBeEnabled();
     await saveButton(page).click();
@@ -506,7 +507,7 @@ test.describe('construction tab', () => {
     await page.goForward();
     await expect(page.getByText(CONFLICT)).toBeVisible();
     await expect(page.locator('[data-restored="conflict"]')).toBeVisible();
-    await expect(page.getByLabel('Plug 1: Top (m)')).toHaveValue('1448'); // the copy, not the newer record
+    await expect(page.getByLabel('Plug #1 (row 1): Top (m)')).toHaveValue('1448'); // the copy, not the newer record
     await expect(dataRows(page, 'Casings')).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Save anyway' })).not.toBeFocused();
 
@@ -521,7 +522,7 @@ test.describe('construction tab', () => {
   test('a stored inverted plug opens without unsaved changes, blocks Save, and is fixed by Swap', async ({ page }) => {
     await storeConstruction(page, FT_SASK.id, {
       td: 1500,
-      plugs: [{ n: 1, kind: 'cement', top_m: 1463, bottom_m: 1448, source: 'extractor', verbatim: 'Plug 1: 1463/1448 m' }],
+      plugs: [{ n: 1, kind: 'cement', top_m: 1463, bottom_m: 1448, source: 'extractor', verbatim: 'Plug #1 (row 1): 1463/1448 m' }],
     });
     await openConstruction(page, FT_SASK.id);
     await expect(page.getByText('Top (m) is deeper than Bottom (m).')).toBeVisible();
@@ -538,6 +539,6 @@ test.describe('construction tab', () => {
     await saveButton(page).click();
     await expect(page.getByText('Construction saved')).toBeVisible();
     const stored = await page.evaluate(async (id) => (await window.__lwa!.store.wells.get(id))!.construction, FT_SASK.id);
-    expect(stored!.plugs[0]).toMatchObject({ top_m: 1448, bottom_m: 1463, source: 'manual', verbatim: 'Plug 1: 1463/1448 m' });
+    expect(stored!.plugs[0]).toMatchObject({ top_m: 1448, bottom_m: 1463, source: 'manual', verbatim: 'Plug #1 (row 1): 1463/1448 m' });
   });
 });

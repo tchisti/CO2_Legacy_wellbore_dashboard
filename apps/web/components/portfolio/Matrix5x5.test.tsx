@@ -27,6 +27,15 @@ const hrefFor = (Lr: number, Cr: number) => wellsFilterHref({ cell: { Lr, Cr } }
 const cellRect = (container: HTMLElement, key: string) => container.querySelector(`[data-cell="${key}"] rect`)!;
 
 describe('Matrix5x5', () => {
+  it('writes the cell value in ink on a cell with wells (AA on the stronger tint), muted on an empty one', () => {
+    const { container } = render(<Matrix5x5 counts={counts()} methodology={DEFAULT_METHODOLOGY} />);
+    const value = (key: string) => container.querySelector(`[data-cell="${key}"] [data-cell-value]`)!;
+    expect(value('2-3').textContent).toBe('6');
+    expect(value('2-3').getAttribute('class')).toContain('fill-ink');
+    expect(value('3-3').getAttribute('class')).toContain('fill-muted-foreground');
+    expect(value('3-3').getAttribute('class')).not.toContain('fill-ink');
+  });
+
   it('names each populated cell by L, C, cell value, band and count, and links it to the filtered register', () => {
     render(<Matrix5x5 counts={counts()} methodology={DEFAULT_METHODOLOGY} hrefFor={hrefFor} />);
     // Document (= tab) order follows the reading order: top row (L 5) first, left to right (WCAG 2.4.3).

@@ -4,7 +4,8 @@
  * page: every rule is scoped to a document that holds the report root (.report-root, rendered by
  * components/report/ReportFrame.tsx), and the page box is the named page `report`, never the
  * unnamed @page. The report's own text for the page margins (project, subject, attribution) is
- * written by the page itself (lib/report.ts pageMarginCss); the page numbers are here.
+ * written by the page itself (lib/report.ts pageMarginCss), which also leaves the running header
+ * off page 1; the page numbers are here.
  */
 
 /*

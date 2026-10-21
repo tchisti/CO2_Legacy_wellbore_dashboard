@@ -451,14 +451,23 @@ export function wellboreFromRows(rows: ConstructionRows, fallbackTd: number | nu
   return { wellbore, record: asRecord.data, drawing, errors, warnings };
 }
 
-/** A row's name in the editor and in reports: "Plug 1" (1-based, in list order). */
-export function rowName(list: ListKey, index: number): string {
+/**
+ * A row's name in the editor (its fields' accessible names) and in reports: "Casing 1" (1-based, in
+ * list order). Plugs carry numbers of their own, so a plug's name says which is which: "Plug #2
+ * (row 3)" with its number as entered, "Plug (row 3)" without one; a row's position is never read
+ * as a plug number.
+ */
+export function rowName(list: ListKey, index: number, row: Pick<EditRow, 'values'>): string {
+  if (list === 'plugs') {
+    const n = (row.values.n ?? '').trim();
+    return /^\d+$/.test(n) ? `Plug #${n} (row ${index + 1})` : `Plug (row ${index + 1})`;
+  }
   return `${LISTS[list].singular} ${index + 1}`;
 }
 
 /** A row the depth rules leave out of the drawing, for a printed record (never left out silently). */
 export type RowNotDrawn = {
-  /** "Plug 2", or "Construction record" for an error in the record as a whole. */
+  /** "Casing 2", "Plug #2 (row 1)", or "Construction record" for an error in the record as a whole. */
   name: string;
   /** The errors' messages: "Top (m) is deeper than Bottom (m)." */
   reasons: string[];
@@ -485,7 +494,7 @@ export function rowsNotDrawn(rows: ConstructionRows, errors: readonly FieldError
         .map((f) => `${f.label} ${(row.values[f.key] ?? '').trim()}`)
         .join(', ');
       const v = row.original.verbatim;
-      out.push({ name: rowName(list, index), reasons, depths, verbatim: typeof v === 'string' && v.trim() ? v : null });
+      out.push({ name: rowName(list, index, row), reasons, depths, verbatim: typeof v === 'string' && v.trim() ? v : null });
     });
   }
   return out;

@@ -262,6 +262,9 @@ test.describe('with the Fort Saskatchewan fixture', () => {
 
     await backup(page).getByRole('radio', { name: /^Replace/ }).check();
     await expect(backup(page).locator('[data-replace-preview]')).toHaveText('1 well will be deleted.');
+    // Announced when the count arrives, and read with the Import button.
+    await expect(backup(page).locator('[data-replace-preview]')).toHaveAttribute('role', 'status');
+    await expect(importButton(page)).toHaveAccessibleDescription('1 well will be deleted.');
     await expect(importButton(page)).toBeDisabled();
     const typed = backup(page).getByLabel('Type the project name to confirm');
     await typed.fill('Fort Saskatchewan');

@@ -38,9 +38,10 @@ export function ProjectSwitcher() {
     <>
       <DropdownMenu modal={false}>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" className="h-8 min-w-0 max-w-[min(28rem,60vw)] gap-2 px-2">
-            <span className="text-xs font-normal text-muted-foreground">Project</span>
-            <span className="truncate">{activeProject?.name ?? 'None'}</span>
+          {/* shrink + min-w-0 let the button give way to the profile menu; the name truncates. */}
+          <Button variant="ghost" className="h-8 min-w-0 max-w-[min(28rem,60vw)] shrink gap-2 px-2">
+            <span className="sr-only text-xs font-normal text-muted-foreground sm:not-sr-only">Project</span>
+            <span className="min-w-0 truncate">{activeProject?.name ?? 'None'}</span>
             <ChevronsUpDownIcon aria-hidden="true" className="size-3.5 text-muted-foreground" />
           </Button>
         </DropdownMenuTrigger>

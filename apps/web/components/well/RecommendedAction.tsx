@@ -3,6 +3,7 @@
 // text is the engine's (recommendationText): a title line, then paragraphs and "- " action lists.
 // An override is the reviewer's own words and keeps its line breaks; the automatic text stays one
 // click away beneath it, or (`foldAutomatic={false}`, the printed dossier) is shown beneath it.
+// Long unbroken text (a pasted URL, a document number) wraps anywhere rather than overflowing.
 import { useId } from 'react';
 import type { Assessment } from '@lwa/engine';
 import { actionText } from '@/lib/assessment-view';
@@ -15,11 +16,11 @@ function AutomaticText({ text, headingLevel }: { text: string; headingLevel: 'h3
       {title ? <Title className="text-base font-semibold tracking-tight text-ink">{title}</Title> : null}
       {blocks.map((b, i) =>
         b.kind === 'paragraph' ? (
-          <p key={i} className="max-w-[80ch] text-pretty">
+          <p key={i} className="max-w-[80ch] text-pretty wrap-anywhere">
             {b.text}
           </p>
         ) : (
-          <ul key={i} className="grid max-w-[80ch] list-disc gap-1 pl-5 marker:text-muted-foreground">
+          <ul key={i} className="grid max-w-[80ch] list-disc gap-1 pl-5 wrap-anywhere marker:text-muted-foreground">
             {b.items.map((item, j) => (
               <li key={j}>{item}</li>
             ))}
@@ -55,7 +56,9 @@ export function RecommendedAction({
       </div>
       {override ? (
         <>
-          <p className="max-w-[80ch] whitespace-pre-line text-pretty text-ink">{override}</p>
+          <p data-override className="max-w-[80ch] whitespace-pre-line text-pretty wrap-anywhere text-ink">
+            {override}
+          </p>
           {action.auto && !foldAutomatic ? (
             <div data-automatic className="grid gap-1.5 border-l-2 pl-3 text-muted-foreground">
               <p className="text-xs">Automatic recommendation</p>

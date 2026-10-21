@@ -266,7 +266,7 @@ export function Dossier({ data, printedAt }: { data: WellData; printedAt: string
 
       <ReportSection name="notes" title="Notes">
         {() => (
-          <p data-notes className="max-w-[80ch] whitespace-pre-line text-pretty">
+          <p data-notes className="max-w-[80ch] whitespace-pre-line text-pretty wrap-anywhere">
             {well.notes.trim() || MISSING}
           </p>
         )}

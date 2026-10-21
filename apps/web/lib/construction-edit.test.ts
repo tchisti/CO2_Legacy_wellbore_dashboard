@@ -499,8 +499,16 @@ describe('a kept working copy', () => {
 
 describe('rows not drawn (for the printed dossier)', () => {
   it('rowName is the editor\'s name for a row: singular and 1-based index', () => {
-    expect(rowName('plugs', 0)).toBe('Plug 1');
-    expect(rowName('formations', 2)).toBe('Formation top 3');
+    expect(rowName('casings', 0, { values: {} })).toBe('Casing 1');
+    expect(rowName('formations', 2, { values: { name: 'Nisku' } })).toBe('Formation top 3');
+  });
+
+  it('rowName gives a plug its own number and its row, so neither is read as the other', () => {
+    expect(rowName('plugs', 2, { values: { n: '2' } })).toBe('Plug #2 (row 3)');
+    expect(rowName('plugs', 0, { values: { n: ' 7 ' } })).toBe('Plug #7 (row 1)');
+    expect(rowName('plugs', 0, { values: {} })).toBe('Plug (row 1)');
+    expect(rowName('plugs', 1, { values: { n: '' } })).toBe('Plug (row 2)');
+    expect(rowName('plugs', 1, { values: { n: '2a' } })).toBe('Plug (row 2)'); // not a number (yet)
   });
 
   it('lists every stored row the depth rules leave out of the drawing, with why, its depths and its source text', () => {
@@ -518,7 +526,7 @@ describe('rows not drawn (for the printed dossier)', () => {
     expect(rowsNotDrawn(rows, result.errors)).toEqual([
       { name: 'Casing 1', reasons: ['Top (m) must be 0 or more.'], depths: 'Top (m) -5, Shoe (m) 186', verbatim: null },
       {
-        name: 'Plug 2',
+        name: 'Plug #2 (row 2)',
         reasons: ['Top (m) is deeper than Bottom (m).'],
         depths: 'Top (m) 1463, Bottom (m) 1448',
         verbatim: 'Plug 2: 1463/1448 m',

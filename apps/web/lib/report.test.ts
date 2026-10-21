@@ -12,6 +12,7 @@ import {
   filterDescription,
   pageMarginCss,
   reportAttribution,
+  reportDocumentTitle,
 } from '@/lib/report';
 import { EMPTY_FILTERS } from '@/lib/wells-view';
 
@@ -143,6 +144,21 @@ describe('filterDescription', () => {
   });
 });
 
+describe('reportDocumentTitle', () => {
+  it('names the report and its project, so each saves as its own PDF', () => {
+    expect(reportDocumentTitle('Well dossier 100/07-21-055-22W4/00', 'Fort Saskatchewan / Wabamun Hub AOR')).toBe(
+      'Well dossier 100/07-21-055-22W4/00 — Fort Saskatchewan / Wabamun Hub AOR',
+    );
+    expect(reportDocumentTitle('Portfolio report', ' Redwater AOR ')).toBe('Portfolio report — Redwater AOR');
+  });
+
+  it('is the subject alone without a project name', () => {
+    expect(reportDocumentTitle('Portfolio report', '')).toBe('Portfolio report');
+    expect(reportDocumentTitle('Well dossier X', null)).toBe('Well dossier X');
+    expect(reportDocumentTitle('Well dossier X', undefined)).toBe('Well dossier X');
+  });
+});
+
 describe('page margin boxes', () => {
   it('cssString escapes everything but plain text, so data cannot end the string or the style element', () => {
     expect(cssString('Fort Saskatchewan / Wabamun Hub AOR')).toBe('"Fort Saskatchewan / Wabamun Hub AOR"');
@@ -151,9 +167,12 @@ describe('page margin boxes', () => {
     expect(cssString('line\nbreak · ×')).toBe('"line\\a break \\b7  \\d7 "');
   });
 
-  it('pageMarginCss fills the named report page’s margin boxes', () => {
+  it('pageMarginCss fills the named report page’s margin boxes, then leaves the running header off page 1', () => {
     const css = pageMarginCss({ 'top-left': 'Fort Sask AOR', 'top-right': 'Well dossier' });
-    expect(css).toBe('@page report { @top-left { content: "Fort Sask AOR"; } @top-right { content: "Well dossier"; } }');
+    expect(css).toBe(
+      '@page report { @top-left { content: "Fort Sask AOR"; } @top-right { content: "Well dossier"; } } ' +
+        '@page report:first { @top-left { content: none; } @top-right { content: none; } }',
+    );
   });
 });
 

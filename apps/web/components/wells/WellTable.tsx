@@ -3,10 +3,12 @@
 // The register table (spec §4.2, §7): 13 px text on 32 px rows, licences and numbers in mono with
 // tabular figures, rank as the RankBadge (the only place rank colours appear), the assessment state
 // as a state badge (neutral; amber for a stale revision). Every row is focusable: Enter or a click opens the well, ↑/↓ move between rows;
-// the checkbox and the actions menu do not open it. Rows arrive filtered and sorted (lib/wells-view);
+// the checkbox and the actions menu do not open it. The licence is a real link to the well, so it can
+// be opened in a new tab; it stays out of the tab order (the row is the keyboard stop). Rows arrive filtered and sorted (lib/wells-view);
 // clicking a sortable header asks for a new sort. Columns are TanStack Table definitions; the
 // selection, sort and row actions reach the cells through context so the definitions stay static.
 import { createContext, useContext, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react';
+import Link from 'next/link';
 import { createColumnHelper, tableFeatures, useTable } from '@tanstack/react-table';
 import { ArrowDownIcon, ArrowUpIcon, EllipsisIcon } from 'lucide-react';
 import { RankBadge } from '@/components/domain/RankBadge';
@@ -21,6 +23,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { MISSING, fmt1, fmtDate } from '@/lib/format';
+import { wellHref } from '@/lib/routes';
 import { cn } from '@/lib/utils';
 import type { Sort, SortKey, WellRow } from '@/lib/wells-view';
 
@@ -82,6 +85,20 @@ function SelectRow({ row }: { row: WellRow }) {
   );
 }
 
+/** The licence as a link to the well (open in a new tab, copy the address); the row handles the keys. */
+function LicenceLink({ row }: { row: WellRow }) {
+  return (
+    <Link
+      href={wellHref(row.id)}
+      tabIndex={-1}
+      prefetch={false}
+      className="rounded-sm text-ink underline-offset-2 outline-none hover:underline"
+    >
+      {row.licence}
+    </Link>
+  );
+}
+
 function RowActions({ row }: { row: WellRow }) {
   const { onOpen, onEdit, onDelete } = useActions();
   return (
@@ -110,7 +127,7 @@ const col = createColumnHelper<typeof features, WellRow>();
 
 const columns = col.columns([
   col.display({ id: 'select', header: () => <SelectAll />, cell: ({ row }) => <SelectRow row={row.original} /> }),
-  col.display({ id: 'licence', header: 'Licence / UWI', cell: ({ row }) => row.original.licence }),
+  col.display({ id: 'licence', header: 'Licence / UWI', cell: ({ row }) => <LicenceLink row={row.original} /> }),
   col.display({ id: 'name', header: 'Name', cell: ({ row }) => <Plain value={row.original.name} /> }),
   col.display({ id: 'operator', header: 'Operator', cell: ({ row }) => <Plain value={row.original.operator} /> }),
   col.display({ id: 'type', header: 'Type', cell: ({ row }) => <Plain value={row.original.type} /> }),
@@ -200,6 +217,16 @@ const HEAD_CLASS: Partial<Record<string, string>> = {
   actions: cn('right-0 w-8', FROZEN_HEAD, FROZEN_EDGE_RIGHT),
 };
 
+/**
+ * Columns left out below 1280 px (spec §7: a 1024 px tablet is fully usable), so the register fits
+ * a tablet without scrolling sideways, Rank and Assessment in view: the well type and spud year
+ * (the record behind the Class column and the age score; both on the well page), the operator
+ * (usually in the well name too), the reviewer and the last update (the well page and its History
+ * tab have them). The filters still use them, and CSV export keeps every field.
+ */
+const WIDE_ONLY: ReadonlySet<string> = new Set(['operator', 'type', 'spudYear', 'reviewer', 'updatedAt']);
+const WIDE_ONLY_CLASS = 'hidden xl:table-cell';
+
 /** Columns whose clicks belong to their control, not to the row. */
 const ROW_CONTROLS: ReadonlySet<string> = new Set(['select', 'actions']);
 
@@ -286,6 +313,8 @@ export function WellTable({
     // React events bubble out of portals (menus, dialogs): only clicks on the row itself count.
     if (!e.currentTarget.contains(target)) return;
     if (target instanceof Element && target.closest('[data-row-control]')) return;
+    // The licence link navigates itself (and a modifier click opens a new tab without leaving here).
+    if (target instanceof Element && target.closest('a[href]')) return;
     onOpen(id);
   }
 
@@ -319,6 +348,7 @@ export function WellTable({
                         'h-8 px-1.5 text-xs font-medium text-muted-foreground',
                         NUMERIC.has(id) && 'text-right',
                         HEAD_CLASS[id],
+                        WIDE_ONLY.has(id) && WIDE_ONLY_CLASS,
                       )}
                     >
                       {header.isPlaceholder ? null : (
@@ -351,7 +381,7 @@ export function WellTable({
                         key={cell.id}
                         data-column={id}
                         data-row-control={ROW_CONTROLS.has(id) ? '' : undefined}
-                        className={cn('h-8 px-1.5 py-0', CELL_CLASS[id])}
+                        className={cn('h-8 px-1.5 py-0', CELL_CLASS[id], WIDE_ONLY.has(id) && WIDE_ONLY_CLASS)}
                         title={TRUNCATED[id]?.(row.original) || undefined}
                       >
                         <table.FlexRender cell={cell} />

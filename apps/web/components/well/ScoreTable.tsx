@@ -74,7 +74,7 @@ export function ScoreTable({
                 </TableRow>
                 {group.map((r) => (
                   <TableRow key={r.key} data-param={r.key} data-axis={r.axis} className="align-top hover:bg-transparent">
-                    <th scope="row" className="px-3 py-1.5 text-left font-normal">
+                    <th scope="row" className="px-3 py-1.5 text-left font-normal wrap-anywhere">
                       <span className="block text-ink">{r.name}</span>
                       <span className="block text-xs text-muted-foreground">
                         weight <span className="num">{r.weight.toFixed(2)}</span>
@@ -91,11 +91,15 @@ export function ScoreTable({
                     </TableCell>
                     <TableCell
                       data-column="anchor"
-                      className={cn('px-3 py-1.5 align-top whitespace-normal', r.score === null && 'text-muted-foreground')}
+                      className={cn(
+                        'px-3 py-1.5 align-top whitespace-normal wrap-anywhere',
+                        r.score === null && 'text-muted-foreground',
+                      )}
                     >
                       {r.anchor}
                     </TableCell>
-                    <TableCell data-column="justification" className="px-3 py-1.5 align-top whitespace-pre-line">
+                    {/* A pasted URL or document number wraps anywhere instead of widening the column. */}
+                    <TableCell data-column="justification" className="px-3 py-1.5 align-top whitespace-pre-line wrap-anywhere">
                       {r.justification === '' ? <span className="text-muted-foreground">{MISSING}</span> : r.justification}
                     </TableCell>
                     <TableCell data-column="contribution" className="num px-3 py-1.5 text-right align-top">

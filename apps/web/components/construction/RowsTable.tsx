@@ -183,7 +183,7 @@ function RowBody({
 }) {
   const baseId = useId();
   const spec = LISTS[list];
-  const name = rowName(list, index);
+  const name = rowName(list, index, row);
   const id = svgIdOf(list, index);
   const verbatim = typeof row.original.verbatim === 'string' && row.original.verbatim ? row.original.verbatim : null;
   const type = typeof row.original.type === 'string' ? row.original.type : undefined;

@@ -88,7 +88,10 @@ export function HistoryTab({ well }: { well: Pick<Well, 'id' | 'projectId'> }) {
               <TableCell data-column="actor" className="h-8 truncate px-3 py-1.5 align-top" title={e.actor}>
                 {e.actor}
               </TableCell>
-              <TableCell data-column="summary" className="h-8 px-3 py-1.5 align-top whitespace-normal text-muted-foreground">
+              <TableCell
+                data-column="summary"
+                className="h-8 px-3 py-1.5 align-top whitespace-normal wrap-anywhere text-muted-foreground"
+              >
                 {e.summary}
               </TableCell>
             </TableRow>

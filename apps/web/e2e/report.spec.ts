@@ -85,6 +85,32 @@ test.describe('with the Fort Saskatchewan fixture', () => {
     await expect(page.locator('[data-footnote]')).toHaveText(FOOTNOTE);
   });
 
+  test('each report titles the browser tab (the Save-as-PDF name) and sits in the main landmark', async ({ page }) => {
+    await page.goto(`/wells/view?id=${FT_SASK.id}`);
+    await expect(page.getByRole('heading', { level: 1, name: FT_SASK.licence })).toBeVisible();
+    await expect(page).toHaveTitle('Legacy Well Assessment');
+
+    await page.getByRole('link', { name: 'Report' }).click();
+    await expect(page.getByRole('heading', { level: 1, name: FT_SASK.licence })).toBeVisible();
+    await expect(page).toHaveTitle(`Well dossier ${FT_SASK.licence} — Fort Saskatchewan / Wabamun Hub AOR`);
+    await expect(page.getByRole('main')).toHaveCount(1);
+    await expect(page.getByRole('main').getByRole('article', { name: `Well dossier ${FT_SASK.licence}` })).toBeVisible();
+    await expect(page.getByRole('main').getByRole('group', { name: 'Report actions' })).toBeVisible();
+
+    // Leaving the report puts the app's title back.
+    await toolbar(page).getByRole('link', { name: 'Back to well' }).click();
+    await expect(page.getByRole('heading', { level: 1, name: FT_SASK.licence })).toBeVisible();
+    await expect(page).toHaveTitle('Legacy Well Assessment');
+
+    await page.goto('/report/portfolio');
+    await expect(page.getByRole('heading', { level: 1, name: 'Portfolio report' })).toBeVisible();
+    await expect(page).toHaveTitle('Portfolio report — Fort Saskatchewan / Wabamun Hub AOR');
+    await expect(page.getByRole('main')).toHaveCount(1);
+    // The project is named once in the report header, not again as a subtitle.
+    const header = page.locator('[data-section="header"]');
+    await expect(header.getByText('Fort Saskatchewan / Wabamun Hub AOR', { exact: true })).toHaveCount(1);
+  });
+
   test('Print button calls window.print', async ({ page }) => {
     let printed = 0;
     await page.exposeFunction('__reportPrinted', () => {

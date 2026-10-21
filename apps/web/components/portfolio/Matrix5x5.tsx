@@ -130,7 +130,15 @@ export function Matrix5x5({
                   rx={4}
                   style={{ fill: colour, fillOpacity: count > 0 ? 0.38 : 0.14 }}
                 />
-                <text x={x + 5} y={y + 12} aria-hidden="true" className="fill-muted-foreground font-mono text-[9px]">
+                {/* The cell value is muted on a light tint, and ink on the stronger tint of a cell with
+                    wells: muted text there falls to 3:1 (dark) and 4.1:1 (light), short of AA. */}
+                <text
+                  x={x + 5}
+                  y={y + 12}
+                  aria-hidden="true"
+                  data-cell-value
+                  className={cn('font-mono text-[9px]', count > 0 ? 'fill-ink' : 'fill-muted-foreground')}
+                >
                   {Lr * Cr}
                 </text>
                 {count > 0 ? (

@@ -14,6 +14,16 @@ export const IDENTITY_FOOTNOTE = 'Reviewer identity is recorded from a local pro
 /** The named page (app/report/report.css `@page report`) every report is printed on. */
 export const REPORT_PAGE = 'report';
 
+/**
+ * The browser tab's title for a report, which "Save as PDF" proposes as the file name, so two
+ * reports never save under the same name: "Well dossier 100/07-21-055-22W4/00 — <project>",
+ * "Portfolio report — <project>" (the subject alone when there is no project name).
+ */
+export function reportDocumentTitle(subject: string, project: string | null | undefined): string {
+  const name = project?.trim();
+  return name ? `${subject} — ${name}` : subject;
+}
+
 /** A parameter scored this high or higher is a driver the dossier's summary names. */
 export const DRIVER_SCORE_MIN = 4;
 
@@ -135,10 +145,18 @@ export function cssString(text: string): string {
 /** The page-margin boxes a report fills with its own text (the page number box is report.css's). */
 export type MarginBoxes = Partial<Record<'top-left' | 'top-right' | 'bottom-left', string>>;
 
-/** A stylesheet that writes `boxes` into the margins of the named report page. */
+/**
+ * A stylesheet that writes `boxes` into the margins of the named report page, except the running
+ * header (the top boxes) on page 1, which opens with the report's own header; the footer stays on
+ * every page. The :first rule comes after the others: Chrome lets the later margin rule win here
+ * whatever the page selectors' specificity, so it cannot sit in report.css (loaded earlier).
+ */
 export function pageMarginCss(boxes: MarginBoxes): string {
   const rules = (Object.keys(boxes) as (keyof MarginBoxes)[])
     .filter((box) => boxes[box])
     .map((box) => `@${box} { content: ${cssString(boxes[box] ?? '')}; }`);
-  return `@page ${REPORT_PAGE} { ${rules.join(' ')} }`;
+  return (
+    `@page ${REPORT_PAGE} { ${rules.join(' ')} } ` +
+    `@page ${REPORT_PAGE}:first { @top-left { content: none; } @top-right { content: none; } }`
+  );
 }

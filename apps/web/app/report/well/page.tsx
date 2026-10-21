@@ -18,7 +18,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { loadWell } from '@/lib/load-well';
 import { useProjects } from '@/lib/project-context';
-import { reportAttribution } from '@/lib/report';
+import { reportAttribution, reportDocumentTitle } from '@/lib/report';
 import { wellHref, wellsHref } from '@/lib/routes';
 import { useStoreQuery } from '@/lib/store/provider';
 
@@ -57,6 +57,7 @@ function WellReport({ id }: { id: string }) {
   return (
     <ReportFrame
       title={`Well dossier ${well.licence}`}
+      documentTitle={reportDocumentTitle(`Well dossier ${well.licence}`, project?.name)}
       back={{ href: wellHref(well.id), label: 'well' }}
       margins={{
         'top-left': project?.name ?? '',

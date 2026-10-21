@@ -44,23 +44,27 @@ export function DriverBars({ drivers }: { drivers: readonly Driver[] }) {
           );
         })}
       </svg>
-      <table className="sr-only">
-        <caption>Driver contribution by parameter, largest first</caption>
-        <thead>
-          <tr>
-            <th scope="col">Parameter</th>
-            <th scope="col">Average contribution</th>
-          </tr>
-        </thead>
-        <tbody>
-          {drivers.map((d) => (
-            <tr key={d.key}>
-              <th scope="row">{d.name}</th>
-              <td>{fmt2(d.avgContribution)}</td>
+      {/* The wrapper is the visually hidden box: a table ignores the 1 px width sr-only gives it, and
+          would widen a phone page. */}
+      <div className="sr-only">
+        <table>
+          <caption>Driver contribution by parameter, largest first</caption>
+          <thead>
+            <tr>
+              <th scope="col">Parameter</th>
+              <th scope="col">Average contribution</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {drivers.map((d) => (
+              <tr key={d.key}>
+                <th scope="row">{d.name}</th>
+                <td>{fmt2(d.avgContribution)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </>
   );
 }

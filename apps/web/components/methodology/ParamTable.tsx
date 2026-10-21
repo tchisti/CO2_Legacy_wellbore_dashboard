@@ -5,7 +5,8 @@
 // the reviewer's judgment between two anchors, said once in the caption. Table text is 13 px with
 // the numbers in mono (spec §7). The table is wide, so it scrolls sideways inside its frame. The
 // `compact` table (a printed dossier's appendix) fits a letter page instead: 11 px text, tighter
-// cells and narrow number columns, so the anchors get the width.
+// cells and narrow number columns, so the anchors get the width. Cells wrap a long word anywhere
+// (the fixed columns never widen for it; an 11 px parameter name could otherwise run into the next).
 import { Fragment, type ReactNode } from 'react';
 import { paramsOf, type Axis, type Methodology } from '@lwa/engine';
 import { ScrollRegion } from '@/components/methodology/Section';
@@ -27,7 +28,7 @@ const STYLE = {
   regular: {
     table: 'min-w-[1040px] text-[13px]',
     head: 'h-8 px-3 text-xs font-normal text-muted-foreground',
-    cell: 'px-3 py-2 align-top whitespace-normal',
+    cell: 'px-3 py-2 align-top whitespace-normal wrap-anywhere',
     sumCell: 'px-3 py-1.5',
     group: 'px-3 pt-3 pb-1',
     cols: ['w-[19%]', 'w-[72px]', 'w-28', 'w-[15%]'],
@@ -35,7 +36,7 @@ const STYLE = {
   compact: {
     table: 'text-[11px] leading-[14px]',
     head: 'h-7 px-1.5 text-[10px] leading-3 font-normal text-muted-foreground',
-    cell: 'px-1.5 py-1.5 align-top whitespace-normal',
+    cell: 'px-1.5 py-1.5 align-top whitespace-normal wrap-anywhere',
     sumCell: 'px-1.5 py-1',
     group: 'px-1.5 pt-2 pb-0.5',
     cols: ['w-[17%]', 'w-11', 'w-14', 'w-[14%]'],

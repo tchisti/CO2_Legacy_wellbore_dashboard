@@ -310,7 +310,11 @@ function ImportReview({
 
       {mode === 'replace' ? (
         <div className="grid gap-2">
+          {/* A live region: the count arrives after the store is read, and screen readers hear it. The
+              Import button points at it, so it is read again when the button is focused. */}
           <p
+            id={`${id}-preview`}
+            role="status"
             data-replace-preview
             className={cn('text-xs', deletes || stored.error ? 'text-destructive' : 'text-muted-foreground')}
           >
@@ -346,6 +350,7 @@ function ImportReview({
           type="button"
           variant={mode === 'replace' ? 'destructive' : 'default'}
           disabled={!confirmed || busy}
+          aria-describedby={mode === 'replace' ? `${id}-preview` : undefined}
           onClick={() => onImport(mode)}
         >
           {busy ? 'Importing…' : 'Import'}

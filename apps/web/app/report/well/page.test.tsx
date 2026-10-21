@@ -201,6 +201,7 @@ describe('well dossier', () => {
     const items = notDrawn.querySelectorAll('li');
     expect(items).toHaveLength(1);
     expect(items[0]!.textContent).toContain('Plug 2');
+    expect(items[0]!.textContent).toContain('Plug #2 (row 2)'); // its own number, then its row
     expect(items[0]!.textContent).toContain('Top (m) is deeper than Bottom (m).');
     expect(items[0]!.textContent).toContain('Top (m) 1463, Bottom (m) 1448');
     expect(items[0]!.textContent).toContain('Plug 2: 1463/1448 m');
