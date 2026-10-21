@@ -308,22 +308,31 @@ function ImportReview({
         </div>
       </fieldset>
 
-      {mode === 'replace' ? (
-        <div className="grid gap-2">
-          {/* A live region: the count arrives after the store is read, and screen readers hear it. The
-              Import button points at it, so it is read again when the button is focused. */}
-          <p
-            id={`${id}-preview`}
-            role="status"
-            data-replace-preview
-            className={cn('text-xs', deletes || stored.error ? 'text-destructive' : 'text-muted-foreground')}
-          >
-            {deletions
+      {/* The Replace preview is a live region that is always in the page (empty, and out of the flow,
+          while Merge is chosen): choosing Replace, and then the count arriving once the store has
+          been read, change the text of a region that already exists, which is what screen readers
+          announce (a region inserted with its text already in it is often not announced). The
+          Import button points at it in Replace mode, so it is read again when the button is
+          focused. In Merge mode the wrapper is `display: contents`, so the empty region adds no gap. */}
+      <div className={mode === 'replace' ? 'grid gap-2' : 'contents'}>
+        <p
+          id={`${id}-preview`}
+          role="status"
+          data-replace-preview
+          className={cn(
+            'text-xs empty:sr-only',
+            deletes || stored.error ? 'text-destructive' : 'text-muted-foreground',
+          )}
+        >
+          {mode !== 'replace'
+            ? ''
+            : deletions
               ? replacePreviewText(deletions)
               : stored.error
                 ? `What Replace would delete could not be worked out: ${stored.error.message}`
                 : 'Working out what Replace would delete…'}
-          </p>
+        </p>
+        {mode === 'replace' ? (
           <div className="grid max-w-sm gap-1.5">
             <Label htmlFor={`${id}-confirm`}>Type the project name to confirm</Label>
             <Input
@@ -339,8 +348,8 @@ function ImportReview({
               Type “<span className="text-ink">{confirmName}</span>” exactly.
             </p>
           </div>
-        </div>
-      ) : null}
+        ) : null}
+      </div>
 
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
         <Button type="button" variant="outline" onClick={onCancel} disabled={busy}>

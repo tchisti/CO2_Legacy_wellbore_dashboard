@@ -259,11 +259,18 @@ test.describe('with the Fort Saskatchewan fixture', () => {
     );
     await backup(page).getByLabel('Import project file').setInputFiles(FIXTURE_PATH);
     await expect(importButton(page)).toBeEnabled(); // merge needs no confirmation
+    // The live region is already in the page, empty, before Replace is chosen: choosing Replace
+    // changes the text of an existing region, which screen readers announce.
+    const preview = backup(page).locator('[data-replace-preview]');
+    await expect(preview).toHaveAttribute('role', 'status');
+    await expect(preview).toHaveText('');
+    const region = await preview.elementHandle();
 
     await backup(page).getByRole('radio', { name: /^Replace/ }).check();
-    await expect(backup(page).locator('[data-replace-preview]')).toHaveText('1 well will be deleted.');
-    // Announced when the count arrives, and read with the Import button.
-    await expect(backup(page).locator('[data-replace-preview]')).toHaveAttribute('role', 'status');
+    await expect(preview).toHaveText('1 well will be deleted.');
+    // The same element, not a new one inserted with its text, and the Import button is described by it.
+    expect(await preview.evaluate((el, before) => el === before, region)).toBe(true);
+    await expect(preview).toHaveAttribute('role', 'status');
     await expect(importButton(page)).toHaveAccessibleDescription('1 well will be deleted.');
     await expect(importButton(page)).toBeDisabled();
     const typed = backup(page).getByLabel('Type the project name to confirm');
