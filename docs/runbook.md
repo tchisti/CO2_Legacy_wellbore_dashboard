@@ -37,7 +37,10 @@ blank cell never clears a stored value (use the well's Edit record for that).
 **Merge or Replace (Project settings → Backup).**
 
 - **Merge** (default) adds wells, assessments and history that are new, and updates wells matched
-  by licence unless the file's copy is older than the stored one. It never deletes anything.
+  by licence unless the file's copy is older than the stored one. It never deletes anything. A
+  matched well is replaced as a whole by the file's copy (its creation date and creator stay), and
+  when that drops an edit made here that the file does not have, the result warns, naming the well;
+  History still lists that edit, and its history event holds the replaced record.
 - **Replace** makes the file the project. It deletes, in this browser: every well of the project
   whose licence is not in the file, with all of that well's assessments; and every assessment of a
   kept well that is not in the file, **final assessments included**. Project fields (name,
@@ -120,6 +123,14 @@ filter). Use **Print / Save as PDF** in the report's toolbar.
 - The PDF's suggested file name is the report's title: "Well dossier <licence> — <project>" or
   "Portfolio report — <project>".
 - A draft is never printed as an assessment; the dossier says when one is in progress.
+
+## Hosting
+
+The app is the static files in `apps/web/out`: serve them from any static host, over HTTPS
+(recommended) or plain HTTP, which works as well (checked in Chromium on a plain-HTTP LAN address:
+creating a project, a well, a draft and an injector, and moving between pages). Each address
+(scheme, host and port) has its own browser database, so after moving the app to a new address,
+import each project's export there.
 
 ## Rolling back
 

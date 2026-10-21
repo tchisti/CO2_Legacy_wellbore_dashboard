@@ -44,7 +44,10 @@ pnpm dev                     # the app on http://localhost:3000 (pnpm --filter w
 
 `pnpm --filter web build` writes plain HTML, CSS and JavaScript to `apps/web/out`. Detail pages take
 their ids from the query string (`/wells/view?id=…`, `/report/well?id=…`), so no server routes are
-needed. Playwright needs Chromium once: `pnpm --filter web exec playwright install chromium`.
+needed. HTTPS is recommended, but plain HTTP works too: where the browser withholds
+`crypto.randomUUID` (any page that is not HTTPS or localhost) ids come from `crypto.getRandomValues`
+(checked in Chromium on a plain-HTTP LAN address). Playwright needs Chromium once:
+`pnpm --filter web exec playwright install chromium`.
 
 ## The reviewer profile
 
