@@ -1,7 +1,11 @@
+'use client';
+
 // What the app shows before it can show a project: opening the local database, or why it could
 // not. Kept to the wordmark and one message, so a slow start never flashes a half-built shell.
+// The error is also sent to the logging hook (lib/log.ts).
 import type { ReactNode } from 'react';
 import { Wordmark } from '@/components/shell/Wordmark';
+import { useReportError } from '@/lib/log';
 
 export function ShellFrame({ children }: { children: ReactNode }) {
   return (
@@ -36,6 +40,7 @@ export function ShellError({
   error: Error;
   title?: string;
 }) {
+  useReportError(error, 'shell');
   return (
     <ShellFrame>
       <main className="mx-auto flex w-full max-w-lg flex-1 flex-col justify-center gap-3 px-4 py-12">

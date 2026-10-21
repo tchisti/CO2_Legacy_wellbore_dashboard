@@ -59,6 +59,7 @@ function PortfolioReport() {
     return (
       <ReportMessage
         title="The portfolio could not be read"
+        error={error}
         action={
           <Button asChild variant="outline">
             <Link href={backHref}>Back to Wells</Link>

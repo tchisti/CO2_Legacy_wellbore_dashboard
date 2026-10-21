@@ -24,10 +24,11 @@ import { useStoreQuery } from '@/lib/store/provider';
 
 const LOADING = 'Loading the well…';
 
-function WellNotFound({ reason }: { reason: string }) {
+function WellNotFound({ reason, error = null }: { reason: string; error?: Error | null }) {
   return (
     <ReportMessage
       title="Well not found"
+      error={error}
       action={
         <Button asChild variant="outline">
           <Link href={wellsHref()}>Back to Wells</Link>
@@ -46,7 +47,7 @@ function WellReport({ id }: { id: string }) {
 
   if (projectsError) return <ProjectReadError error={projectsError} backHref={wellsHref()} />;
   if (page.loading || !projects) return <ReportStatus>{LOADING}</ReportStatus>;
-  if (page.error) return <WellNotFound reason={`The well could not be read: ${page.error.message}`} />;
+  if (page.error) return <WellNotFound reason={`The well could not be read: ${page.error.message}`} error={page.error} />;
   if (!page.data) return <WellNotFound reason="No well with this link is stored in this browser. It may have been deleted." />;
   const { well, project, current } = page.data;
   if (activeProject && well.projectId !== activeProject.id) {

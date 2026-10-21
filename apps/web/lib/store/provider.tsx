@@ -17,6 +17,7 @@ import {
 } from 'react';
 import { ReviewerProfileSchema, type ReviewerProfile } from '@lwa/engine';
 import { installE2EHooks } from '@/lib/e2e-hooks';
+import { reportError } from '@/lib/log';
 import { createLocalStore } from '@/lib/store/local-store';
 import type { Store } from '@/lib/store/store';
 
@@ -107,7 +108,7 @@ export function StoreProvider({
     );
     // Any change may be a profile write (the profile menu, another code path, an e2e hook).
     const unsubscribe = store.onChange(() => {
-      readProfile().catch((e: unknown) => console.error('Could not read the reviewer profile', e));
+      readProfile().catch((e: unknown) => reportError(e, { where: 'store-provider', action: 'read-profile' }));
     });
     return () => {
       active = false;

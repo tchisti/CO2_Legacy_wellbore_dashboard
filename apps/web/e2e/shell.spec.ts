@@ -90,3 +90,15 @@ test('the sections are reachable from the keyboard and mark the current page', a
   await expect(nav.getByRole('link', { name: 'Wells' })).toHaveAttribute('aria-current', 'page');
   await expect(nav.getByRole('link', { name: 'Portfolio' })).not.toHaveAttribute('aria-current', 'page');
 });
+
+test('an address the app does not have shows "Page not found" (404), with the way to Portfolio and Wells', async ({ page }) => {
+  await seed(page);
+  const response = await page.goto('/no-such-page');
+  expect(response?.status()).toBe(404);
+  await expect(page.getByRole('heading', { level: 1, name: 'Page not found' })).toBeVisible();
+  const main = page.getByRole('main');
+  await expect(main.getByRole('link', { name: 'Portfolio', exact: true })).toHaveAttribute('href', '/portfolio');
+  await main.getByRole('link', { name: 'Wells', exact: true }).click();
+  await expect(page).toHaveURL(/\/wells$/);
+  await expect(page.getByRole('heading', { level: 1, name: 'Wells' })).toBeVisible();
+});

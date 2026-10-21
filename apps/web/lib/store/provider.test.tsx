@@ -1,6 +1,7 @@
 import { StrictMode, type ReactNode } from 'react';
 import { act, cleanup, render, renderHook, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { LOG_PREFIX } from '@/lib/log';
 import { StoreProvider, useProfile, useStore, useStoreQuery, type StoreFactory } from '@/lib/store/provider';
 import { createLocalStore } from '@/lib/store/local-store';
 import type { Store } from '@/lib/store/store';
@@ -214,6 +215,26 @@ describe('useProfile', () => {
     await waitFor(() => expect(result.current.profile).toEqual({ name: 'E. Twoe', initials: 'ET' }));
     const p = await result.current.store.projects.create({ name: 'Signed' });
     expect(p.createdBy).toBe('E. Twoe');
+  });
+
+  it('a profile read that fails after a write is reported through the logging hook, not thrown', async () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const make = freshFactory();
+    let fail = false;
+    const factory: StoreFactory = (actor) => {
+      const store = make(actor);
+      const get = () => (fail ? Promise.reject(new Error('profile table locked')) : store.profile.get());
+      return { ...store, profile: { ...store.profile, get } };
+    };
+    const { result } = renderHook(() => ({ store: useStore(), ...useProfile() }), { wrapper: wrapperFor(factory) });
+    await waitFor(() => expect(result.current.store).toBeTruthy());
+    fail = true;
+    await act(() => result.current.store.projects.create({ name: 'Write' }));
+    await waitFor(() =>
+      expect(spy).toHaveBeenCalledWith(`${LOG_PREFIX} Error: profile table locked`, expect.objectContaining({ where: 'store-provider', action: 'read-profile' })),
+    );
+    expect(result.current.profile).toBeNull();
+    spy.mockRestore();
   });
 
   it('setProfile rejects an invalid profile and keeps the old one', async () => {

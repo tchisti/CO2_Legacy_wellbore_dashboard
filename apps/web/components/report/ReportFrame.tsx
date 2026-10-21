@@ -11,6 +11,7 @@ import { flushSync } from 'react-dom';
 import Link from 'next/link';
 import { ArrowLeftIcon, PrinterIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useReportError } from '@/lib/log';
 import { pageMarginCss, type MarginBoxes } from '@/lib/report';
 
 /** The page background, light palette forced (report.css), filling the window. */
@@ -41,8 +42,22 @@ export function ReportStatus({ children = 'Opening the report…' }: { children?
   );
 }
 
-/** A plain page in place of a report that cannot be made: what is wrong, and a way back. */
-export function ReportMessage({ title, children, action }: { title: string; children: ReactNode; action: ReactNode }) {
+/**
+ * A plain page in place of a report that cannot be made: what is wrong, and a way back. When it is
+ * shown because of an `error` (a failed read), the error goes to the logging hook.
+ */
+export function ReportMessage({
+  title,
+  children,
+  action,
+  error = null,
+}: {
+  title: string;
+  children: ReactNode;
+  action: ReactNode;
+  error?: Error | null;
+}) {
+  useReportError(error, 'report');
   return (
     <div data-report-root className={ROOT}>
       <main className="mx-auto grid max-w-lg gap-3 px-4 py-16">
@@ -62,6 +77,7 @@ export function ProjectReadError({ error, backHref }: { error: Error; backHref: 
   return (
     <ReportMessage
       title="The project could not be read"
+      error={error}
       action={
         <Button asChild variant="outline">
           <Link href={backHref}>Back to Wells</Link>
