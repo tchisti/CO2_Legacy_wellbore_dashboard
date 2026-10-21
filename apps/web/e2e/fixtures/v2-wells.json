@@ -1,0 +1,63 @@
+[
+  {
+    "id": "W-V2A001",
+    "licence": "100/10-14-054-23W4/00",
+    "operator": "Legacy Oil Co.",
+    "lat": 53.6712,
+    "lon": -113.3105,
+    "year": 1958,
+    "type": "Oil Producer",
+    "traj": "Vertical",
+    "status": "Abandoned (P&A)",
+    "klass": "Type 4",
+    "reviewer": "T. Khan",
+    "notes": "Era-standard abandonment, plugs unverified.",
+    "schema": 2,
+    "scores": {
+      "plugQuality": 1,
+      "cement": 1,
+      "barriers": 1,
+      "scvf": 2,
+      "age": 4,
+      "complexity": 2,
+      "data": 1,
+      "penetration": 5,
+      "plume": 1,
+      "usdw": 1,
+      "access": 2
+    },
+    "computed": {
+      "L": 1.56,
+      "C": 2.4,
+      "Lr": 2,
+      "Cr": 2,
+      "cell": 4,
+      "riskIndex": 3.74,
+      "rankLabel": "Low",
+      "integrity": 89
+    },
+    "scoredUnder": "2.0.0",
+    "needsReview": false,
+    "createdAt": "2026-07-24T12:15:02.271Z",
+    "updatedAt": "2026-08-07T16:08:21.621Z",
+    "updatedBy": "T. Khan"
+  },
+  {
+    "id": "W-V2A002",
+    "licence": "102/03-22-054-23W4/00",
+    "operator": "Prairie Gas Ltd.",
+    "lat": 53.6844,
+    "lon": -113.3301,
+    "year": 1972,
+    "type": "Gas Producer",
+    "traj": "Deviated",
+    "status": "Suspended",
+    "klass": "Type 6",
+    "reviewer": "",
+    "notes": "",
+    "schema": 2,
+    "createdAt": "2026-07-24T12:15:02.272Z",
+    "updatedAt": "2026-07-24T12:15:02.272Z",
+    "updatedBy": "T. Khan"
+  }
+]

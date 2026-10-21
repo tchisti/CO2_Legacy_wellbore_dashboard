@@ -1,0 +1,24 @@
+{
+  "name": "@lwa/engine",
+  "version": "3.0.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "test": "vitest run --coverage --passWithNoTests",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@vitest/coverage-v8": "5.0.5",
+    "eslint": "^9.39.5",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.71.1",
+    "vitest": "^5.0.5"
+  }
+}

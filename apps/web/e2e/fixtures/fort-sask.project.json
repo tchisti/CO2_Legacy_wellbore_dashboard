@@ -1,0 +1,1019 @@
+{
+  "format": "lwa-project",
+  "version": 1,
+  "exportedAt": "2026-10-20T20:28:24.002Z",
+  "exportedBy": "v2 migration",
+  "project": {
+    "id": "prj_v2_fort-saskatchewan-wabamun-hub-aor",
+    "name": "Fort Saskatchewan / Wabamun Hub AOR",
+    "jurisdiction": "AER",
+    "description": "",
+    "injectors": [
+      {
+        "id": "INJ-PINE",
+        "name": "Pine (proposed)",
+        "lat": 53.788997,
+        "lon": -113.249007,
+        "aorRadius_m": 5000
+      },
+      {
+        "id": "INJ-OAK",
+        "name": "Oak (proposed)",
+        "lat": 53.774499,
+        "lon": -113.249007,
+        "aorRadius_m": 5000
+      },
+      {
+        "id": "INJ-CEDAR",
+        "name": "Cedar (proposed)",
+        "lat": 53.76,
+        "lon": -113.273398,
+        "aorRadius_m": 5000
+      }
+    ],
+    "formations": [
+      {
+        "id": "fm-leapark",
+        "name": "Lea Park",
+        "top_m": 290,
+        "base_m": 450,
+        "role": "other",
+        "order": 0
+      },
+      {
+        "id": "fm-colorado",
+        "name": "Colorado Grp",
+        "top_m": 450,
+        "base_m": 746,
+        "role": "other",
+        "order": 1
+      },
+      {
+        "id": "fm-viking",
+        "name": "Viking",
+        "top_m": 746,
+        "base_m": 790,
+        "role": "other",
+        "order": 2
+      },
+      {
+        "id": "fm-mannville",
+        "name": "Mannville Grp",
+        "top_m": 790,
+        "base_m": 1030,
+        "role": "other",
+        "order": 3
+      },
+      {
+        "id": "fm-wabamun",
+        "name": "Wabamun",
+        "top_m": 1030,
+        "base_m": 1050,
+        "role": "other",
+        "order": 4
+      },
+      {
+        "id": "fm-calmar",
+        "name": "Calmar (seal)",
+        "top_m": 1050,
+        "base_m": 1080,
+        "role": "seal",
+        "order": 5
+      },
+      {
+        "id": "fm-nisku",
+        "name": "Nisku (reservoir)",
+        "top_m": 1080,
+        "base_m": 1160,
+        "role": "reservoir",
+        "order": 6
+      },
+      {
+        "id": "fm-ireton",
+        "name": "Ireton",
+        "top_m": 1160,
+        "base_m": 1330,
+        "role": "other",
+        "order": 7
+      },
+      {
+        "id": "fm-cookinglake",
+        "name": "Cooking Lake",
+        "top_m": 1330,
+        "base_m": 1450,
+        "role": "other",
+        "order": 8
+      }
+    ],
+    "requireApproval": false,
+    "createdAt": "2026-07-24T12:15:02.271Z",
+    "createdBy": "v2 migration",
+    "updatedAt": "2026-07-24T12:15:02.271Z",
+    "updatedBy": "v2 migration"
+  },
+  "wells": [
+    {
+      "id": "wel_v2_W-W8QB2S",
+      "projectId": "prj_v2_fort-saskatchewan-wabamun-hub-aor",
+      "licence": "100/13-06-055-22W4/00",
+      "name": "MANNING 13-6 WILDCAT",
+      "operator": "Fred M. Manning Ltd.",
+      "lat": 53.728872,
+      "lon": -113.269667,
+      "spudYear": 1949,
+      "type": "Unknown",
+      "trajectory": "Vertical",
+      "status": "Abandoned (P&A)",
+      "classification": "Type 4",
+      "td_m": 1447.2,
+      "notes": "Well abandoned by cement plugs (Sept. 12-13, 1949): Plug #1 from 4748 to 4675 ft with 50 sacks cement; Plug #2 from 3800 to 3700 ft with 40 sacks cement (felt for and found at 3657 ft); Plug #3 from 3550 to 3450 ft with 42 sacks cement plus 1% calcium chloride; Plug #4 from 2775 to 2700 ft with 30 sacks cement (felt for plug, hit at 3430 ft prior); Run #5 plug from 2650 to 2575 ft with 42 sacks cement (felt for plug #5 at 4 PM, found at 2555 ft); Run #6 plug from 630 to 550 ft with 35 sacks cement, plug felt at 545 ft with 4 points. Operations also included mixing mud, laying down 3 1/2\" drill pipe, circulating, waiting on orders, and the rig was released at 4 PM.",
+      "construction": null,
+      "legacyV1": {
+        "scores": {
+          "plug": 5,
+          "barriers": 3,
+          "cement": 5,
+          "prox": 1,
+          "depthR": 5,
+          "depthC": 5,
+          "age": 5,
+          "access": 1,
+          "data": 5
+        },
+        "total": 35
+      },
+      "createdAt": "2026-07-24T12:15:02.271Z",
+      "createdBy": "Tahir Chisti",
+      "updatedAt": "2026-08-07T16:08:21.621Z",
+      "updatedBy": "Tahir Chisti"
+    },
+    {
+      "id": "wel_v2_W-ZVX8JD",
+      "projectId": "prj_v2_fort-saskatchewan-wabamun-hub-aor",
+      "licence": "100/08-19-055-22W4/00",
+      "name": "ENBRIDGE WABAMUN HUB 8-19",
+      "operator": "Enbridge Wabamun Hub Ltd.",
+      "lat": 53.763685,
+      "lon": -113.249104,
+      "spudYear": 2025,
+      "type": "Disposal",
+      "trajectory": "Vertical",
+      "status": "Abandoned (P&A)",
+      "classification": "Type 7",
+      "td_m": 2337,
+      "notes": "Enbridge disposal well, spud 2025-11-16, Fort Saskatchewan field. Modern four-string design with CRS bottom liner — engineered for injection service. Risk override LOW: active engineered wellbore, not a legacy abandonment. [From 3D Reviewer: low 67/100 — subscores derived; verify Classification, Access, Data]",
+      "construction": null,
+      "legacyV1": {
+        "scores": {
+          "plug": 1,
+          "barriers": 1,
+          "cement": 1,
+          "prox": 3,
+          "depthR": 3,
+          "depthC": 3,
+          "age": 1,
+          "access": 1,
+          "data": 1
+        },
+        "total": 15
+      },
+      "createdAt": "2026-07-24T12:15:02.272Z",
+      "createdBy": "Tahir Chisti",
+      "updatedAt": "2026-08-07T17:02:02.318Z",
+      "updatedBy": "Tahir Chisti"
+    },
+    {
+      "id": "wel_v2_W-4A62O7",
+      "projectId": "prj_v2_fort-saskatchewan-wabamun-hub-aor",
+      "licence": "100/07-21-055-22W4/00",
+      "name": "IMPERIAL FT SASK 7-21",
+      "operator": "Imperial Oil Limited",
+      "lat": 53.764946,
+      "lon": -113.207628,
+      "spudYear": 1953,
+      "type": "Strat Test",
+      "trajectory": "Vertical",
+      "status": "Abandoned (P&A)",
+      "classification": "Type 3",
+      "td_m": 1463.3,
+      "notes": "1953 D&A, Fort Saskatchewan field. Surface casing only to 186.2 m. Tops: Wabamun 1022, Calmar 1053, Nisku 1065, Ireton 1117, Beaverhill Lake 1450 m. \n\nThe well was plugged and abandoned April 10-12, 1953 after reaching total depth (~4801 ft). Seven cement plugs were run: Plug #1, 4801-4751 ft, 25 sax cement, down at 7:20 (Apr 10); Plug #2, 4480-4430 ft, 35 sax cement with 2% C.C., down at 8:30 PM (Apr 10); Plug #3, 3510-3460 ft, 35 sax cement & 2% C.C., down at 7:00, felt O.K. at 3440 (Apr 11); Plug #4, 3100-3050 ft, 35 sax cement and 2% C.C., down at 4:30, felt O.K. with top at 3038 (Apr 11); Plug #5, 2550-2350 ft, 100 sax cement 2% C.C., down at 4:00, felt O.K. at 2345 (Apr 12); Plug #6, 570-640 ft, 40 sax cement with 2% additive, down at 1:30, felt (Apr 12); and Plug #7 set at surface after taking off the B.O.P. (Apr 12). Waiting-on-cement periods were observed between plugs and drill pipe, drill collars and core barrel were laid down at the end of the job.",
+      "construction": null,
+      "legacyV1": {
+        "scores": {
+          "plug": 5,
+          "barriers": 3,
+          "cement": 5,
+          "prox": 3,
+          "depthR": 5,
+          "depthC": 5,
+          "age": 5,
+          "access": 3,
+          "data": 3
+        },
+        "total": 37
+      },
+      "createdAt": "2026-07-24T12:15:02.272Z",
+      "createdBy": "Tahir Chisti",
+      "updatedAt": "2026-08-07T16:16:21.843Z",
+      "updatedBy": "Tahir Chisti"
+    },
+    {
+      "id": "wel_v2_W-LX242Q",
+      "projectId": "prj_v2_fort-saskatchewan-wabamun-hub-aor",
+      "licence": "100/13-05-056-22W4/00",
+      "name": "SINOPEC REDWATER 13-5",
+      "operator": "Sinopec Canada Energy Ltd.",
+      "lat": 53.814949,
+      "lon": -113.243559,
+      "spudYear": 2004,
+      "type": "Strat Test",
+      "trajectory": "Deviated",
+      "status": "Abandoned (P&A)",
+      "classification": "Type 9",
+      "td_m": 1160.5,
+      "notes": "2004 deviated Viking gas well, Redwater field, abandoned 2017 to modern standards. TD in the Wabamun — does NOT penetrate the Calmar caprock or Nisku. Perfs squeezed on abandonment. [From 3D Reviewer: medium 25/100 — subscores derived; verify Classification, Access, Data]",
+      "construction": null,
+      "legacyV1": {
+        "scores": {
+          "plug": 1,
+          "barriers": 1,
+          "cement": 1,
+          "prox": 3,
+          "depthR": 1,
+          "depthC": 1,
+          "age": 1,
+          "access": 1,
+          "data": 1
+        },
+        "total": 11
+      },
+      "createdAt": "2026-07-24T12:15:02.272Z",
+      "createdBy": "Tahir Chisti",
+      "updatedAt": "2026-07-24T16:01:23.221Z",
+      "updatedBy": "Tahir Chisti"
+    },
+    {
+      "id": "wel_v2_W-4039S4",
+      "projectId": "prj_v2_fort-saskatchewan-wabamun-hub-aor",
+      "licence": "100/03-17-056-22W4/00",
+      "name": "PHOENIX REDWATER 3-17",
+      "operator": "Phoenix Resources Company",
+      "lat": 53.834594,
+      "lon": -113.239156,
+      "spudYear": 1965,
+      "type": "Strat Test",
+      "trajectory": "Vertical",
+      "status": "Abandoned (P&A)",
+      "classification": "Type 3",
+      "td_m": 1115.6,
+      "notes": "1965 D&A, Redwater field. Surface casing only to 185.9 m. Tops: Calmar 1016, Nisku 1029, Ireton 1069, Leduc 1095 m — penetrates caprock and reservoir. Just outside the 5 km circles (~5.1 km from the Pine injector) but inside the review area. \n\nThe well was abandoned with four cement plugs after reaching T.D. 3660' (July 2-4, 1965). Plug No. 1: 3658'-3277' with 170 sx cement, cementing equipment rigged up and plug down @ 5:30 P.M. July 2/65, pulled 15 stands and waited on cement; felt plug No. 1 at 3217'-3219'. Plug No. 2: 3130'-3029' with 50 sx cement and 2% C.C., plug down @ 2:00 A.M., felt at 2994'. Plug No. 3: 2430'-2290' with 64 sx cement and 2% C.C., plug down @ 10:30 A.M., felt at 2275'. Plug No. 4: 660'-560' with 65 sx cement and 2% C.C., plug down @ 8:00 P.M., felt at 520' at 4:00 A.M. Surface casing (8 5/8\" 24 lb J-55, 0-610') had been cemented with 320 sx normal cement plus 2% C.C. After the final plug the pipe was laid down, B.O.P. and rig laid down, and the rig was released at 8:00 A.M. July 4/65.",
+      "construction": null,
+      "legacyV1": {
+        "scores": {
+          "plug": 5,
+          "barriers": 3,
+          "cement": 5,
+          "prox": 1,
+          "depthR": 5,
+          "depthC": 5,
+          "age": 5,
+          "access": 1,
+          "data": 5
+        },
+        "total": 35
+      },
+      "createdAt": "2026-07-24T12:15:02.272Z",
+      "createdBy": "Tahir Chisti",
+      "updatedAt": "2026-08-07T16:20:33.019Z",
+      "updatedBy": "Tahir Chisti"
+    }
+  ],
+  "assessments": [
+    {
+      "id": "asm_v2_W-W8QB2S_1786118901621",
+      "wellId": "wel_v2_W-W8QB2S",
+      "methodologyRevision": "2.0.0",
+      "scores": {
+        "plugQuality": 1,
+        "cement": 1,
+        "barriers": 1,
+        "scvf": 2,
+        "age": 4,
+        "complexity": 2,
+        "data": 1,
+        "penetration": 5,
+        "plume": 1,
+        "usdw": 1,
+        "access": 2
+      },
+      "justifications": {},
+      "suggestions": {},
+      "computed": {
+        "L": 1.56,
+        "C": 2.4,
+        "Lr": 2,
+        "Cr": 2,
+        "cell": 4,
+        "riskIndex": 3.74,
+        "rank": "Low"
+      },
+      "recommendedAction": {
+        "auto": "No Further Action — Monitor at MMV Cycle\nLow Tier. Well is adequately documented and unlikely to act as a migration pathway. Carry through as background population; re-evaluate on AoR refresh or if plume forecast shifts.",
+        "override": null
+      },
+      "status": "final",
+      "reviewerName": "Tahir Chisti",
+      "assessedAt": "2026-08-07T16:08:21.621Z",
+      "supersedesId": null,
+      "approvedByName": null,
+      "approvedAt": null,
+      "createdAt": "2026-08-07T16:08:21.621Z",
+      "updatedAt": "2026-08-07T16:08:21.621Z"
+    },
+    {
+      "id": "asm_v2_W-ZVX8JD_1786122122318",
+      "wellId": "wel_v2_W-ZVX8JD",
+      "methodologyRevision": "2.0.0",
+      "scores": {
+        "plugQuality": 1,
+        "cement": 1,
+        "barriers": 1,
+        "scvf": null,
+        "age": 1,
+        "complexity": null,
+        "data": 1,
+        "penetration": 3,
+        "plume": 2,
+        "usdw": 1,
+        "access": 1
+      },
+      "justifications": {},
+      "suggestions": {},
+      "computed": {
+        "L": 1.52,
+        "C": 1.85,
+        "Lr": 2,
+        "Cr": 2,
+        "cell": 4,
+        "riskIndex": 2.81,
+        "rank": "Low"
+      },
+      "recommendedAction": {
+        "auto": "No Further Action — Monitor at MMV Cycle\nLow Tier. Well is adequately documented and unlikely to act as a migration pathway. Carry through as background population; re-evaluate on AoR refresh or if plume forecast shifts.",
+        "override": null
+      },
+      "status": "final",
+      "reviewerName": "T. Chisti",
+      "assessedAt": "2026-08-07T17:02:02.318Z",
+      "supersedesId": null,
+      "approvedByName": null,
+      "approvedAt": null,
+      "createdAt": "2026-08-07T17:02:02.318Z",
+      "updatedAt": "2026-08-07T17:02:02.318Z"
+    },
+    {
+      "id": "asm_v2_W-4A62O7_1786119381843",
+      "wellId": "wel_v2_W-4A62O7",
+      "methodologyRevision": "2.0.0",
+      "scores": {
+        "plugQuality": 1,
+        "cement": 1,
+        "barriers": 1,
+        "scvf": 2,
+        "age": 4,
+        "complexity": 4,
+        "data": 1,
+        "penetration": 4,
+        "plume": 3,
+        "usdw": 1,
+        "access": 2
+      },
+      "justifications": {},
+      "suggestions": {},
+      "computed": {
+        "L": 1.76,
+        "C": 2.6,
+        "Lr": 2,
+        "Cr": 3,
+        "cell": 6,
+        "riskIndex": 4.58,
+        "rank": "Moderate"
+      },
+      "recommendedAction": {
+        "auto": "Targeted Diagnostics + Watchlist\nModerate Tier. Add to MMV watchlist (§ 8.3). Recommended diagnostics: SCVF pressure test, annular surveillance, CBL across caprock if cement data is partial. Re-score on every MMV re-evaluation (3-year AER / 5-year EPA cadence). Drivers worth closing: Well Age & Regulatory Era, Wellbore Complexity & Condition, Penetration vs Storage Complex.",
+        "override": null
+      },
+      "status": "final",
+      "reviewerName": "Tahir Chisti",
+      "assessedAt": "2026-08-07T16:16:21.843Z",
+      "supersedesId": null,
+      "approvedByName": null,
+      "approvedAt": null,
+      "createdAt": "2026-08-07T16:16:21.843Z",
+      "updatedAt": "2026-08-07T16:16:21.843Z"
+    },
+    {
+      "id": "asm_v2_W-LX242Q_1784908883221",
+      "wellId": "wel_v2_W-LX242Q",
+      "methodologyRevision": "1.0.0",
+      "scores": {
+        "plugQuality": 1,
+        "cement": 1,
+        "barriers": 1,
+        "scvf": null,
+        "age": 1,
+        "complexity": null,
+        "data": 1,
+        "penetration": 1,
+        "plume": 3,
+        "usdw": null,
+        "access": 1
+      },
+      "justifications": {},
+      "suggestions": {},
+      "computed": {
+        "L": 1.52,
+        "C": 2,
+        "Lr": 2,
+        "Cr": 2,
+        "cell": 4,
+        "riskIndex": 3.04,
+        "rank": "Low"
+      },
+      "recommendedAction": {
+        "auto": "No Further Action — Monitor at MMV Cycle\nLow Tier. Well is adequately documented and unlikely to act as a migration pathway. Carry through as background population; re-evaluate on AoR refresh or if plume forecast shifts.",
+        "override": null
+      },
+      "status": "final",
+      "reviewerName": "Tahir Chisti",
+      "assessedAt": "2026-07-24T16:01:23.221Z",
+      "supersedesId": null,
+      "approvedByName": null,
+      "approvedAt": null,
+      "createdAt": "2026-07-24T16:01:23.221Z",
+      "updatedAt": "2026-07-24T16:01:23.221Z"
+    },
+    {
+      "id": "asm_v2_W-4039S4_1786119633019",
+      "wellId": "wel_v2_W-4039S4",
+      "methodologyRevision": "2.0.0",
+      "scores": {
+        "plugQuality": 1,
+        "cement": 1,
+        "barriers": 1,
+        "scvf": 3,
+        "age": 3,
+        "complexity": 3,
+        "data": 1,
+        "penetration": 4,
+        "plume": 1,
+        "usdw": 1,
+        "access": 1
+      },
+      "justifications": {},
+      "suggestions": {},
+      "computed": {
+        "L": 1.72,
+        "C": 1.9,
+        "Lr": 2,
+        "Cr": 2,
+        "cell": 4,
+        "riskIndex": 3.27,
+        "rank": "Low"
+      },
+      "recommendedAction": {
+        "auto": "No Further Action — Monitor at MMV Cycle\nLow Tier. Well is adequately documented and unlikely to act as a migration pathway. Carry through as background population; re-evaluate on AoR refresh or if plume forecast shifts.",
+        "override": null
+      },
+      "status": "final",
+      "reviewerName": "Unknown (v2)",
+      "assessedAt": "2026-08-07T16:20:33.019Z",
+      "supersedesId": null,
+      "approvedByName": null,
+      "approvedAt": null,
+      "createdAt": "2026-08-07T16:20:33.019Z",
+      "updatedAt": "2026-08-07T16:20:33.019Z"
+    }
+  ],
+  "methodologies": [
+    {
+      "revision": "2.0.0",
+      "methodology": {
+        "revision": "2.0.0",
+        "updatedBy": "Tahir Chisti",
+        "updatedAt": "2026-07-28T00:00:00Z",
+        "params": [
+          {
+            "key": "plugQuality",
+            "name": "Abandonment & Plug Quality",
+            "axis": "L",
+            "weight": 0.22,
+            "desc": "Verified modern plugs vs. missing/unverifiable",
+            "anchors": {
+              "1": "Abandoned to current D020 / Class VI standard; verified plugs across storage complex",
+              "3": "Era-standard abandonment; plugs present but unverified (no tag/log)",
+              "5": "Improper abandonment; bridge-plug-only / welded-cap era; plugs missing"
+            },
+            "unknownScore": 5,
+            "refs": [
+              "AER D020 §3",
+              "40 CFR 146.84(c)",
+              "Arbad et al. 2024"
+            ]
+          },
+          {
+            "key": "cement",
+            "name": "Cement Coverage & Quality",
+            "axis": "L",
+            "weight": 0.2,
+            "desc": "TOC and cement quality vs. seals and BGWP/USDW base",
+            "anchors": {
+              "1": "Returns/CBL confirm coverage across primary seal and to surface-casing shoe",
+              "3": "TOC below a required seal, or quality unverified (no CBL/VDL)",
+              "5": "Known uncemented interval across a seal or across BGWP/USDW base; no cement records"
+            },
+            "unknownScore": 5,
+            "refs": [
+              "AER D020",
+              "40 CFR 146.84(c)",
+              "Watson & Bachu 2009"
+            ]
+          },
+          {
+            "key": "barriers",
+            "name": "Barriers Across Flow Zones",
+            "axis": "L",
+            "weight": 0.12,
+            "desc": "Independent permanent barriers per flow zone",
+            "anchors": {
+              "1": "≥2 independent verified barriers per flow zone",
+              "3": "Single barrier somewhere",
+              "5": "No barrier across ≥1 flow zone"
+            },
+            "unknownScore": 3,
+            "refs": [
+              "AER D020",
+              "CSA Z741"
+            ]
+          },
+          {
+            "key": "scvf",
+            "name": "SCVF / Gas Migration History",
+            "axis": "L",
+            "weight": 0.16,
+            "desc": "Surface casing vent flow / gas migration test history",
+            "anchors": {
+              "1": "Tested; none reported",
+              "3": "Historical SCVF/GM repaired & verified, or never tested",
+              "5": "Active or unrepaired SCVF/GM"
+            },
+            "unknownScore": 3,
+            "refs": [
+              "Watson & Bachu 2009 (top predictor)",
+              "AER ID 2003-01"
+            ]
+          },
+          {
+            "key": "age",
+            "name": "Well Age & Regulatory Era",
+            "axis": "L",
+            "weight": 0.1,
+            "desc": "Drilling year as a proxy for cementing/abandonment practice vintage",
+            "anchors": {
+              "1": "Post-1995",
+              "3": "1965–1995",
+              "5": "Pre-1965 or unknown spud date"
+            },
+            "unknownScore": 5,
+            "refs": [
+              "Watson & Bachu 2009 era analysis",
+              "Arbad et al. 2024"
+            ]
+          },
+          {
+            "key": "complexity",
+            "name": "Wellbore Complexity & Condition",
+            "axis": "L",
+            "weight": 0.1,
+            "desc": "Deviation, sour/oil service history, casing condition",
+            "anchors": {
+              "1": "Vertical, sweet, simple completion",
+              "3": "Deviated, or sour/oil-producer history, or suspected casing issues",
+              "5": "Multiple factors, or known casing failure/corrosion"
+            },
+            "unknownScore": 3,
+            "refs": [
+              "Watson & Bachu 2009",
+              "AER D065 wellbore review"
+            ]
+          },
+          {
+            "key": "data",
+            "name": "Data Confidence",
+            "axis": "L",
+            "weight": 0.1,
+            "desc": "Completeness of drilling/completion/abandonment records",
+            "anchors": {
+              "1": "Complete records incl. logs",
+              "3": "Partial / incomplete",
+              "5": "None or analog only"
+            },
+            "unknownScore": 5,
+            "refs": [
+              "40 CFR 146.84(c)",
+              "Arbad public-data method"
+            ]
+          },
+          {
+            "key": "penetration",
+            "name": "Penetration vs Storage Complex",
+            "axis": "C",
+            "weight": 0.3,
+            "desc": "Deepest penetration relative to primary seal and storage reservoir",
+            "anchors": {
+              "1": "Does not reach primary seal (Types 8–9)",
+              "3": "Penetrates primary seal, not reservoir (Types 4–7)",
+              "5": "Intersects storage reservoir (Types 1–3)"
+            },
+            "unknownScore": 5,
+            "refs": [
+              "Type classification (GD-40 / Arbad)",
+              "40 CFR 146.84",
+              "AER D065 AOR"
+            ]
+          },
+          {
+            "key": "plume",
+            "name": "Position vs Plume & Pressure Front",
+            "axis": "C",
+            "weight": 0.25,
+            "desc": "Position relative to the modeled CO₂ plume and pressure front (AoR)",
+            "anchors": {
+              "1": "Outside modeled pressure front (AoR). No model yet: > 3.2 km from injector",
+              "3": "Inside pressure front, outside plume. No model yet: 1.6 – 3.2 km",
+              "5": "Inside modeled CO₂ plume extent. No model yet: < 1.6 km"
+            },
+            "unknownScore": 3,
+            "refs": [
+              "40 CFR 146.84(a) AoR modeling",
+              "AER D065"
+            ]
+          },
+          {
+            "key": "usdw",
+            "name": "Groundwater (USDW/BGWP) Isolation",
+            "axis": "C",
+            "weight": 0.25,
+            "desc": "Barrier status across the protected groundwater interval",
+            "anchors": {
+              "1": "Verified isolation across BGWP/USDW base (surface casing + cement, or plugs)",
+              "3": "Unverified",
+              "5": "Known open pathway at the groundwater interval"
+            },
+            "unknownScore": 3,
+            "refs": [
+              "AER D020 non-saline protection",
+              "EPA USDW mandate"
+            ]
+          },
+          {
+            "key": "access",
+            "name": "Corrective-Action Accessibility",
+            "axis": "C",
+            "weight": 0.2,
+            "desc": "Feasibility of re-entry / re-abandonment if intervention is needed",
+            "anchors": {
+              "1": "Licensee active; surface access; re-entry feasible",
+              "3": "Suspended / no marker / constrained access",
+              "5": "Orphaned, unknown location, or re-entry infeasible"
+            },
+            "unknownScore": 3,
+            "refs": [
+              "40 CFR 146.84(d) corrective action",
+              "AER orphan registry"
+            ]
+          }
+        ],
+        "matrix": {
+          "bands": [
+            {
+              "min": 1,
+              "max": 4,
+              "label": "Low",
+              "cls": "low",
+              "color": "#1fbf75"
+            },
+            {
+              "min": 5,
+              "max": 9,
+              "label": "Moderate",
+              "cls": "mod",
+              "color": "#f0a93b"
+            },
+            {
+              "min": 10,
+              "max": 16,
+              "label": "High",
+              "cls": "high",
+              "color": "#e85a4f"
+            },
+            {
+              "min": 17,
+              "max": 25,
+              "label": "Very High",
+              "cls": "crit",
+              "color": "#a8324a"
+            }
+          ]
+        },
+        "wellTypes": {
+          "Type 1": {
+            "short": "No records — undocumented construction",
+            "desc": "No documentation available, minimal or no records; only drilling is known. Construction details are absent, so schematics cannot be produced.",
+            "prot": "Unknown"
+          },
+          "Type 2": {
+            "short": "Thru seal + reservoir — nothing protected",
+            "desc": "Penetrates both the primary geologic seal and storage reservoir.",
+            "prot": "No protection for groundwater/USDWs, primary geologic seal, or storage reservoir."
+          },
+          "Type 3": {
+            "short": "Thru seal + reservoir — groundwater only",
+            "desc": "Penetrates both the primary geologic seal and storage reservoir.",
+            "prot": "Protection for groundwater/USDWs only; no protection for primary geologic seal or storage reservoir."
+          },
+          "Type 4": {
+            "short": "Thru seal + reservoir — groundwater + seal",
+            "desc": "Penetrates both the primary geologic seal and storage reservoir.",
+            "prot": "Protection for groundwater/USDWs and primary geologic seal; storage reservoir not protected."
+          },
+          "Type 5": {
+            "short": "Thru seal only — nothing protected",
+            "desc": "Penetrates only the primary geologic seal.",
+            "prot": "No protection for groundwater/USDWs or primary geologic seal."
+          },
+          "Type 6": {
+            "short": "Thru seal only — groundwater protected",
+            "desc": "Penetrates only the primary geologic seal.",
+            "prot": "Protection for groundwater/USDWs; primary geologic seal not protected."
+          },
+          "Type 7": {
+            "short": "Thru seal + reservoir — fully protected",
+            "desc": "Penetrates both the primary geologic seal and storage reservoir.",
+            "prot": "Protection for groundwater/USDWs, primary geologic seal, and storage reservoir."
+          },
+          "Type 8": {
+            "short": "Thru seal only — groundwater + seal",
+            "desc": "Penetrates only the primary geologic seal.",
+            "prot": "Protection for groundwater/USDWs and primary geologic seal."
+          },
+          "Type 9": {
+            "short": "Above seal & reservoir — lowest risk",
+            "desc": "Does not penetrate either the primary geologic seal or storage reservoir.",
+            "prot": "Dependent on confining-zone integrity; if the confining zone is intact, represents the lowest level of risk."
+          }
+        }
+      },
+      "note": "migrated from v2",
+      "publishedAt": "2026-07-28T00:00:00Z",
+      "publishedBy": "Tahir Chisti"
+    }
+  ],
+  "auditEvents": [
+    {
+      "id": "aud_v2_W-W8QB2S_1786118901621",
+      "at": "2026-08-07T16:08:21.621Z",
+      "actorName": "v2 migration",
+      "projectId": "prj_v2_fort-saskatchewan-wabamun-hub-aor",
+      "entity": "well",
+      "entityId": "wel_v2_W-W8QB2S",
+      "action": "import",
+      "diff": {
+        "before": null,
+        "after": {
+          "id": "wel_v2_W-W8QB2S",
+          "projectId": "prj_v2_fort-saskatchewan-wabamun-hub-aor",
+          "licence": "100/13-06-055-22W4/00",
+          "name": "MANNING 13-6 WILDCAT",
+          "operator": "Fred M. Manning Ltd.",
+          "lat": 53.728872,
+          "lon": -113.269667,
+          "spudYear": 1949,
+          "type": "Unknown",
+          "trajectory": "Vertical",
+          "status": "Abandoned (P&A)",
+          "classification": "Type 4",
+          "td_m": 1447.2,
+          "notes": "Well abandoned by cement plugs (Sept. 12-13, 1949): Plug #1 from 4748 to 4675 ft with 50 sacks cement; Plug #2 from 3800 to 3700 ft with 40 sacks cement (felt for and found at 3657 ft); Plug #3 from 3550 to 3450 ft with 42 sacks cement plus 1% calcium chloride; Plug #4 from 2775 to 2700 ft with 30 sacks cement (felt for plug, hit at 3430 ft prior); Run #5 plug from 2650 to 2575 ft with 42 sacks cement (felt for plug #5 at 4 PM, found at 2555 ft); Run #6 plug from 630 to 550 ft with 35 sacks cement, plug felt at 545 ft with 4 points. Operations also included mixing mud, laying down 3 1/2\" drill pipe, circulating, waiting on orders, and the rig was released at 4 PM.",
+          "construction": null,
+          "legacyV1": {
+            "scores": {
+              "plug": 5,
+              "barriers": 3,
+              "cement": 5,
+              "prox": 1,
+              "depthR": 5,
+              "depthC": 5,
+              "age": 5,
+              "access": 1,
+              "data": 5
+            },
+            "total": 35
+          },
+          "createdAt": "2026-07-24T12:15:02.271Z",
+          "createdBy": "Tahir Chisti",
+          "updatedAt": "2026-08-07T16:08:21.621Z",
+          "updatedBy": "Tahir Chisti"
+        }
+      }
+    },
+    {
+      "id": "aud_v2_W-ZVX8JD_1786122122318",
+      "at": "2026-08-07T17:02:02.318Z",
+      "actorName": "v2 migration",
+      "projectId": "prj_v2_fort-saskatchewan-wabamun-hub-aor",
+      "entity": "well",
+      "entityId": "wel_v2_W-ZVX8JD",
+      "action": "import",
+      "diff": {
+        "before": null,
+        "after": {
+          "id": "wel_v2_W-ZVX8JD",
+          "projectId": "prj_v2_fort-saskatchewan-wabamun-hub-aor",
+          "licence": "100/08-19-055-22W4/00",
+          "name": "ENBRIDGE WABAMUN HUB 8-19",
+          "operator": "Enbridge Wabamun Hub Ltd.",
+          "lat": 53.763685,
+          "lon": -113.249104,
+          "spudYear": 2025,
+          "type": "Disposal",
+          "trajectory": "Vertical",
+          "status": "Abandoned (P&A)",
+          "classification": "Type 7",
+          "td_m": 2337,
+          "notes": "Enbridge disposal well, spud 2025-11-16, Fort Saskatchewan field. Modern four-string design with CRS bottom liner — engineered for injection service. Risk override LOW: active engineered wellbore, not a legacy abandonment. [From 3D Reviewer: low 67/100 — subscores derived; verify Classification, Access, Data]",
+          "construction": null,
+          "legacyV1": {
+            "scores": {
+              "plug": 1,
+              "barriers": 1,
+              "cement": 1,
+              "prox": 3,
+              "depthR": 3,
+              "depthC": 3,
+              "age": 1,
+              "access": 1,
+              "data": 1
+            },
+            "total": 15
+          },
+          "createdAt": "2026-07-24T12:15:02.272Z",
+          "createdBy": "Tahir Chisti",
+          "updatedAt": "2026-08-07T17:02:02.318Z",
+          "updatedBy": "Tahir Chisti"
+        }
+      }
+    },
+    {
+      "id": "aud_v2_W-4A62O7_1786119381843",
+      "at": "2026-08-07T16:16:21.843Z",
+      "actorName": "v2 migration",
+      "projectId": "prj_v2_fort-saskatchewan-wabamun-hub-aor",
+      "entity": "well",
+      "entityId": "wel_v2_W-4A62O7",
+      "action": "import",
+      "diff": {
+        "before": null,
+        "after": {
+          "id": "wel_v2_W-4A62O7",
+          "projectId": "prj_v2_fort-saskatchewan-wabamun-hub-aor",
+          "licence": "100/07-21-055-22W4/00",
+          "name": "IMPERIAL FT SASK 7-21",
+          "operator": "Imperial Oil Limited",
+          "lat": 53.764946,
+          "lon": -113.207628,
+          "spudYear": 1953,
+          "type": "Strat Test",
+          "trajectory": "Vertical",
+          "status": "Abandoned (P&A)",
+          "classification": "Type 3",
+          "td_m": 1463.3,
+          "notes": "1953 D&A, Fort Saskatchewan field. Surface casing only to 186.2 m. Tops: Wabamun 1022, Calmar 1053, Nisku 1065, Ireton 1117, Beaverhill Lake 1450 m. \n\nThe well was plugged and abandoned April 10-12, 1953 after reaching total depth (~4801 ft). Seven cement plugs were run: Plug #1, 4801-4751 ft, 25 sax cement, down at 7:20 (Apr 10); Plug #2, 4480-4430 ft, 35 sax cement with 2% C.C., down at 8:30 PM (Apr 10); Plug #3, 3510-3460 ft, 35 sax cement & 2% C.C., down at 7:00, felt O.K. at 3440 (Apr 11); Plug #4, 3100-3050 ft, 35 sax cement and 2% C.C., down at 4:30, felt O.K. with top at 3038 (Apr 11); Plug #5, 2550-2350 ft, 100 sax cement 2% C.C., down at 4:00, felt O.K. at 2345 (Apr 12); Plug #6, 570-640 ft, 40 sax cement with 2% additive, down at 1:30, felt (Apr 12); and Plug #7 set at surface after taking off the B.O.P. (Apr 12). Waiting-on-cement periods were observed between plugs and drill pipe, drill collars and core barrel were laid down at the end of the job.",
+          "construction": null,
+          "legacyV1": {
+            "scores": {
+              "plug": 5,
+              "barriers": 3,
+              "cement": 5,
+              "prox": 3,
+              "depthR": 5,
+              "depthC": 5,
+              "age": 5,
+              "access": 3,
+              "data": 3
+            },
+            "total": 37
+          },
+          "createdAt": "2026-07-24T12:15:02.272Z",
+          "createdBy": "Tahir Chisti",
+          "updatedAt": "2026-08-07T16:16:21.843Z",
+          "updatedBy": "Tahir Chisti"
+        }
+      }
+    },
+    {
+      "id": "aud_v2_W-LX242Q_1784908883221",
+      "at": "2026-07-24T16:01:23.221Z",
+      "actorName": "v2 migration",
+      "projectId": "prj_v2_fort-saskatchewan-wabamun-hub-aor",
+      "entity": "well",
+      "entityId": "wel_v2_W-LX242Q",
+      "action": "import",
+      "diff": {
+        "before": null,
+        "after": {
+          "id": "wel_v2_W-LX242Q",
+          "projectId": "prj_v2_fort-saskatchewan-wabamun-hub-aor",
+          "licence": "100/13-05-056-22W4/00",
+          "name": "SINOPEC REDWATER 13-5",
+          "operator": "Sinopec Canada Energy Ltd.",
+          "lat": 53.814949,
+          "lon": -113.243559,
+          "spudYear": 2004,
+          "type": "Strat Test",
+          "trajectory": "Deviated",
+          "status": "Abandoned (P&A)",
+          "classification": "Type 9",
+          "td_m": 1160.5,
+          "notes": "2004 deviated Viking gas well, Redwater field, abandoned 2017 to modern standards. TD in the Wabamun — does NOT penetrate the Calmar caprock or Nisku. Perfs squeezed on abandonment. [From 3D Reviewer: medium 25/100 — subscores derived; verify Classification, Access, Data]",
+          "construction": null,
+          "legacyV1": {
+            "scores": {
+              "plug": 1,
+              "barriers": 1,
+              "cement": 1,
+              "prox": 3,
+              "depthR": 1,
+              "depthC": 1,
+              "age": 1,
+              "access": 1,
+              "data": 1
+            },
+            "total": 11
+          },
+          "createdAt": "2026-07-24T12:15:02.272Z",
+          "createdBy": "Tahir Chisti",
+          "updatedAt": "2026-07-24T16:01:23.221Z",
+          "updatedBy": "Tahir Chisti"
+        }
+      }
+    },
+    {
+      "id": "aud_v2_W-4039S4_1786119633019",
+      "at": "2026-08-07T16:20:33.019Z",
+      "actorName": "v2 migration",
+      "projectId": "prj_v2_fort-saskatchewan-wabamun-hub-aor",
+      "entity": "well",
+      "entityId": "wel_v2_W-4039S4",
+      "action": "import",
+      "diff": {
+        "before": null,
+        "after": {
+          "id": "wel_v2_W-4039S4",
+          "projectId": "prj_v2_fort-saskatchewan-wabamun-hub-aor",
+          "licence": "100/03-17-056-22W4/00",
+          "name": "PHOENIX REDWATER 3-17",
+          "operator": "Phoenix Resources Company",
+          "lat": 53.834594,
+          "lon": -113.239156,
+          "spudYear": 1965,
+          "type": "Strat Test",
+          "trajectory": "Vertical",
+          "status": "Abandoned (P&A)",
+          "classification": "Type 3",
+          "td_m": 1115.6,
+          "notes": "1965 D&A, Redwater field. Surface casing only to 185.9 m. Tops: Calmar 1016, Nisku 1029, Ireton 1069, Leduc 1095 m — penetrates caprock and reservoir. Just outside the 5 km circles (~5.1 km from the Pine injector) but inside the review area. \n\nThe well was abandoned with four cement plugs after reaching T.D. 3660' (July 2-4, 1965). Plug No. 1: 3658'-3277' with 170 sx cement, cementing equipment rigged up and plug down @ 5:30 P.M. July 2/65, pulled 15 stands and waited on cement; felt plug No. 1 at 3217'-3219'. Plug No. 2: 3130'-3029' with 50 sx cement and 2% C.C., plug down @ 2:00 A.M., felt at 2994'. Plug No. 3: 2430'-2290' with 64 sx cement and 2% C.C., plug down @ 10:30 A.M., felt at 2275'. Plug No. 4: 660'-560' with 65 sx cement and 2% C.C., plug down @ 8:00 P.M., felt at 520' at 4:00 A.M. Surface casing (8 5/8\" 24 lb J-55, 0-610') had been cemented with 320 sx normal cement plus 2% C.C. After the final plug the pipe was laid down, B.O.P. and rig laid down, and the rig was released at 8:00 A.M. July 4/65.",
+          "construction": null,
+          "legacyV1": {
+            "scores": {
+              "plug": 5,
+              "barriers": 3,
+              "cement": 5,
+              "prox": 1,
+              "depthR": 5,
+              "depthC": 5,
+              "age": 5,
+              "access": 1,
+              "data": 5
+            },
+            "total": 35
+          },
+          "createdAt": "2026-07-24T12:15:02.272Z",
+          "createdBy": "Tahir Chisti",
+          "updatedAt": "2026-08-07T16:20:33.019Z",
+          "updatedBy": "Tahir Chisti"
+        }
+      }
+    }
+  ]
+}
