@@ -3,7 +3,8 @@
 // The well dossier (spec §4.3 "Report"), reached as /report/well?id=… (static export: the id is in
 // the query). A document to print or save as PDF for a regulator: see DossierSections for what it
 // holds. A well that is not stored here, or belongs to another project than the active one, is
-// "Well not found", with the way back to Wells.
+// "Well not found"; one the store fails to read is "The well could not be read"; both with the way
+// back to Wells.
 import { Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
@@ -24,10 +25,18 @@ import { useStoreQuery } from '@/lib/store/provider';
 
 const LOADING = 'Loading the well…';
 
-function WellNotFound({ reason, error = null }: { reason: string; error?: Error | null }) {
+function WellNotFound({
+  reason,
+  title = 'Well not found',
+  error = null,
+}: {
+  reason: string;
+  title?: string;
+  error?: Error | null;
+}) {
   return (
     <ReportMessage
-      title="Well not found"
+      title={title}
       error={error}
       action={
         <Button asChild variant="outline">
@@ -47,7 +56,15 @@ function WellReport({ id }: { id: string }) {
 
   if (projectsError) return <ProjectReadError error={projectsError} backHref={wellsHref()} />;
   if (page.loading || !projects) return <ReportStatus>{LOADING}</ReportStatus>;
-  if (page.error) return <WellNotFound reason={`The well could not be read: ${page.error.message}`} error={page.error} />;
+  if (page.error) {
+    return (
+      <WellNotFound
+        title="The well could not be read"
+        reason={`This browser could not read the well: ${page.error.message}`}
+        error={page.error}
+      />
+    );
+  }
   if (!page.data) return <WellNotFound reason="No well with this link is stored in this browser. It may have been deleted." />;
   const { well, project, current } = page.data;
   if (activeProject && well.projectId !== activeProject.id) {

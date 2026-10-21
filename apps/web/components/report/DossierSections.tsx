@@ -20,13 +20,7 @@ import { AssessmentScores, CONTRIBUTION_CAPTION, RevisionNote } from '@/componen
 import { RecommendedAction } from '@/components/well/RecommendedAction';
 import { VerdictFigures } from '@/components/well/WellHeader';
 import { methodologyForRevision, scoreRows, type DisplayMethodology } from '@/lib/assessment-view';
-import {
-  rowsFromWellbore,
-  rowsNotDrawn,
-  schematicExport,
-  schematicInput,
-  wellboreFromRows,
-} from '@/lib/construction-edit';
+import { savedConstruction, schematicExport } from '@/lib/construction-edit';
 import { assessmentState } from '@/lib/derived';
 import { MISSING, fmtCoord, fmtDate, fmtDepth } from '@/lib/format';
 import type { WellData } from '@/lib/load-well';
@@ -72,13 +66,11 @@ function Construction({ well }: { well: Well }) {
   const notDrawnId = useId();
   const model = useMemo(() => {
     if (!well.construction) return null;
-    const rows = rowsFromWellbore(well.construction);
-    const result = wellboreFromRows(rows, well.td_m);
-    const drawing = schematicInput(result.drawing, well.td_m);
+    const { drawing, stats, notDrawn } = savedConstruction(well.construction, well.td_m);
     return {
       svg: drawing ? schematicExport(drawing, 'm', drawingSize(PRINT_BOX, drawing.td)) : '',
-      stats: schematicInput(result.wellbore, well.td_m),
-      notDrawn: rowsNotDrawn(rows, result.errors),
+      stats,
+      notDrawn,
     };
   }, [well.construction, well.td_m]);
 

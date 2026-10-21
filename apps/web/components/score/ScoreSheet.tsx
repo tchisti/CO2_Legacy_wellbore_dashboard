@@ -21,8 +21,9 @@
 //
 // "Show schematic" (spec §4.4: the schematic is viewable in a split pane while scoring) widens the
 // sheet to the full viewport with the well's saved construction drawn, read-only and in metres,
-// in a left column beside the rows (stacked above them below 1280 px). A well with neither a
-// construction record nor a TD has nothing to draw, so the toggle is unavailable and says why.
+// in a left column beside the rows (stacked above them below 1280 px). It is drawn as the dossier
+// draws it (savedConstruction): a saved row the depth rules refuse is left out. A well with neither
+// a construction record nor a TD has nothing to draw, so the toggle is unavailable and says why.
 import { useEffect, useId, useMemo, useReducer, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { LayersIcon } from 'lucide-react';
@@ -46,7 +47,7 @@ import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { toastFinalised } from '@/lib/backup-reminder';
-import { schematicInput } from '@/lib/construction-edit';
+import { savedConstruction } from '@/lib/construction-edit';
 import { fmtDate } from '@/lib/format';
 import {
   carriedNote,
@@ -174,7 +175,7 @@ export function ScoreSheet({
   const [tipOpen, setTipOpen] = useState(false);
   const [showSchematic, setShowSchematic] = useState(false);
   const [schematicHover, setSchematicHover] = useState<string | null>(null);
-  const drawing = useMemo(() => schematicInput(well.construction, well.td_m), [well.construction, well.td_m]);
+  const drawing = useMemo(() => savedConstruction(well.construction, well.td_m).drawing, [well.construction, well.td_m]);
   const canShowSchematic = drawing !== null;
   /** The scoring rows: the sheet opens with focus on their first control, as before the header had a button. */
   const rowsRef = useRef<HTMLDivElement>(null);

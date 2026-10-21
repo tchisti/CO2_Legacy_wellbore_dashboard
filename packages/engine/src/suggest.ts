@@ -52,8 +52,13 @@ function barriers(casingCount: number | null | undefined): Suggestion | undefine
 function plume(input: SuggestInput): Suggestion | undefined {
   const nearest = nearestInjector(input);
   if (nearest === null) return undefined;
-  const score: Score = nearest.distance_m < PLUME_CORRIDOR_M ? 5 : nearest.insideAoR ? 3 : 1;
   const km = (nearest.distance_m / 1000).toFixed(1);
+  // In the corridor the distance alone gives 5, whichever side of an AoR the well is on, so the
+  // basis names the corridor rule (not "outside the AoR" beside a 5).
+  if (nearest.distance_m < PLUME_CORRIDOR_M) {
+    return derived(5, `within ${PLUME_CORRIDOR_M / 1000} km of ${nearest.name}, ${km} km away`);
+  }
+  const score: Score = nearest.insideAoR ? 3 : 1;
   return derived(score, `from ${km} km to ${nearest.name}, ${nearest.insideAoR ? 'inside' : 'outside'} the AoR`);
 }
 

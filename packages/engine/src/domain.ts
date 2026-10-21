@@ -105,7 +105,8 @@ const ProjectFormationSchema = z
 
 // Stored records carry no defaults: a field the record never had must fail validation, not be
 // filled with a plausible value (a missing requireApproval is not "no approval required").
-// Defaults exist only on the *Input schemas below, where a form or an import fills in blanks.
+// Defaults exist only on the *Input schemas below, where a form or an import fills in blanks; the
+// one exception is the construction record's row lists (see WellSchema).
 export const ProjectSchema = z.object({
   id: IdSchema,
   name: NameSchema,
@@ -139,7 +140,9 @@ export const ProjectInputSchema = ProjectSchema.omit({
 
 // Every field is required as stored (nullable ones must be present, as null). A well that never
 // had a classification fails here instead of being stamped "Type 1", which suggest() would turn
-// into the maximum-risk penetration score. Defaults live on WellInputSchema only.
+// into the maximum-risk penetration score. Defaults live on WellInputSchema, with one accepted
+// exception: inside `construction`, WellboreSchema reads a missing row list (casings, plugs, …) as
+// [] and drops null rows (wellbore/types.ts), since a list that was never recorded has no rows.
 export const WellSchema = z.object({
   id: IdSchema,
   projectId: IdSchema,

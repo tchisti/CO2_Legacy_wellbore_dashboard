@@ -289,6 +289,17 @@ describe('well dossier', () => {
     expect(screen.getByRole('link', { name: 'Back to Wells' }).getAttribute('href')).toBe('/wells');
   });
 
+  it('a failed read of the well is "The well could not be read", with the detail and a link back, never "Well not found"', async () => {
+    await renderDossier(FT_SASK.id, undefined, (s) => ({
+      ...s,
+      wells: { ...s.wells, get: () => Promise.reject(new Error('IndexedDB read failed')) },
+    }));
+    expect(await screen.findByRole('heading', { level: 1, name: 'The well could not be read' })).toBeTruthy();
+    expect(screen.getByText('This browser could not read the well: IndexedDB read failed')).toBeTruthy();
+    expect(screen.queryByRole('heading', { name: 'Well not found' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'Back to Wells' }).getAttribute('href')).toBe('/wells');
+  });
+
   it('a well of another project than the active one is "Well not found"', async () => {
     await renderDossier('', async (s) => {
       const other = await s.projects.create({ name: 'Other AOR' });

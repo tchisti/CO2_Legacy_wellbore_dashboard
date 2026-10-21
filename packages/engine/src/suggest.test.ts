@@ -107,11 +107,11 @@ describe('suggest: barriers from casing count', () => {
 });
 
 describe('suggest: plume from nearest injector and AoR', () => {
-  it('1000 m from an injector → 5, basis names the injector and distance', () => {
+  it('1000 m from an injector → 5, basis names the corridor rule, the injector and the distance', () => {
     expect(suggest({ ...WELL, injectors: [injectorAt('INJ-A', 1000, 3200)] }).plume).toEqual({
       score: 5,
       source: 'derived',
-      basis: 'from 1.0 km to INJ-A, inside the AoR',
+      basis: 'within 1.6 km of INJ-A, 1.0 km away',
     });
   });
 
@@ -156,11 +156,11 @@ describe('suggest: plume from nearest injector and AoR', () => {
     });
   });
 
-  it('within 1,600 m of an injector but outside its tiny AoR still scores 5', () => {
+  it('within 1,600 m of an injector but outside its tiny AoR still scores 5, and the basis says why (never "outside the AoR")', () => {
     expect(suggest({ ...WELL, injectors: [injectorAt('INJ-A', 1200, 1000)] }).plume).toEqual({
       score: 5,
       source: 'derived',
-      basis: 'from 1.2 km to INJ-A, outside the AoR',
+      basis: 'within 1.6 km of INJ-A, 1.2 km away',
     });
   });
 

@@ -107,7 +107,7 @@ test('add an injector and a formation; the Score flow plume chip now appears for
   plume = sheet.locator('[data-param="plume"]');
   await expect(plume).toContainText('Nearest injector: Birch (proposed) · 0.4 km (inside the AoR)');
   await expect(
-    plume.getByRole('button', { name: 'Suggested 5 · from 0.4 km to Birch (proposed), inside the AoR', exact: true }),
+    plume.getByRole('button', { name: 'Suggested 5 · within 1.6 km of Birch (proposed), 0.4 km away', exact: true }),
   ).toBeVisible();
 });
 

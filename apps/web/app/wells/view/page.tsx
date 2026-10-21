@@ -4,11 +4,11 @@
 // leads with the verdict (WellHeader) and keeps the evidence one click away in three tabs whose
 // choice lives in the URL (`tab=`). `score=1` opens the score flow over the page; closing it drops
 // `score` and keeps the tab. A well that is not stored here, or belongs to another project than the
-// active one, is "not found" (and never opens the score flow).
+// active one, is "not found"; one the store fails to read says so (neither opens the score flow).
 import { Suspense, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ArrowLeftIcon, FileQuestionIcon } from 'lucide-react';
+import { ArrowLeftIcon, FileQuestionIcon, TriangleAlertIcon, type LucideIcon } from 'lucide-react';
 import { ConstructionEditor, DiscardConstructionDialog } from '@/components/construction/ConstructionEditor';
 import { ScoreSheet } from '@/components/score/ScoreSheet';
 import { EmptyState } from '@/components/shell/EmptyState';
@@ -45,13 +45,21 @@ const Loading = () => (
   </PageBody>
 );
 
-function NotFound({ reason }: { reason: string }) {
+function NotFound({
+  reason,
+  title = 'Well not found',
+  icon = FileQuestionIcon,
+}: {
+  reason: string;
+  title?: string;
+  icon?: LucideIcon;
+}) {
   return (
     <PageBody>
       <BackToWells />
       <EmptyState
-        icon={FileQuestionIcon}
-        title="Well not found"
+        icon={icon}
+        title={title}
         action={
           <Button asChild variant="outline">
             <Link href={wellsHref()}>Back to Wells</Link>
@@ -80,7 +88,15 @@ function WellView({ id }: { id: string }) {
   const page = useStoreQuery((s) => (id ? loadWell(s, id) : Promise.resolve(null)), [id]);
 
   if (page.loading) return <Loading />;
-  if (page.error) return <NotFound reason={`The well could not be read: ${page.error.message}`} />;
+  if (page.error) {
+    return (
+      <NotFound
+        title="The well could not be read"
+        icon={TriangleAlertIcon}
+        reason={`This browser could not read the well: ${page.error.message}`}
+      />
+    );
+  }
   if (!page.data) return <NotFound reason="No well with this link is stored in this browser. It may have been deleted." />;
 
   const { well, project, current, draft, assessments, records, methodology } = page.data;

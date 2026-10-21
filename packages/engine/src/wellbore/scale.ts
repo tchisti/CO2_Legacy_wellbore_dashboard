@@ -8,12 +8,15 @@ export type DepthScale = {
 };
 
 /** Linear depth scale surface(0) → td mapped onto 0 → pxHeight, with ticks
- * every 50 m or 100 ft (step doubled until there are at most 200 steps). */
+ * every 50 m or 100 ft (step doubled until there are at most 200 steps).
+ * A non-finite td has no ticks. */
 export function depthScale(td: number, pxHeight: number): DepthScale {
   const yOf = (m: number): number => (td > 0 ? (m / td) * pxHeight : 0);
   const MAX_TICKS = 200; // cap tick count so a corrupt/absurd td can't hang the tab
   const ticks = (unit: DepthUnit): DepthTick[] => {
     const out: DepthTick[] = [];
+    // An infinite td doubles the step to Infinity, and m += Infinity never passes td: no ticks.
+    if (!Number.isFinite(td)) return out;
     if (unit === 'ft') {
       let stepFt = 100;
       while (td > 0 && td / (stepFt * 0.3048) > MAX_TICKS) stepFt *= 2;

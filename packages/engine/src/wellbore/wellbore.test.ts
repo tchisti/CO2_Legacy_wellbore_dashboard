@@ -731,6 +731,19 @@ describe('empty input and less common report wording (v3)', () => {
     ]);
   });
 
+  it.each([
+    ['Infinity', Number.POSITIVE_INFINITY],
+    ['-Infinity', Number.NEGATIVE_INFINITY],
+    ['NaN', Number.NaN],
+  ])('a non-finite td (%s) returns promptly: no drawing and no ticks, never an endless tick loop', (_name, td) => {
+    const started = Date.now();
+    expect(W.renderWellboreSVG({ td }, { unit: 'm' })).toBe('');
+    expect(W.renderWellboreSVG({ td, plugs: [{ top_m: 100, bottom_m: 200 }] }, { unit: 'ft' })).toBe('');
+    expect(W.depthScale(td, 900).ticks('m')).toEqual([]);
+    expect(W.depthScale(td, 900).ticks('ft')).toEqual([]);
+    expect(Date.now() - started).toBeLessThan(1000);
+  });
+
   it('a zero td maps every depth to the surface and gives the single 0 tick', () => {
     const s = W.depthScale(0, 500);
     expect([s.yOf(0), s.yOf(100)]).toEqual([0, 0]);

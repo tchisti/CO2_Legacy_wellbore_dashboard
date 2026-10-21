@@ -23,6 +23,7 @@ import {
   safeColour,
   sameConstruction,
   schematicExport,
+  savedConstruction,
   schematicInput,
   setHeader,
   setValue,
@@ -315,6 +316,26 @@ describe('schematic helpers', () => {
     expect(schematicInput(null, 1463.3)).toEqual({ td: 1463.3 });
     expect(schematicInput(null, null)).toBeNull();
     expect(schematicInput(emptyWellbore(), null)?.td).toBeNull();
+  });
+
+  it('a saved record is drawn through the depth rules: a refused row is null in the drawing and listed as not drawn', () => {
+    const saved = emptyWellbore({
+      td: 1500,
+      plugs: [
+        { n: 1, kind: 'cement', top_m: 1400, bottom_m: 1450 },
+        { n: 2, kind: 'cement', top_m: 1463, bottom_m: 1448 },
+      ],
+    });
+    const { drawing, stats, notDrawn } = savedConstruction(saved, 1463.3);
+    expect(drawing?.td).toBe(1500);
+    expect(drawing?.plugs).toEqual([saved.plugs[0], null]);
+    expect(stats?.plugs).toEqual([saved.plugs[0]]);
+    expect(notDrawn.map((r) => r.name)).toEqual(['Plug #2 (row 2)']);
+  });
+
+  it('without a saved record only the well TD is drawn, and nothing at all without one', () => {
+    expect(savedConstruction(null, 1463.3)).toEqual({ drawing: { td: 1463.3 }, stats: { td: 1463.3 }, notDrawn: [] });
+    expect(savedConstruction(null, null)).toEqual({ drawing: null, stats: null, notDrawn: [] });
   });
 
   it('names the export after the licence, with unsafe characters replaced', () => {

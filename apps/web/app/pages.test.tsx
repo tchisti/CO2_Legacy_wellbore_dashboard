@@ -6,6 +6,7 @@ import MethodologyPage from '@/app/methodology/page';
 import PortfolioPage from '@/app/portfolio/page';
 import SettingsPage from '@/app/settings/page';
 import WellsPage from '@/app/wells/page';
+import { ShellGate } from '@/components/shell/ShellGate';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { ProjectProvider } from '@/lib/project-context';
 import { createLocalStore } from '@/lib/store/local-store';
@@ -22,16 +23,21 @@ beforeEach(() => vi.clearAllMocks());
 afterEach(cleanup);
 
 let dbCount = 0;
-async function renderPage(Page: ComponentType, withProject = true) {
+async function renderPage(Page: ComponentType, withProject = true, inShell = false) {
   dbCount += 1;
   const dbName = `lwa-pages-test-${dbCount}`;
   if (withProject) await createLocalStore({ dbName, actor: () => 'seed' }).projects.create({ name: 'Test AOR' });
+  const page = inShell ? (
+    <ShellGate>
+      <Page />
+    </ShellGate>
+  ) : (
+    <Page />
+  );
   render(
     <StoreProvider createStore={(actor) => createLocalStore({ dbName, actor })}>
       <ProjectProvider>
-        <TooltipProvider>
-          <Page />
-        </TooltipProvider>
+        <TooltipProvider>{page}</TooltipProvider>
       </ProjectProvider>
     </StoreProvider>,
   );
@@ -56,8 +62,8 @@ describe('home page', () => {
     await waitFor(() => expect(router.replace).toHaveBeenCalledWith('/portfolio'));
   });
 
-  it('shows the first-run screen while there is no project', async () => {
-    await renderPage(HomePage, false);
+  it('shows the first-run screen while there is no project (ShellGate, around every page, shows it)', async () => {
+    await renderPage(HomePage, false, true);
     expect(await screen.findByRole('heading', { name: 'Create your first project' })).toBeTruthy();
     expect(router.replace).not.toHaveBeenCalled();
   });

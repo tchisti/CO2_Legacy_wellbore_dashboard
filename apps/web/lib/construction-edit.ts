@@ -688,6 +688,35 @@ export function schematicInput(wb: WellboreInput | null, fallbackTd: number | nu
   return { ...wb, td: wb.td ?? fallbackTd ?? null };
 }
 
+/** A saved construction record as every read-only view shows it. */
+export type SavedConstruction = {
+  /** What the schematic draws (see schematicInput): rows the depth rules refuse are null, so ids keep their row. */
+  drawing: WellboreInput | null;
+  /** The rows that are drawn, for the statistics. */
+  stats: WellboreInput | null;
+  /** The saved rows left out of the drawing, with why. */
+  notDrawn: RowNotDrawn[];
+};
+
+/**
+ * A saved construction record read through the editor's rules (wellboreFromRows), so the score
+ * sheet and the dossier draw exactly what the editor draws and never a row the depth rules refuse
+ * (an inverted plug that an import or the migration stored). Without a record, only the well's TD.
+ */
+export function savedConstruction(wb: Wellbore | null, fallbackTd: number | null): SavedConstruction {
+  if (!wb) {
+    const drawing = schematicInput(null, fallbackTd);
+    return { drawing, stats: drawing, notDrawn: [] };
+  }
+  const rows = rowsFromWellbore(wb);
+  const result = wellboreFromRows(rows, fallbackTd);
+  return {
+    drawing: schematicInput(result.drawing, fallbackTd),
+    stats: schematicInput(result.wellbore, fallbackTd),
+    notDrawn: rowsNotDrawn(rows, result.errors),
+  };
+}
+
 /** A colour read from a CSS custom property, when it is safe to write into an SVG attribute; else the fallback. */
 export function safeColour(value: string, fallback: string): string {
   const v = value.trim();

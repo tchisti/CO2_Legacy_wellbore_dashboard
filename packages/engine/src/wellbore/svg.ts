@@ -40,9 +40,10 @@ function fmtDepth(m: number | null | undefined, unit: DepthUnit): string {
 
 type LooseCasing = NonNullable<NonNullable<WellboreInput['casings']>[number]>;
 
-/** Render the schematic as an SVG string; '' when there is no positive td. */
+/** Render the schematic as an SVG string; '' when there is no positive, finite td. */
 export function renderWellboreSVG(wb: WellboreInput | null | undefined, opts: WellboreSvgOptions = { unit: 'm' }): string {
-  if (!wb || typeof wb.td !== 'number' || !(wb.td > 0)) return '';
+  // Number.isFinite: an infinite td would make the depth ticks endless (see depthScale).
+  if (!wb || typeof wb.td !== 'number' || !Number.isFinite(wb.td) || !(wb.td > 0)) return '';
 
   const unit: DepthUnit = opts.unit === 'ft' ? 'ft' : 'm';
   const W = opts.width || 760;
