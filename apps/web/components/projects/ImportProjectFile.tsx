@@ -6,14 +6,12 @@
 import { useId, useState, type ChangeEvent } from 'react';
 import { UploadIcon } from 'lucide-react';
 import { toast } from 'sonner';
+import { ImportProblems, NOT_IMPORTED } from '@/components/projects/ImportProblems';
 import { buttonVariants } from '@/components/ui/button';
 import { exportProjectId, readExportFile } from '@/lib/backup';
 import { toError, useStore } from '@/lib/store/provider';
 import { ImportError } from '@/lib/store/store';
 import { cn } from '@/lib/utils';
-
-/** Problems listed before the rest are summarised as "…and N more". */
-const MAX_PROBLEMS = 12;
 
 type State = { kind: 'idle' } | { kind: 'busy' } | { kind: 'failed'; message: string; problems: string[] };
 
@@ -41,15 +39,13 @@ export function ImportProjectFile({ onImported }: { onImported: (projectId: stri
     } catch (err) {
       setState(
         err instanceof ImportError
-          ? { kind: 'failed', message: 'This file was not imported. Nothing was changed. Problems found:', problems: err.problems }
+          ? { kind: 'failed', message: NOT_IMPORTED, problems: err.problems }
           : { kind: 'failed', message: toError(err).message, problems: [] },
       );
     }
   }
 
   const busy = state.kind === 'busy';
-  const shown = state.kind === 'failed' ? state.problems.slice(0, MAX_PROBLEMS) : [];
-  const hidden = state.kind === 'failed' ? state.problems.length - shown.length : 0;
   return (
     <div className="grid gap-1.5">
       <input
@@ -72,17 +68,7 @@ export function ImportProjectFile({ onImported }: { onImported: (projectId: stri
         {busy ? 'Importing…' : 'Import project file'}
       </label>
       {state.kind === 'failed' ? (
-        <div id={`${id}-error`} role="alert" className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs">
-          <p className="font-medium text-destructive">{state.message}</p>
-          {shown.length > 0 ? (
-            <ul className="mt-1.5 grid list-disc gap-0.5 pl-4 font-mono text-[11px] text-ink">
-              {shown.map((problem, i) => (
-                <li key={i}>{problem}</li>
-              ))}
-            </ul>
-          ) : null}
-          {hidden > 0 ? <p className="mt-1 text-muted-foreground">…and {hidden} more.</p> : null}
-        </div>
+        <ImportProblems id={`${id}-error`} message={state.message} problems={state.problems} />
       ) : (
         <p id={`${id}-hint`} className="text-xs text-muted-foreground">
           A .json project file exported from this app, or made by the v2 migration.
