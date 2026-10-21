@@ -1,13 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { WellboreSchema } from '@lwa/engine';
-import { rowsFromWellbore, setHeader } from '@/lib/construction-edit';
+import { constructionKey, rowsFromWellbore, setHeader } from '@/lib/construction-edit';
 import {
   clearUnsavedConstruction,
   readUnsavedConstruction,
   saveUnsavedConstruction,
 } from '@/lib/construction-session';
 
-const rows = () => setHeader(rowsFromWellbore(WellboreSchema.parse({ td: 1500, plugs: [{ top_m: 1, bottom_m: 2 }] })), 'td', '1600');
+const saved = WellboreSchema.parse({ td: 1500, plugs: [{ top_m: 1, bottom_m: 2 }] });
+const rows = () => setHeader(rowsFromWellbore(saved), 'td', '1600');
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -15,12 +16,19 @@ afterEach(() => {
 });
 
 describe('construction-session', () => {
-  it('keeps a working copy per well until it is cleared', () => {
-    saveUnsavedConstruction('wel_1', rows());
-    expect(readUnsavedConstruction('wel_1')?.td).toBe('1600');
+  it('keeps a working copy per well, with the key of the record it was made from, until it is cleared', () => {
+    saveUnsavedConstruction('wel_1', rows(), constructionKey(saved));
+    expect(readUnsavedConstruction('wel_1')?.rows.td).toBe('1600');
+    expect(readUnsavedConstruction('wel_1')?.base).toBe(constructionKey(saved));
+    expect(JSON.parse(sessionStorage.getItem('lwa.construction.unsaved.wel_1') ?? '{}')).toMatchObject({ base: constructionKey(saved) });
     expect(readUnsavedConstruction('wel_2')).toBeNull();
     clearUnsavedConstruction('wel_1');
     expect(readUnsavedConstruction('wel_1')).toBeNull();
+  });
+
+  it('reads a copy stored before bases were kept with base null', () => {
+    sessionStorage.setItem('lwa.construction.unsaved.wel_1', JSON.stringify(rows()));
+    expect(readUnsavedConstruction('wel_1')).toMatchObject({ base: null, rows: { td: '1600' } });
   });
 
   it('ignores unreadable stored text', () => {
@@ -38,7 +46,7 @@ describe('construction-session', () => {
     vi.spyOn(Storage.prototype, 'removeItem').mockImplementation(() => {
       throw new Error('blocked');
     });
-    expect(() => saveUnsavedConstruction('wel_1', rows())).not.toThrow();
+    expect(() => saveUnsavedConstruction('wel_1', rows(), constructionKey(saved))).not.toThrow();
     expect(readUnsavedConstruction('wel_1')).toBeNull();
     expect(() => clearUnsavedConstruction('wel_1')).not.toThrow();
   });

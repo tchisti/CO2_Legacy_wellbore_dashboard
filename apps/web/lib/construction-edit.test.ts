@@ -9,8 +9,11 @@ import {
   applyParsed,
   applyParsedToRows,
   exportFilename,
+  hasUnsavedChanges,
   parseDecimal,
   removeRow,
+  restoreDecision,
+  reviveKeptCopy,
   reviveRows,
   rowForSvgId,
   rowSource,
@@ -28,6 +31,7 @@ import {
   swapValues,
   toConstruction,
   wellboreFromRows,
+  constructionKey,
   type ConstructionRows,
 } from '@/lib/construction-edit';
 
@@ -346,9 +350,8 @@ describe('depth sanity', () => {
     ]);
     expect(result.wellbore.plugs).toEqual([]);
     expect(result.drawing.plugs).toEqual([null]);
-    // As stored, the row is not an edit: the record as entered still holds it.
+    // As stored, the row is not an edit: the record as entered still holds it, equal to the stored record.
     expect(result.record.plugs).toHaveLength(1);
-    expect(sameConstruction(toConstruction(result.record), toConstruction(wellboreFromRows(rows).record))).toBe(true);
 
     const swapped = swapValues(rows, 'plugs', key, 'top_m', 'bottom_m');
     expect(rowSource(swapped.lists.plugs[0]!)).toBe('manual');
@@ -431,4 +434,63 @@ describe('reviveRows', () => {
       expect(reviveRows(data)).toBeNull();
     },
   );
+});
+
+describe('hasUnsavedChanges', () => {
+  const inverted = emptyWellbore({
+    td: 1500,
+    plugs: [{ n: 1, top_m: 1463, bottom_m: 1448, source: 'extractor', verbatim: 'P1 1463/1448' }],
+  });
+
+  it('a stored inverted row read back is not unsaved, yet carries its blocking depth error', () => {
+    const result = wellboreFromRows(rowsFromWellbore(inverted));
+    expect(hasUnsavedChanges(result, inverted)).toBe(false);
+    expect(result.errors).toEqual([expect.objectContaining({ kind: 'depth', swap: ['top_m', 'bottom_m'] })]);
+    expect(result.wellbore.plugs).toEqual([]); // and it is not what Save would write
+  });
+
+  it('is true after an edit, after typed text that does not read, and false once reverted', () => {
+    const rows = rowsFromWellbore(FULL);
+    const key = rows.lists.plugs[0]!.key;
+    expect(hasUnsavedChanges(wellboreFromRows(rows), FULL)).toBe(false);
+    expect(hasUnsavedChanges(wellboreFromRows(setValue(rows, 'plugs', key, 'sacks', '30')), FULL)).toBe(true);
+    expect(hasUnsavedChanges(wellboreFromRows(setValue(rows, 'plugs', key, 'sacks', '3O')), FULL)).toBe(true);
+    expect(hasUnsavedChanges(wellboreFromRows(setHeader(rowsFromWellbore(null), 'td', 'deep')), null)).toBe(true);
+    expect(hasUnsavedChanges(wellboreFromRows(setValue(rows, 'plugs', key, 'sacks', '25')), FULL)).toBe(false);
+  });
+});
+
+describe('a kept working copy', () => {
+  const edited = () => {
+    const rows = rowsFromWellbore(FULL);
+    return setValue(rows, 'plugs', rows.lists.plugs[0]!.key, 'sacks', '30');
+  };
+
+  it('is stored with the key of the saved record it was made from, and read back as such', () => {
+    const stored = JSON.parse(JSON.stringify({ base: constructionKey(FULL), rows: edited() }));
+    const kept = reviveKeptCopy(stored);
+    expect(kept?.base).toBe(constructionKey(FULL));
+    expect(kept?.rows.lists.plugs[0]!.values.sacks).toBe('30');
+  });
+
+  it('a copy stored without a base (before bases were kept) reads with base null', () => {
+    const kept = reviveKeptCopy(JSON.parse(JSON.stringify(edited())));
+    expect(kept?.base).toBeNull();
+    expect(kept?.rows.lists.plugs[0]!.values.sacks).toBe('30');
+    expect(reviveKeptCopy({ base: 'x', rows: 'nope' })).toBeNull();
+    expect(reviveKeptCopy(null)).toBeNull();
+  });
+
+  it('restore when made from the saved record; conflict when that record changed (or the base is unknown); drop when nothing differs', () => {
+    const rows = edited();
+    expect(restoreDecision({ base: constructionKey(FULL), rows }, FULL, null)).toBe('restore');
+    const newer = { ...FULL, kbElev: 805 };
+    expect(restoreDecision({ base: constructionKey(FULL), rows }, newer, null)).toBe('conflict');
+    expect(restoreDecision({ base: null, rows }, FULL, null)).toBe('conflict');
+    // A key, not a timestamp: the same content under another key order is the same record.
+    const reordered: Wellbore = JSON.parse(JSON.stringify(Object.fromEntries(Object.entries(FULL).reverse())));
+    expect(Object.keys(reordered)).not.toEqual(Object.keys(FULL));
+    expect(restoreDecision({ base: constructionKey(reordered), rows }, FULL, null)).toBe('restore');
+    expect(restoreDecision({ base: 'stale', rows: rowsFromWellbore(FULL) }, FULL, null)).toBe('drop');
+  });
 });

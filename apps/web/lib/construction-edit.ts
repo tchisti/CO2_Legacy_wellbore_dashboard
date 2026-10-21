@@ -450,6 +450,15 @@ export function wellboreFromRows(rows: ConstructionRows, fallbackTd: number | nu
   return { wellbore, record: asRecord.data, drawing, errors, warnings };
 }
 
+/**
+ * Whether the working copy has changes to save: the record as entered differs from the saved one,
+ * or typed text does not read. A depth error alone in a stored row (an imported inverted interval)
+ * is not a change: it shows on its row and blocks Save, and fixing it is the change.
+ */
+export function hasUnsavedChanges(result: RowsResult, saved: Wellbore | null): boolean {
+  return result.errors.some((e) => e.kind === 'input') || !sameConstruction(toConstruction(result.record), saved);
+}
+
 /** The record as stored: null when it holds nothing (no rows, no TD or KB, no open hole, no pasted text). */
 export function toConstruction(wb: Wellbore): Wellbore | null {
   const empty =
@@ -701,4 +710,31 @@ export function reviveRows(data: unknown): ConstructionRows | null {
     lists: mapLists((k) => revived[k] ?? []),
     base: headerOf(base.data),
   };
+}
+
+/** A working copy kept between visits, with the key (constructionKey) of the saved record it was made from. */
+export type KeptCopy = { base: string | null; rows: ConstructionRows };
+
+/**
+ * A kept copy read back from storage: `{ base, rows }`. A copy stored as bare rows (before bases
+ * were kept) reads with base null, so it is never taken for a copy of the current record.
+ */
+export function reviveKeptCopy(data: unknown): KeptCopy | null {
+  if (isObject(data) && 'rows' in data) {
+    const rows = reviveRows(data.rows);
+    return rows ? { base: typeof data.base === 'string' ? data.base : null, rows } : null;
+  }
+  const rows = reviveRows(data);
+  return rows ? { base: null, rows } : null;
+}
+
+/**
+ * What to do with a kept copy when the tab opens on `saved`: `drop` it when it holds nothing the
+ * saved record does not; `restore` it when it was made from this very record (same content key;
+ * not a timestamp, which an unrelated edit to the well bumps); `conflict` when the saved record
+ * changed since the edits were made, or the copy does not say what it was made from.
+ */
+export function restoreDecision(copy: KeptCopy, saved: Wellbore | null, fallbackTd: number | null): 'drop' | 'restore' | 'conflict' {
+  if (!hasUnsavedChanges(wellboreFromRows(copy.rows, fallbackTd), saved)) return 'drop';
+  return copy.base !== null && copy.base === constructionKey(saved) ? 'restore' : 'conflict';
 }

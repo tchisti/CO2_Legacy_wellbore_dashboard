@@ -60,6 +60,7 @@ async function addWell(page: Page, input: Record<string, unknown>): Promise<stri
   );
 }
 
+const CONFLICT = 'The saved record changed after these edits were made. Saving replaces it.';
 const sectionsNav = (page: Page) => page.getByRole('navigation', { name: 'Sections' });
 const discardDialog = (page: Page) => page.getByRole('alertdialog', { name: 'Discard unsaved construction changes?' });
 
@@ -407,6 +408,8 @@ test.describe('construction tab', () => {
     await expect(page).toHaveURL(/\/wells$/);
     await page.goForward();
     await expect(page.getByText('Unsaved construction changes were restored')).toBeVisible();
+    await expect(page.getByText(CONFLICT)).toHaveCount(0); // made from the record still saved: no warning
+    await expect(page.getByRole('button', { name: 'Save anyway' })).toHaveCount(0);
     await expect(page.getByLabel('Plug 1: Sacks')).toHaveValue('30');
     await expect(dataRows(page, 'Plugs').first().locator('[data-verbatim]')).toContainText('1463–1448 m');
     await expect(unsaved(page)).toBeVisible();
@@ -488,5 +491,53 @@ test.describe('construction tab', () => {
     expect(text).toContain('fill="#15191e"');
     expect(text).not.toContain('#16191d');
     expect(text).not.toContain('var(--');
+  });
+  test('a restored copy made from an older saved record warns before replacing the newer one', async ({ page }) => {
+    await page.goto('/wells');
+    await page.locator('tbody tr').filter({ hasText: FT_SASK.licence }).locator('td[data-column="name"]').click();
+    await page.getByRole('tab', { name: 'Construction' }).click();
+    await expect(page).toHaveURL(/[?&]tab=construction(&|$)/);
+    await pasteReport(page, PLUG_REPORT);
+    await page.goBack();
+    await expect(page).toHaveURL(/\/wells$/);
+    // Meanwhile the saved record changes (as an import or another tab would).
+    await storeConstruction(page, FT_SASK.id, STORED);
+
+    await page.goForward();
+    await expect(page.getByText(CONFLICT)).toBeVisible();
+    await expect(page.locator('[data-restored="conflict"]')).toBeVisible();
+    await expect(page.getByLabel('Plug 1: Top (m)')).toHaveValue('1448'); // the copy, not the newer record
+    await expect(dataRows(page, 'Casings')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Save anyway' })).not.toBeFocused();
+
+    await page.getByRole('button', { name: 'Save anyway' }).click();
+    await expect(page.getByText('Construction saved')).toBeVisible();
+    await expect(page.getByText(CONFLICT)).toHaveCount(0);
+    const stored = await page.evaluate(async (id) => (await window.__lwa!.store.wells.get(id))!.construction, FT_SASK.id);
+    expect(stored).toMatchObject({ td: 1463.3, sourceText: PLUG_REPORT, plugs: [{ n: 1, top_m: 1448, bottom_m: 1463, sacks: 25 }] });
+    expect(stored!.casings).toEqual([]);
+  });
+
+  test('a stored inverted plug opens without unsaved changes, blocks Save, and is fixed by Swap', async ({ page }) => {
+    await storeConstruction(page, FT_SASK.id, {
+      td: 1500,
+      plugs: [{ n: 1, kind: 'cement', top_m: 1463, bottom_m: 1448, source: 'extractor', verbatim: 'Plug 1: 1463/1448 m' }],
+    });
+    await openConstruction(page, FT_SASK.id);
+    await expect(page.getByText('Top (m) is deeper than Bottom (m).')).toBeVisible();
+    await expect(unsaved(page)).toHaveCount(0);
+    await expect(saveButton(page)).toBeDisabled();
+    await expect(page.getByRole('button', { name: 'Discard changes' })).toBeDisabled();
+    await expect(svg(page).locator('[data-kind="plug"]')).toHaveCount(0);
+
+    await dataRows(page, 'Plugs').first().getByRole('button', { name: 'Swap top and bottom' }).click();
+    await expect(unsaved(page)).toBeVisible();
+    await expect(saveButton(page)).toBeEnabled();
+    await expect(dataRows(page, 'Plugs').first().locator('[data-source]')).toHaveText('Manual');
+    await expect(svg(page).locator('[data-kind="plug"]')).toHaveCount(1);
+    await saveButton(page).click();
+    await expect(page.getByText('Construction saved')).toBeVisible();
+    const stored = await page.evaluate(async (id) => (await window.__lwa!.store.wells.get(id))!.construction, FT_SASK.id);
+    expect(stored!.plugs[0]).toMatchObject({ top_m: 1448, bottom_m: 1463, source: 'manual', verbatim: 'Plug 1: 1463/1448 m' });
   });
 });

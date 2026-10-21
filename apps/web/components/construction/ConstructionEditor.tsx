@@ -12,12 +12,14 @@
 //   click guard; links that keep the tab, such as the header's score link, are let through);
 // - and for what cannot be intercepted (the browser's Back button) the copy is kept in
 //   sessionStorage while it has changes and offered back, with a banner, on the next visit. It is
-//   never written into the record; a save or a discard clears it.
+//   kept with the content key of the saved record it was made from: if that record has changed
+//   since (an import, another tab), the banner warns that saving replaces it. It is never written
+//   into the record; a save or a discard clears it.
 // The schematic draws with the record's TD, else the well's.
 import { useEffect, useId, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { CircleDotIcon, ClipboardPasteIcon, HistoryIcon, LayersIcon, XIcon } from 'lucide-react';
+import { CircleDotIcon, ClipboardPasteIcon, HistoryIcon, LayersIcon, TriangleAlertIcon, XIcon } from 'lucide-react';
 import { parseWellboreReport, type DepthUnit, type Well, type Wellbore } from '@lwa/engine';
 import { PasteReportDialog } from '@/components/construction/PasteReportDialog';
 import { RowsTable, type FocusRequest } from '@/components/construction/RowsTable';
@@ -40,10 +42,11 @@ import {
   applyParsedToRows,
   constructionKey,
   exportFilename,
+  hasUnsavedChanges,
   removeRow,
+  restoreDecision,
   rowForSvgId,
   rowsFromWellbore,
-  sameConstruction,
   schematicExport,
   schematicInput,
   setHeader,
@@ -171,18 +174,26 @@ export function ConstructionEditor({
   const stored = well.construction;
 
   // A working copy kept from an earlier visit (see construction-session.ts) is offered back when it
-  // still differs from the saved record; one that matches it is stale and dropped.
-  const [kept] = useState<ConstructionRows | null>(() => {
+  // still differs from the saved record (one that matches it is stale and dropped), with a warning
+  // when it was made from another saved record than this one.
+  const [kept] = useState(() => {
     const copy = readUnsavedConstruction(well.id);
     if (!copy) return null;
-    const r = wellboreFromRows(copy, well.td_m);
-    if (r.errors.some((e) => e.kind === 'input') || !sameConstruction(toConstruction(r.record), stored)) return copy;
-    clearUnsavedConstruction(well.id);
-    return null;
+    const decision = restoreDecision(copy, stored, well.td_m);
+    if (decision === 'drop') {
+      clearUnsavedConstruction(well.id);
+      return null;
+    }
+    return { ...copy, decision };
   });
-  const [rows, setRows] = useState<ConstructionRows>(() => kept ?? rowsFromWellbore(stored));
-  /** The working copy came back from an earlier visit (shown as a banner while it has changes). */
-  const [restored, setRestored] = useState(kept !== null);
+  const [rows, setRows] = useState<ConstructionRows>(() => kept?.rows ?? rowsFromWellbore(stored));
+  /** The working copy came back from an earlier visit (a banner while it has changes); `conflict` when made from another saved record. */
+  const [restored, setRestored] = useState<'restore' | 'conflict' | null>(kept?.decision ?? null);
+  /**
+   * While a restored copy conflicts, the base it was made from (unknown: ''). It is kept with the
+   * copy until saved or discarded, so leaving and coming back still warns.
+   */
+  const [conflictBase, setConflictBase] = useState<string | null>(kept?.decision === 'conflict' ? (kept.base ?? '') : null);
   /** The record the working copy is measured against: as stored, or as just saved. */
   const [baseline, setBaseline] = useState<Wellbore | null>(stored);
   const [seenKey, setSeenKey] = useState(() => constructionKey(stored));
@@ -205,8 +216,7 @@ export function ConstructionEditor({
   const errorCount = result.errors.length;
   // Unsaved: the record as entered differs from the saved one, or typed text does not read. A
   // depth error alone in a stored row (an imported inverted interval) is not an edit.
-  const dirty =
-    result.errors.some((e) => e.kind === 'input') || !sameConstruction(toConstruction(result.record), baseline);
+  const dirty = hasUnsavedChanges(result, baseline);
 
   // The stored record changed under the tab (it is re-read after every store change): a clean
   // working copy follows it; one with unsaved changes is kept and measured against the new record.
@@ -225,11 +235,12 @@ export function ConstructionEditor({
   }, [dirty, onDirtyChange]);
   useEffect(() => () => onDirtyChange?.(false), [onDirtyChange]);
 
-  // Kept while it has changes, so leaving by Back does not lose it; cleared once it has none.
+  // Kept while it has changes, with the saved record it was made from, so leaving by Back does not
+  // lose it; cleared once it has none.
   useEffect(() => {
-    if (dirty) saveUnsavedConstruction(well.id, rows);
+    if (dirty) saveUnsavedConstruction(well.id, rows, conflictBase ?? constructionKey(baseline));
     else clearUnsavedConstruction(well.id);
-  }, [dirty, rows, well.id]);
+  }, [dirty, rows, well.id, baseline, conflictBase]);
 
   // A same-origin link that would leave this tab asks first (capture phase, before Next's Link
   // navigates). Modified clicks, new-tab and download links, and links that keep this tab pass.
@@ -296,7 +307,8 @@ export function ConstructionEditor({
     clearUnsavedConstruction(well.id);
     setRows(rowsFromWellbore(baseline));
     setStarted(baseline !== null);
-    setRestored(false);
+    setRestored(null);
+    setConflictBase(null);
     setParsed(null);
     setHoverId(null);
     setFocusId(null);
@@ -311,7 +323,8 @@ export function ConstructionEditor({
       setSeenKey(constructionKey(saved));
       setRows(rowsFromWellbore(saved));
       setStarted(saved !== null);
-      setRestored(false);
+      setRestored(null);
+      setConflictBase(null);
       clearUnsavedConstruction(well.id);
       toast.success('Construction saved');
     } catch (e) {
@@ -417,13 +430,16 @@ export function ConstructionEditor({
             <p className="text-right text-xs text-danger">Fix {plural(errorCount, 'value')} before saving</p>
           ) : null}
         </div>
-        {restored && dirty ? (
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-warn-line bg-warn-bg px-3 py-2.5 text-[13px] text-warn">
+        {restored === 'restore' && dirty ? (
+          <div
+            data-restored="restore"
+            className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-subtle px-3 py-2.5 text-[13px] text-ink"
+          >
             <p className="flex items-center gap-2">
-              <HistoryIcon aria-hidden="true" className="size-4 shrink-0" />
+              <HistoryIcon aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
               <span>
                 <span className="font-medium">Unsaved construction changes were restored</span>
-                <span className="text-warn/90"> from your last visit to this tab. They are not saved yet.</span>
+                <span className="text-muted-foreground"> from your last visit to this tab. They are not saved yet.</span>
               </span>
             </p>
             <div className="flex items-center gap-2">
@@ -432,6 +448,29 @@ export function ConstructionEditor({
               </Button>
               <Button size="sm" onClick={() => void save()} disabled={errorCount > 0 || busy}>
                 Save
+              </Button>
+            </div>
+          </div>
+        ) : null}
+        {restored === 'conflict' && dirty ? (
+          <div
+            role="alert"
+            data-restored="conflict"
+            className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-warn-line bg-warn-bg px-3 py-2.5 text-[13px] text-warn"
+          >
+            <p className="flex items-start gap-2">
+              <TriangleAlertIcon aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+              <span>
+                <span className="font-medium">Unsaved construction changes were restored.</span>{' '}
+                The saved record changed after these edits were made. Saving replaces it.
+              </span>
+            </p>
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="outline" onClick={discard} disabled={busy}>
+                Discard
+              </Button>
+              <Button size="sm" variant="destructive" onClick={() => void save()} disabled={errorCount > 0 || busy}>
+                Save anyway
               </Button>
             </div>
           </div>
