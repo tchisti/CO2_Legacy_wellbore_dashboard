@@ -13,6 +13,12 @@
 // contrast is ink on surface (15:1 light, 14:1 dark) wherever they fall, so it does not depend on the
 // layer colour: no single text colour reaches 4.5:1 on all four layers in both themes with a halo-free
 // label that a well can also cross (v2's light-on-colour labels were 2.8:1 to 3.8:1).
+//
+// Non-text contrast (WCAG 1.4.11): the leak arrows, the open hole and the cement sheaths sit on a
+// thin fixed near-black outline (OUTLINE), drawn beneath each mark. On every backdrop a mark meets
+// (the rock body in either theme, each stratum, the plume) either the mark's own colour or its
+// outline clears 3:1: the outline on the light rock body and on every stratum (4.0:1 to 15.7:1),
+// the mark itself on the dark rock body (5.2:1 to 9.9:1), where a dark outline cannot show.
 import { useId } from 'react';
 import { ScrollRegion } from '@/components/methodology/Section';
 
@@ -32,6 +38,10 @@ const CASING_EDGE = '#9aa4b5';
 const INJECTOR_BORE = '#2f3b52';
 const INJECTOR_EDGE = '#7fb2e5';
 const INJECTOR_FLOW = '#9fd1ff';
+/** The outline under the leak arrows, the open hole and the cement sheaths, in both themes. */
+const OUTLINE = '#111418';
+/** How far the outline shows beyond a mark, in figure units (px at 960 wide). */
+const OUTLINE_W = 1.25;
 
 const ARROW_ID = 'figure-a4-leak';
 
@@ -41,7 +51,54 @@ const FIGURE_A4_LABEL = 'Legacy well classification types, adapted after Arbad e
 const HALO = 'fill-ink stroke-surface';
 const HALO_PROPS = { strokeWidth: 4, strokeLinejoin: 'round', paintOrder: 'stroke' } as const;
 
-const LEAK_PATH = { stroke: LEAK, strokeWidth: 3, fill: 'none', markerEnd: `url(#${ARROW_ID})` } as const;
+const LEAK_W = 3;
+/** The arrow head's size, in arrow stroke widths (the marker's units); its path is drawn in a 10-unit box. */
+const HEAD = 7;
+/**
+ * The head's outline width, in its own units: twice OUTLINE_W at its drawn scale (LEAK_W × HEAD / 10
+ * px per unit), painted under the fill, so OUTLINE_W shows outside it as along the shaft.
+ */
+const HEAD_OUTLINE = (2 * OUTLINE_W) / ((LEAK_W * HEAD) / 10);
+const LEAK_PATH = { stroke: LEAK, strokeWidth: LEAK_W, fill: 'none', markerEnd: `url(#${ARROW_ID})` } as const;
+
+/** A leak arrow: the red stroke and head over a near-black underlay (the head has its own outline). */
+function Leak({ d }: { d: string }) {
+  return (
+    <>
+      <path
+        d={d}
+        data-outline
+        stroke={OUTLINE}
+        strokeWidth={LEAK_W + 2 * OUTLINE_W}
+        strokeLinecap="round"
+        fill="none"
+      />
+      <path d={d} {...LEAK_PATH} />
+    </>
+  );
+}
+
+/** A rectangle drawn on its outline: the near-black underlay OUTLINE_W wider on every side. */
+function OutlinedRect({ x, y, width, height, fill }: { x: number; y: number; width: number; height: number; fill: string }) {
+  return (
+    <>
+      <rect
+        data-outline
+        x={x - OUTLINE_W}
+        y={y - OUTLINE_W}
+        width={width + 2 * OUTLINE_W}
+        height={height + 2 * OUTLINE_W}
+        fill={OUTLINE}
+      />
+      <rect x={x} y={y} width={width} height={height} fill={fill} />
+    </>
+  );
+}
+
+/** Open hole: tan, on its outline. */
+const OpenHole = ({ x, y, height }: { x: number; y: number; height: number }) => (
+  <OutlinedRect x={x} y={y} width={8} height={height} fill={OPEN_HOLE} />
+);
 
 /** A well's title above the section. */
 function TypeLabel({ x, children }: { x: number; children: string }) {
@@ -56,7 +113,7 @@ function TypeLabel({ x, children }: { x: number; children: string }) {
 function Casing({ x, height }: { x: number; height: number }) {
   return (
     <>
-      <rect x={x} y="28" width="20" height={height} fill={CEMENT} />
+      <OutlinedRect x={x} y={28} width={20} height={height} fill={CEMENT} />
       <rect x={x + 3} y="28" width="14" height={height} fill={CASING} stroke={CASING_EDGE} />
     </>
   );
@@ -71,6 +128,7 @@ export function FigureA4() {
           viewBox="0 0 960 470"
           role="img"
           aria-label={FIGURE_A4_LABEL}
+          aria-describedby={captionId}
           className="block w-full min-w-[820px] rounded-[10px] border border-line bg-surface"
         >
           <defs>
@@ -79,11 +137,19 @@ export function FigureA4() {
               viewBox="0 0 10 10"
               refX="8"
               refY="5"
-              markerWidth="7"
-              markerHeight="7"
+              markerWidth={HEAD}
+              markerHeight={HEAD}
               orient="auto-start-reverse"
+              overflow="visible"
             >
-              <path d="M0,0 L10,5 L0,10 z" fill={LEAK} />
+              <path
+                d="M0,0 L10,5 L0,10 z"
+                fill={LEAK}
+                stroke={OUTLINE}
+                strokeWidth={HEAD_OUTLINE}
+                strokeLinejoin="round"
+                paintOrder="stroke"
+              />
             </marker>
           </defs>
 
@@ -106,46 +172,46 @@ export function FigureA4() {
           {/* Type 2: fully open hole to the reservoir, leaks everywhere */}
           <g>
             <TypeLabel x={90}>Type 2</TypeLabel>
-            <rect x="86" y="28" width="8" height="360" fill={OPEN_HOLE} />
-            <path d="M96,370 C110,320 108,300 100,262" {...LEAK_PATH} />
-            <path d="M100,225 C112,180 110,140 100,100" {...LEAK_PATH} />
-            <path d="M100,66 C110,52 112,46 116,38" {...LEAK_PATH} />
+            <OpenHole x={86} y={28} height={360} />
+            <Leak d="M96,370 C110,320 108,300 100,262" />
+            <Leak d="M100,225 C112,180 110,140 100,100" />
+            <Leak d="M100,66 C110,52 112,46 116,38" />
           </g>
           {/* Type 3: surface casing through the USDW, open below */}
           <g>
             <TypeLabel x={190}>Type 3</TypeLabel>
             <Casing x={180} height={84} />
-            <rect x="186" y="112" width="8" height="276" fill={OPEN_HOLE} />
-            <path d="M196,370 C210,330 208,300 200,262" {...LEAK_PATH} />
-            <path d="M200,225 C212,190 210,160 202,120" {...LEAK_PATH} />
+            <OpenHole x={186} y={112} height={276} />
+            <Leak d="M196,370 C210,330 208,300 200,262" />
+            <Leak d="M200,225 C212,190 210,160 202,120" />
           </g>
           {/* Type 4: cased and cemented through the seal, open at the reservoir */}
           <g>
             <TypeLabel x={290}>Type 4</TypeLabel>
             <Casing x={280} height={244} />
-            <rect x="286" y="272" width="8" height="116" fill={OPEN_HOLE} />
-            <path d="M296,370 C312,352 314,330 306,308" {...LEAK_PATH} />
+            <OpenHole x={286} y={272} height={116} />
+            <Leak d="M296,370 C312,352 314,330 306,308" />
           </g>
           {/* Type 5: open hole ends in the seal */}
           <g>
             <TypeLabel x={390}>Type 5</TypeLabel>
-            <rect x="386" y="28" width="8" height="222" fill={OPEN_HOLE} />
-            <path d="M396,240 C410,190 408,150 400,100" {...LEAK_PATH} />
-            <path d="M400,66 C410,52 412,46 416,38" {...LEAK_PATH} />
+            <OpenHole x={386} y={28} height={222} />
+            <Leak d="M396,240 C410,190 408,150 400,100" />
+            <Leak d="M400,66 C410,52 412,46 416,38" />
           </g>
           {/* Type 6: surface casing, open hole ends in the seal */}
           <g>
             <TypeLabel x={478}>Type 6</TypeLabel>
             <Casing x={468} height={84} />
-            <rect x="474" y="112" width="8" height="138" fill={OPEN_HOLE} />
-            <path d="M484,240 C496,205 494,170 486,125" {...LEAK_PATH} />
+            <OpenHole x={474} y={112} height={138} />
+            <Leak d="M484,240 C496,205 494,170 486,125" />
           </g>
           {/* Injector */}
           <g>
             <text x="588" y="18" fontSize="13" fontWeight="800" textAnchor="middle" className="fill-ink">
               CO₂ Injector (Class VI)
             </text>
-            <rect x="576" y="28" width="24" height="360" fill={CEMENT} />
+            <OutlinedRect x={576} y={28} width={24} height={360} fill={CEMENT} />
             <rect x="580" y="28" width="16" height="360" fill={INJECTOR_BORE} stroke={INJECTOR_EDGE} strokeWidth="2" />
             <line x1="588" y1="30" x2="588" y2="386" stroke={INJECTOR_FLOW} strokeWidth="2" strokeDasharray="6 4" />
           </g>
@@ -182,7 +248,8 @@ export function FigureA4() {
             <text x="440" y="374" fontSize="11">
               CO₂ plume
             </text>
-            <text x="18" y="280" fontSize="10" transform="rotate(-90 18 280)">
+            {/* Clear of the seal's label: it reads upward from y 200, between the USDW and the seal. */}
+            <text x="18" y="200" fontSize="10" transform="rotate(-90 18 200)">
               Depth
             </text>
           </g>

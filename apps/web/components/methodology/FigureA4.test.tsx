@@ -92,4 +92,57 @@ describe('FigureA4', () => {
       ),
     ).toBeTruthy();
   });
+
+  it('draws every leak arrow, open hole and cement sheath on a near-black outline (non-text contrast in both themes)', () => {
+    const { container } = render(<FigureA4 />);
+    const svg = container.querySelector('svg')!;
+    const OUTLINE = '#111418';
+    // Each arrow has an outline path with the same course right before it, wider by the outline on both sides.
+    const arrows = Array.from(svg.querySelectorAll('path[marker-end]'));
+    expect(arrows).toHaveLength(9);
+    for (const a of arrows) {
+      const under = a.previousElementSibling!;
+      expect(under.hasAttribute('data-outline')).toBe(true);
+      expect(under.getAttribute('d')).toBe(a.getAttribute('d'));
+      expect(under.getAttribute('stroke')).toBe(OUTLINE);
+      expect(Number(under.getAttribute('stroke-width'))).toBeGreaterThan(Number(a.getAttribute('stroke-width')));
+      expect(under.hasAttribute('marker-end')).toBe(false);
+    }
+    // The head is outlined too, under its fill.
+    const head = svg.querySelector('marker path')!;
+    expect(head.getAttribute('stroke')).toBe(OUTLINE);
+    expect(head.getAttribute('paint-order')).toBe('stroke');
+    // Open hole (tan) and cement sheath (light) rects each sit right on an outline rect that encloses them.
+    for (const hex of ['#d9a066', '#cfd6e2']) {
+      const marks = Array.from(svg.querySelectorAll(`rect[fill="${hex}"]`));
+      expect(marks.length).toBeGreaterThan(0);
+      for (const m of marks) {
+        const under = m.previousElementSibling!;
+        expect(under.hasAttribute('data-outline')).toBe(true);
+        expect(under.getAttribute('fill')).toBe(OUTLINE);
+        const n = (el: Element, attr: string) => Number(el.getAttribute(attr));
+        expect(n(under, 'x')).toBeLessThan(n(m, 'x'));
+        expect(n(under, 'y')).toBeLessThan(n(m, 'y'));
+        expect(n(under, 'x') + n(under, 'width')).toBeGreaterThan(n(m, 'x') + n(m, 'width'));
+        expect(n(under, 'y') + n(under, 'height')).toBeGreaterThan(n(m, 'y') + n(m, 'height'));
+      }
+    }
+    expect(svg.querySelectorAll('rect[fill="#d9a066"]')).toHaveLength(5); // Types 2–6
+    expect(svg.querySelectorAll('rect[fill="#cfd6e2"]')).toHaveLength(7); // Types 3, 4, 6, 7, 8, 9 and the injector
+  });
+
+  it('sets the Depth label clear of the seal label, reading upward from y 200', () => {
+    const { container } = render(<FigureA4 />);
+    const depth = Array.from(container.querySelectorAll('svg text')).find((t) => t.textContent === 'Depth')!;
+    expect(depth.getAttribute('y')).toBe('200');
+    expect(depth.getAttribute('transform')).toBe('rotate(-90 18 200)');
+  });
+
+  it('is described by its caption', () => {
+    render(<FigureA4 />);
+    const img = screen.getByRole('img', { name: ARIA_LABEL });
+    const caption = document.getElementById(img.getAttribute('aria-describedby')!)!;
+    expect(caption.tagName.toLowerCase()).toBe('figcaption');
+    expect(caption.textContent).toMatch(/^Figure A-4 \(adapted\)/);
+  });
 });
