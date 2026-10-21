@@ -584,6 +584,18 @@ describe('MethodologyRecordSchema', () => {
     expect(ok(MethodologyRecordSchema, { ...methodologyRecord, revision: '' })).toBe(false);
     expect(ok(MethodologyRecordSchema, { ...methodologyRecord, publishedAt: 'today' })).toBe(false);
   });
+
+  it('refuses a band class other than low, mod, high, crit, with a readable message', () => {
+    const bands = methodologyRecord.methodology.matrix.bands.map((b) => (b.cls === 'crit' ? { ...b, cls: 'critical' } : b));
+    const parsed = MethodologyRecordSchema.safeParse({
+      ...methodologyRecord,
+      methodology: { ...methodologyRecord.methodology, matrix: { bands } },
+    });
+    expect(parsed.success).toBe(false);
+    expect(parsed.error?.issues.map((i) => [i.path.join('.'), i.message])).toEqual([
+      ['methodology.matrix.bands.3.cls', 'band class must be one of low, mod, high, crit'],
+    ]);
+  });
 });
 
 describe('AuditEventSchema', () => {

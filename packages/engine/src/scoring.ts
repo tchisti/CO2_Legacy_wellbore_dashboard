@@ -6,6 +6,7 @@
 import { z } from 'zod';
 import defaultMethodologyJson from './methodology.default.json';
 import {
+  BAND_CLASSES,
   PARAM_KEYS,
   type Band,
   type Computed,
@@ -22,10 +23,11 @@ import {
   type ValidationResult,
 } from './types';
 
-export { PARAM_KEYS } from './types';
+export { BAND_CLASSES, PARAM_KEYS } from './types';
 export type {
   Axis,
   Band,
+  BandClass,
   Computed,
   ComputedBlock,
   GoldenVector,
@@ -74,11 +76,14 @@ const ParamSchema = z.object({
 // fractional bounds by accident (e.g. a min within float rounding of an integer such as 1e-17,
 // where 1e-17 + 1 === 1) and rejected others. v3 rejects every non-integer bound with one stable
 // message. computeWell and the golden vectors are unaffected: bandFor only sees the shipped bands.
+// The class must be one of the four the recommendation knows (recommend.ts tierOf): a rulebook
+// imported with any other class is refused, never ranked into a fallback tier.
+const BAND_CLASS_MESSAGE = `band class must be one of ${BAND_CLASSES.join(', ')}`;
 const BandSchema = z.object({
   min: z.number().int(),
   max: z.number().int(),
   label: z.string(),
-  cls: z.string(),
+  cls: z.enum(BAND_CLASSES, { error: BAND_CLASS_MESSAGE }),
   color: z.string(),
 });
 
@@ -142,9 +147,10 @@ function describeIssue(issue: z.ZodError['issues'][number], params: readonly unk
       return `${label}: anchors for 1/3/5 are required`;
     }
   }
-  // path is matrix.bands.<i>.min|max; the same text for every band, so it appears once per methodology
-  if (root === 'matrix' && idx === 'bands' && typeof field === 'number' && (sub === 'min' || sub === 'max')) {
-    return BAND_BOUNDS_MESSAGE;
+  // path is matrix.bands.<i>.min|max|cls; the same text for every band, so it appears once per methodology
+  if (root === 'matrix' && idx === 'bands' && typeof field === 'number') {
+    if (sub === 'min' || sub === 'max') return BAND_BOUNDS_MESSAGE;
+    if (sub === 'cls') return BAND_CLASS_MESSAGE;
   }
   const where = issue.path.map(String).join('.') || 'methodology';
   return `${where}: ${issue.message}`;

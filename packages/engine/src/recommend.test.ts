@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { recommend, recommendationText } from './recommend';
 import { DEFAULT_METHODOLOGY, computeWell, emptyScores, type Methodology } from './scoring';
-import { PARAM_KEYS, type Score, type Scores } from './types';
+import { BAND_CLASSES, PARAM_KEYS, type BandClass, type Score, type Scores } from './types';
 
 const M = DEFAULT_METHODOLOGY;
 
@@ -170,6 +170,31 @@ describe('recommend: each action is gated on its own driver', () => {
     expect(['high', 'crit']).toContain(r.tier);
     expect(r.drivers).toEqual(withoutData.params.map((p) => p.name));
     expect(r.actions).toEqual(ALL_ACTIONS.filter((a) => a !== A_DATA));
+  });
+});
+
+describe('recommend: the tier is the band class, for each of the four classes', () => {
+  /** A rulebook with one band over the whole matrix, of class `cls`. */
+  const oneBand = (cls: BandClass): Methodology => ({
+    ...M,
+    matrix: { bands: [{ min: 1, max: 25, label: `Only ${cls}`, cls, color: '#000000' }] },
+  });
+  const TITLES: Record<BandClass, string> = {
+    low: 'No Further Action — Monitor at MMV Cycle',
+    mod: 'Targeted Diagnostics + Watchlist',
+    high: 'Re-entry + Mitigation Required',
+    crit: 'Re-entry + Mitigation Required',
+  };
+
+  it.each(BAND_CLASSES.map((cls) => [cls]))('class "%s" → tier "%s", with its title', (cls) => {
+    const r = recommend(scoresOf(3), oneBand(cls));
+    expect(r.tier).toBe(cls);
+    expect(r.title).toBe(TITLES[cls]);
+  });
+
+  it('a band class outside the four (an unvalidated rulebook) throws instead of falling back to Low', () => {
+    const renamed = { ...M, matrix: { bands: M.matrix.bands.map((b) => ({ ...b, cls: 'critical' })) } } as unknown as Methodology;
+    expect(() => recommend(scoresOf(5), renamed)).toThrow('Unknown band class "critical": validate the methodology first');
   });
 });
 

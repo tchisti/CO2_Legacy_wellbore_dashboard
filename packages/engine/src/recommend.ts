@@ -1,9 +1,9 @@
 // Recommended action (§ 8), ported from v2 index.html recommend(). The wording is v2's, as plain
 // text: the <b> lead-in tags are dropped and every other character is kept verbatim.
 import { computeWell, resolveScore, type Methodology } from './scoring';
-import type { ParamKey, Scores } from './types';
+import type { BandClass, ParamKey, Scores } from './types';
 
-export type Tier = 'low' | 'mod' | 'high' | 'crit';
+export type Tier = BandClass;
 
 export type Recommendation = {
   tier: Tier;
@@ -59,9 +59,22 @@ const ACTIONS: readonly ActionRule[] = [
 const HIGH_WARN =
   'Per CSA Z741 § 9 / EPA Class VI 40 CFR 146.84(d), high-risk wells inside AoR require corrective action plan before injection authorization.';
 
-/** A band class other than the four known ones falls through to Low, as v2 does. */
-function tierOf(cls: string): Tier {
-  return cls === 'crit' || cls === 'high' || cls === 'mod' ? cls : 'low';
+/**
+ * The tier of a band's class. Exhaustive over the four classes BandSchema allows; any other value
+ * means the methodology was never validated, so it throws rather than fall back to Low (v2 did).
+ */
+function tierOf(cls: BandClass): Tier {
+  switch (cls) {
+    case 'low':
+    case 'mod':
+    case 'high':
+    case 'crit':
+      return cls;
+    default: {
+      const unknown: never = cls;
+      throw new Error(`Unknown band class ${JSON.stringify(unknown)}: validate the methodology first`);
+    }
+  }
 }
 
 export function recommend(scores: Scores, m: Methodology): Recommendation {

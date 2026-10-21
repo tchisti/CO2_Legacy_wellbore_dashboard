@@ -1014,6 +1014,29 @@ export function runStoreContract(makeStore: StoreFactory): void {
       expect(await b.projects.list()).toEqual([]);
     });
 
+    it('importProject refuses a methodology record whose band class is not low, mod, high or crit, and installs nothing', async () => {
+      const a = open();
+      const p = await newProject(a);
+      await a.wells.create(p.id, { licence: LICENCE });
+      const file = clone(await a.exportProject(p.id));
+      // A rulebook that would otherwise become current (highest revision), with a renamed class.
+      const renamed = withRevision('2.1.0');
+      renamed.matrix.bands = renamed.matrix.bands.map((b) =>
+        b.cls === 'crit' ? { ...b, cls: 'critical' } : b,
+      ) as unknown as Methodology['matrix']['bands'];
+      file.methodologies.push({ ...file.methodologies[0]!, revision: '2.1.0', methodology: renamed });
+
+      const b = open();
+      const err = await rejection(b.importProject(file, 'merge'));
+      expect(err).toBeInstanceOf(ImportError);
+      expect((err as ImportError).problems).toEqual([
+        'methodologies.1.methodology.matrix.bands.3.cls: band class must be one of low, mod, high, crit',
+      ]);
+      expect(await b.projects.list()).toEqual([]);
+      expect((await b.methodology.list()).map((r) => r.revision)).toEqual(['2.0.0']);
+      expect((await b.methodology.current()).revision).toBe('2.0.0');
+    });
+
     it('importProject merge keeps the stored project when the file\'s copy is older', async () => {
       const a = open();
       const p = await newProject(a);

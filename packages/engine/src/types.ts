@@ -18,6 +18,14 @@ export const PARAM_KEYS = [
 
 export type ParamKey = (typeof PARAM_KEYS)[number];
 
+/**
+ * A rank band's class, which picks its recommended action (recommend.ts): Low, Moderate, High or
+ * Very High. Every shipped rulebook uses exactly these; BandSchema refuses any other.
+ */
+export const BAND_CLASSES = ['low', 'mod', 'high', 'crit'] as const;
+
+export type BandClass = (typeof BAND_CLASSES)[number];
+
 /** Likelihood (leak) axis or Consequence axis. */
 export type Axis = 'L' | 'C';
 
@@ -33,7 +41,7 @@ export type Scores = Record<ParamKey, Score | null>;
  */
 export type LooseScores = Readonly<Partial<Record<ParamKey, unknown>>> | null | undefined;
 
-export type Band = { min: number; max: number; label: string; cls: string; color: string };
+export type Band = { min: number; max: number; label: string; cls: BandClass; color: string };
 
 export type Computed = {
   L: number;
@@ -84,7 +92,7 @@ export interface MigratedWell extends V2WellLike {
   legacy: { scores: Record<string, unknown>; total: unknown };
 }
 
-export type V1Tier = { min: number; max: number; label: string; cls: string };
+export type V1Tier = { min: number; max: number; label: string; cls: BandClass };
 
 export type ValidationResult = { ok: boolean; errors: string[] };
 

@@ -22,7 +22,7 @@ import {
   v1TierFor,
   validateMethodology,
 } from './scoring';
-import { PARAM_KEYS, type Score, type Scores, type V2WellLike } from './types';
+import { BAND_CLASSES, PARAM_KEYS, type Score, type Scores, type V2WellLike } from './types';
 
 const M = DEFAULT_METHODOLOGY;
 
@@ -45,7 +45,7 @@ interface MutableMethodology {
     unknownScore: number;
     anchors: Record<string, string>;
   }>;
-  matrix: { bands: Array<{ min: number; max: number }> };
+  matrix: { bands: Array<{ min: number; max: number; cls: string; label: unknown }> };
 }
 const mutable = (): MutableMethodology => clone(rawMethodology);
 const param = (m: MutableMethodology, i: number) => {
@@ -228,6 +228,41 @@ describe('methodology', () => {
     if (!first) throw new Error('no bands');
     first.max = 4.5;
     expect(validateMethodology(fractionalMax)).toEqual({ ok: false, errors: [WHOLE_NUMBERS] });
+  });
+
+  const BAND_CLASS = 'band class must be one of low, mod, high, crit';
+
+  it('the shipped rulebook uses exactly the four band classes, in rank order', () => {
+    expect(BAND_CLASSES).toEqual(['low', 'mod', 'high', 'crit']);
+    expect(rawMethodology.matrix.bands.map((b) => b.cls)).toEqual([...BAND_CLASSES]);
+  });
+
+  it.each([['critical'], ['Low'], [''], ['none']])(
+    'validateMethodology refuses a band class "%s" with one readable message',
+    (cls) => {
+      const renamed = mutable();
+      for (const band of renamed.matrix.bands) if (band.cls === 'crit' || band.cls === 'high') band.cls = cls;
+      expect(validateMethodology(renamed)).toEqual({ ok: false, errors: [BAND_CLASS] });
+    },
+  );
+
+  it('validateMethodology refuses a band without a class with the same message', () => {
+    const missing = mutable();
+    const first = missing.matrix.bands[0] as Partial<MutableMethodology['matrix']['bands'][number]> | undefined;
+    if (!first) throw new Error('no bands');
+    delete first.cls;
+    expect(validateMethodology(missing)).toEqual({ ok: false, errors: [BAND_CLASS] });
+  });
+
+  it('another malformed band field keeps the generic path message', () => {
+    const badLabel = mutable();
+    const first = badLabel.matrix.bands[0];
+    if (!first) throw new Error('no bands');
+    first.label = 5;
+    expect(validateMethodology(badLabel)).toEqual({
+      ok: false,
+      errors: ['matrix.bands.0.label: Invalid input: expected string, received number'],
+    });
   });
 
   it('validateMethodology reports the whole-numbers message once, however many bounds are fractional', () => {
