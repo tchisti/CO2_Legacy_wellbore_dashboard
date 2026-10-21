@@ -334,6 +334,26 @@ export function runStoreContract(makeStore: StoreFactory): void {
       expect(await s.audit.list({ entityId: ids[0] })).toEqual(eventsBefore);
     });
 
+    it('wells.upsertByLicence: unchanged matches followed by a new licence and a change commit as one', async () => {
+      // Regression: a run of no-op matches used to end the IndexedDB transaction before the next
+      // write (Dexie PrematureCommitError), e.g. re-importing a CSV with one new row at the end.
+      const s = open();
+      const p = await newProject(s);
+      const { ids } = await s.wells.upsertByLicence(p.id, [{ licence: 'A' }, { licence: 'B' }, { licence: 'C' }, { licence: 'E' }]);
+      const result = await s.wells.upsertByLicence(p.id, [
+        { licence: 'A' },
+        { licence: 'B' },
+        { licence: 'C' },
+        { licence: 'D' },
+        { licence: 'E', operator: 'Acme' },
+      ]);
+      expect(result).toMatchObject({ created: 1, updated: 4 });
+      expect(result.ids.slice(0, 3)).toEqual(ids.slice(0, 3));
+      expect(result.ids[4]).toBe(ids[3]);
+      expect(await s.wells.get(ids[3]!)).toMatchObject({ operator: 'Acme' });
+      expect(await s.wells.list(p.id)).toHaveLength(5);
+    });
+
     it('wells.remove snapshots assessments in audit (diff.before.assessments.length === n) and deletes them', async () => {
       const s = open();
       const p = await newProject(s);

@@ -260,10 +260,18 @@ export function createLocalStore(opts: LocalStoreOptions): Store {
     return well;
   }
 
-  /** Applies a patch to a stored well. A patch that changes nothing writes nothing. */
-  async function patchWell(stamp: Stamp, before: Well, patch: Partial<WellInput>): Promise<Well> {
+  /**
+   * The fields a patch gives a stored well, or null when it changes nothing. Synchronous on purpose:
+   * callers skip the write without awaiting anything, because inside a Dexie transaction a run of
+   * awaits that do no IndexedDB work loses the transaction (PrematureCommitError on the next write).
+   */
+  function patchedFields(before: Well, patch: Partial<WellInput>): WellFields | null {
     const fields = WellInputSchema.parse({ ...before, ...patch });
-    if (jsonEqual(WellInputSchema.parse(before), fields)) return before;
+    return jsonEqual(WellInputSchema.parse(before), fields) ? null : fields;
+  }
+
+  /** Writes a stored well's new fields (from patchedFields) with its audit event. */
+  async function patchWell(stamp: Stamp, before: Well, fields: WellFields): Promise<Well> {
     if (licenceKey(fields.licence) !== licenceKey(before.licence)) {
       await assertLicenceFree(before.projectId, fields.licence, before.id);
     }
@@ -371,7 +379,11 @@ export function createLocalStore(opts: LocalStoreOptions): Store {
         });
       },
       update: (id, patch) =>
-        mutate(async (stamp) => patchWell(stamp, await mustGet(db.wells, 'well', id), definedOnly(patch))),
+        mutate(async (stamp) => {
+          const before = await mustGet(db.wells, 'well', id);
+          const fields = patchedFields(before, definedOnly(patch));
+          return fields ? patchWell(stamp, before, fields) : before;
+        }),
       remove: (id) =>
         mutate(async (stamp) => {
           const well = await mustGet(db.wells, 'well', id);
@@ -399,10 +411,15 @@ export function createLocalStore(opts: LocalStoreOptions): Store {
           for (const [i, fields] of parsed.entries()) {
             const key = licenceKey(fields.licence);
             const match = byKey.get(key);
-            // A match takes only the fields the input carries, and keeps its licence text.
-            const well = match
-              ? await patchWell(stamp, match, { ...definedOnly(inputs[i]), licence: match.licence })
-              : await insertWell(stamp, projectId, fields);
+            // A match takes only the fields the input carries, and keeps its licence text. A match
+            // that changes nothing is skipped without an await (see patchedFields).
+            let well: Well;
+            if (match) {
+              const patched = patchedFields(match, { ...definedOnly(inputs[i]), licence: match.licence });
+              well = patched ? await patchWell(stamp, match, patched) : match;
+            } else {
+              well = await insertWell(stamp, projectId, fields);
+            }
             byKey.set(key, well);
             result.ids.push(well.id);
             if (match) result.updated += 1;

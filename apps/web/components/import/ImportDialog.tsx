@@ -37,12 +37,14 @@ import {
   importProjectFile,
   importedDescription,
   saveWithLink,
+  skippedNote,
   type ExportSummary,
   type ImportedProjectFile,
 } from '@/lib/backup';
 import { TEMPLATE_FILE_NAME, templateCsv } from '@/lib/csv';
 import { plural } from '@/lib/format';
 import {
+  carryStoredFields,
   migrateV2Into,
   planCsvImport,
   readImportJson,
@@ -142,23 +144,28 @@ function ImportFlow({
     setWriteFailure(null);
     try {
       const outcome = await runCsvImport(store, project.id, plan);
+      // The wells are written: whatever happened to the drafts, the result step says what was done.
       const lines = csvLines(outcome);
-      toast.success(`${plural(outcome.created + outcome.updated, 'well')} imported`, {
-        description: `${lines.wells}. ${lines.added}.`,
-      });
+      const title = `${plural(outcome.created + outcome.updated, 'well')} imported`;
+      const description = `${lines.wells}. ${lines.added}.`;
+      const failed = outcome.failedDrafts.length;
+      if (failed > 0) toast.warning(`${title}; ${plural(failed, 'draft')} not saved`, { description });
+      else toast.success(title, { description });
       go({ kind: 'csv-done', fileName, outcome });
     } catch (err) {
-      setWriteFailure({ message: `The import did not finish: ${toError(err).message}`, problems: [] });
+      // The wells are written in one all-or-nothing step, so a failure here wrote nothing.
+      setWriteFailure({ message: `Nothing was imported: ${toError(err).message}`, problems: [] });
     } finally {
       setBusy(false);
     }
   }
 
-  async function importJson(fileName: string, data: unknown, legacy: boolean) {
+  /** `data` is read at the click, so a v2 file is merged with the wells as they are then. */
+  async function importJson(fileName: string, data: () => Promise<unknown>, legacy: boolean) {
     setBusy(true);
     setWriteFailure(null);
     try {
-      const imported = await importProjectFile(store, data, 'merge', project.id);
+      const imported = await importProjectFile(store, await data(), 'merge', project.id);
       toast.success(legacy ? 'Legacy v2 wells imported' : 'Project imported', { description: importedDescription(imported) });
       go({ kind: 'json-done', fileName, imported, legacy });
       if (imported.switchTo) setProjectId(imported.switchTo.id);
@@ -246,13 +253,22 @@ function ImportFlow({
     case 'csv-done': {
       const lines = csvLines(step.outcome);
       const skipped = step.outcome.skippedRows;
-      description = 'The import is complete.';
+      description =
+        step.outcome.failedDrafts.length > 0
+          ? 'The wells are imported, but not every draft could be saved.'
+          : 'The import is complete.';
       body = (
         <ImportResultView
           fileName={step.fileName}
           wells={lines.wells}
           added={lines.added}
-          warnings={[...(skipped > 0 ? [`${plural(skipped, 'row')} with errors skipped`] : []), ...step.outcome.warnings]}
+          warnings={[
+            ...(skipped > 0 ? [`${plural(skipped, 'row')} with errors skipped`] : []),
+            ...step.outcome.failedDrafts.map(
+              (f) => `Draft for ${f.licence} not saved (${f.message}); the well is imported, score it on its page.`,
+            ),
+            ...step.outcome.warnings,
+          ]}
           switchedTo={null}
         />
       );
@@ -270,7 +286,7 @@ function ImportFlow({
       footer = (
         <>
           {anotherFile}
-          {importButton(step.summary.wells ?? 0, () => importJson(step.fileName, step.data, false))}
+          {importButton(step.summary.wells ?? 0, () => importJson(step.fileName, async () => step.data, false))}
         </>
       );
       break;
@@ -281,24 +297,36 @@ function ImportFlow({
       footer = (
         <>
           {anotherFile}
-          {importButton(step.migration.export.wells.length, () => importJson(step.fileName, step.migration.export, true))}
+          {importButton(step.migration.export.wells.length, () =>
+            importJson(
+              step.fileName,
+              // v3-only fields (name, TD, construction) of wells already here are kept (lib/import-plan.ts).
+              async () => carryStoredFields(step.migration.export, await store.wells.list(project.id)),
+              true,
+            ),
+          )}
         </>
       );
       break;
-    case 'json-done':
+    case 'json-done': {
+      const note = skippedNote(step.imported.result);
       description = 'The import is complete.';
       body = (
         <ImportResultView
           fileName={step.fileName}
           wells={step.imported.wells}
           added={step.imported.added}
-          warnings={step.imported.result.warnings}
+          warnings={[
+            ...step.imported.result.warnings,
+            ...(note === null ? [] : [note]),
+          ]}
           switchedTo={step.imported.switchTo?.name ?? null}
           notice={step.legacy ? 'Legacy v2 format — migrated' : undefined}
         />
       );
       footer = done;
       break;
+    }
   }
 
   return (

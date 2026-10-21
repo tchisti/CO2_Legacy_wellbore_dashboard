@@ -15,6 +15,7 @@ import {
   readExportFile,
   replaceDeletions,
   replacePreviewText,
+  skippedNote,
 } from '@/lib/backup';
 import { createLocalStore } from '@/lib/store/local-store';
 
@@ -300,5 +301,26 @@ describe('exportFacts', () => {
       expect.stringMatching(/^exported \d{4}-\d{2}-\d{2} by .+$/),
     ]);
     expect(exportFacts(describeExport({ format: 'lwa-project', wells: [] }))).toEqual(['0 wells']);
+  });
+});
+
+describe('skippedNote', () => {
+  const result = {
+    wells: { created: 0, updated: 2 },
+    assessments: { added: 0, skipped: 1 },
+    auditEvents: { added: 0, skipped: 2 },
+    removed: { wells: 0, assessments: 0 },
+    warnings: [],
+  };
+
+  it('says what an import left alone because this browser already had it', () => {
+    expect(skippedNote(result)).toBe('Already in this browser, so not imported again: 1 assessment, 2 history events.');
+    expect(skippedNote({ ...result, auditEvents: { added: 2, skipped: 0 } })).toBe(
+      'Already in this browser, so not imported again: 1 assessment.',
+    );
+  });
+
+  it('is null when nothing was skipped', () => {
+    expect(skippedNote({ ...result, assessments: { added: 1, skipped: 0 }, auditEvents: { added: 2, skipped: 0 } })).toBeNull();
   });
 });

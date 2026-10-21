@@ -226,6 +226,18 @@ export async function importProjectFile(
   return { result, ...importSummary(result, mode), switchTo };
 }
 
+/**
+ * What an import left alone because this browser already had it (ImportResult's `skipped`):
+ * "Already in this browser, so not imported again: 1 assessment, 2 history events." Null when nothing.
+ */
+export function skippedNote(result: Pick<ImportResult, 'assessments' | 'auditEvents'>): string | null {
+  const parts = [
+    result.assessments.skipped > 0 ? plural(result.assessments.skipped, 'assessment') : null,
+    result.auditEvents.skipped > 0 ? plural(result.auditEvents.skipped, 'history event') : null,
+  ].filter((p): p is string => p !== null);
+  return parts.length === 0 ? null : `Already in this browser, so not imported again: ${parts.join(', ')}.`;
+}
+
 /** The toast text of an import: "Wells: 0 created, 5 updated. 0 assessments and 0 history events added." plus warnings. */
 export function importedDescription(imported: Pick<ImportedProjectFile, 'wells' | 'added' | 'result'>): string {
   return [`Wells: ${imported.wells}.`, `${imported.added}.`, ...imported.result.warnings].join(' ');

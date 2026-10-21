@@ -270,6 +270,27 @@ describe('rowsToWellInputs', () => {
     expect(report[0]!.warnings).toEqual(['Well Age & Regulatory Era (1-5 or ?) "n/a" not readable; left unscored']);
   });
 
+  it('score cells: explicit unknowns are recorded (as null); empty cells and absent columns are not', () => {
+    const { scoreCells, report } = read(HEADER, [row({ licence: 'A-1', sc_plugQuality: '4', sc_cement: '?', sc_barriers: 'unknown' })]);
+    expect(scoreCells.get('A-1')).toEqual({ plugQuality: 4, cement: null, barriers: null });
+    expect(report[0]).toMatchObject({ scored: 1, scores: { plugQuality: 4, cement: null, barriers: null } });
+    // A value in one of two columns for a parameter wins over "?" in the other.
+    const v1 = read(
+      ['Well ID / Licence', 'Depth vs Reservoir (Low/Med/High)', 'Depth vs Storage Complex (Low/Med/High)'],
+      [['A-1', '?', 'Med']],
+    );
+    expect(v1.scoreCells.get('A-1')).toEqual({ penetration: 3 });
+  });
+
+  it('a duplicate licence merges score cells: an explicit "?" survives as null, an empty cell keeps the earlier value', () => {
+    const { scoreCells, scoreDrafts } = read(HEADER, [
+      row({ licence: 'A-1', sc_plugQuality: '4', sc_cement: '2' }),
+      row({ licence: 'A-1', sc_plugQuality: '?', sc_cement: '' }),
+    ]);
+    expect(scoreCells.get('A-1')).toEqual({ plugQuality: null, cement: 2 });
+    expect(scoreDrafts.get('A-1')).toEqual({ ...emptyScores(), cement: 2 });
+  });
+
   it('a row without a licence is an error; blank rows are skipped', () => {
     const { report } = read(HEADER, [row({ operator: 'Nobody' }), row({}), row({ licence: 'A-3' })]);
     expect(report.map((r) => [r.row, r.status, r.message])).toEqual([

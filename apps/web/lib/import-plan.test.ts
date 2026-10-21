@@ -1,10 +1,20 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { ProjectExportSchema, emptyScores, type Project, type ProjectExport, type Scores } from '@lwa/engine';
+import {
+  DEFAULT_METHODOLOGY,
+  PARAM_KEYS,
+  ProjectExportSchema,
+  emptyScores,
+  migrateV2Data,
+  type Project,
+  type ProjectExport,
+  type Scores,
+} from '@lwa/engine';
 import { CSV_COLUMNS, toCsv, type CsvColumnKey } from '@/lib/csv';
 import {
   MISSING_LICENCE_MESSAGE,
+  carryStoredFields,
   migrateV2Into,
   planCsvImport,
   readImportJson,
@@ -113,11 +123,119 @@ describe('planCsvImport', () => {
 
     const changed = planOf(csv({ licence: FIRST, ...scoreCells({ ...finalScores, plugQuality: 4 }) }), snapshot);
     expect(changed.rows[0]).toMatchObject({ draft: 'reassessment', scored: 11 });
-    expect(changed.drafts).toEqual([{ key: FIRST, scores: { ...finalScores, plugQuality: 4 }, reassessment: true }]);
+    expect(changed.drafts).toMatchObject([{ key: FIRST, scores: { ...finalScores, plugQuality: 4 }, reassessment: true }]);
 
     const same = planOf(csv({ licence: FIRST, ...scoreCells(finalScores) }), snapshot);
     expect(same.rows[0]).toMatchObject({ draft: 'same' });
     expect(same.drafts).toEqual([]);
+  });
+});
+
+/* ---------- CSV scores over a current final (fix round 1, C1) ---------- */
+
+const FINAL_SCORES: Scores = {
+  plugQuality: 1,
+  cement: 2,
+  barriers: 1,
+  scvf: null,
+  age: 4,
+  complexity: 3,
+  data: 1,
+  penetration: 4,
+  plume: 3,
+  usdw: 1,
+  access: 2,
+};
+const FINAL_JUSTIFICATIONS = Object.fromEntries(
+  PARAM_KEYS.filter((k) => FINAL_SCORES[k] !== null).map((k) => [k, `Reason for ${k}`]),
+) as Record<string, string>;
+const OVERRIDE = 'Re-enter and re-plug across the Calmar';
+
+/** The final's justifications without `drop`. */
+const justificationsWithout = (...drop: string[]) =>
+  Object.fromEntries(Object.entries(FINAL_JUSTIFICATIONS).filter(([k]) => !drop.includes(k)));
+
+/** A project with one well (F-1) finalised with FINAL_SCORES, a justification for every score and an override. */
+async function finalisedWell() {
+  const store = newStore();
+  const project = await store.projects.create({ name: 'Final AOR' });
+  const well = await store.wells.create(project.id, { licence: 'F-1', classification: 'Type 3' });
+  const draft = await store.assessments.saveDraft(well.id, {
+    scores: FINAL_SCORES,
+    justifications: FINAL_JUSTIFICATIONS,
+    override: OVERRIDE,
+    suggestions: {},
+  });
+  const final = await store.assessments.finalise(draft.id);
+  return { store, project, well, final };
+}
+
+describe('CSV scores over a current final', () => {
+  it('a partial-score CSV keeps the other 10 scores, their justifications and the override', async () => {
+    const { store, project, well, final } = await finalisedWell();
+    const plan = planOf(csv({ licence: 'F-1', sc_plugQuality: '5' }), await register(store, project.id));
+    expect(plan.rows[0]).toMatchObject({ status: 'updated', draft: 'reassessment', scoreChanges: ['Plug quality 1→5'] });
+    expect(plan.drafts).toEqual([
+      {
+        key: 'F-1',
+        scores: { ...FINAL_SCORES, plugQuality: 5 },
+        justifications: justificationsWithout('plugQuality'),
+        override: OVERRIDE,
+        reassessment: true,
+      },
+    ]);
+
+    await runCsvImport(store, project.id, plan);
+    expect(await store.assessments.draft(well.id)).toMatchObject({
+      status: 'draft',
+      scores: { ...FINAL_SCORES, plugQuality: 5 },
+      justifications: justificationsWithout('plugQuality'),
+      recommendedAction: { auto: '', override: OVERRIDE },
+    });
+    expect(await store.assessments.current(well.id)).toEqual(final);
+  });
+
+  it('a partial CSV that matches the final plans "same": no draft', async () => {
+    const { store, project, well } = await finalisedWell();
+    const text = toCsv([
+      ['Well ID / Licence', 'Abandonment & Plug Quality (1-5 or ?)', 'Cement Coverage & Quality (1-5 or ?)', 'SCVF / GM History (1-5 or ?)'],
+      ['F-1', '1', '', '?'],
+    ]);
+    const plan = planOf(text, await register(store, project.id));
+    expect(plan.rows[0]).toMatchObject({ draft: 'same', scoreChanges: [] });
+    expect(plan.drafts).toEqual([]);
+    await runCsvImport(store, project.id, plan);
+    expect(await store.assessments.draft(well.id)).toBeNull();
+  });
+
+  it('"?" over a known score makes it Unknown (null) and drops that parameter\'s justification', async () => {
+    const { store, project } = await finalisedWell();
+    const plan = planOf(csv({ licence: 'F-1', sc_cement: '?' }), await register(store, project.id));
+    expect(plan.rows[0]).toMatchObject({ draft: 'reassessment', scoreChanges: ['Cement 2→?'] });
+    expect(plan.drafts[0]).toMatchObject({
+      scores: { ...FINAL_SCORES, cement: null },
+      justifications: justificationsWithout('cement'),
+    });
+  });
+
+  it('rows of one licence list their changes against what the rows before left; an explicit "?" survives the merge', async () => {
+    const { store, project } = await finalisedWell();
+    const plan = planOf(
+      csv({ licence: 'F-1', sc_plugQuality: '5' }, { licence: 'F-1', sc_plugQuality: '?', sc_cement: '3', sc_age: '' }),
+      await register(store, project.id),
+    );
+    expect(plan.rows.map((r) => r.scoreChanges)).toEqual([['Plug quality 1→5'], ['Plug quality 5→?', 'Cement 2→3']]);
+    expect(plan.drafts[0]!.scores).toEqual({ ...FINAL_SCORES, plugQuality: null, cement: 3 });
+    expect(plan.drafts[0]!.justifications).toEqual(justificationsWithout('plugQuality', 'cement'));
+  });
+
+  it('a well without a final keeps the first-assessment rule: "?" cells alone make no draft', async () => {
+    const store = newStore();
+    const project = await store.projects.create({ name: 'Unscored AOR' });
+    await store.wells.create(project.id, { licence: 'U-1' });
+    const plan = planOf(csv({ licence: 'U-1', sc_plugQuality: '?', sc_cement: '?' }), await register(store, project.id));
+    expect(plan.rows[0]).toMatchObject({ draft: null, scoreChanges: [] });
+    expect(plan.drafts).toEqual([]);
   });
 });
 
@@ -136,7 +254,7 @@ describe('runCsvImport', () => {
     expect(await store.wells.list(project.id)).toEqual([]); // planning writes nothing
 
     const outcome = await runCsvImport(store, project.id, plan);
-    expect(outcome).toEqual({ created: 2, updated: 0, drafts: 1, skippedRows: 1, warnings: [] });
+    expect(outcome).toEqual({ created: 2, updated: 0, drafts: 1, skippedRows: 1, warnings: [], failedDrafts: [] });
 
     // One upsert stamps both wells alike, so list order between them is by id: look them up by licence.
     const wells = await store.wells.list(project.id);
@@ -198,6 +316,42 @@ describe('runCsvImport', () => {
   });
 });
 
+describe('runCsvImport when a draft cannot be saved', () => {
+  it('reports the draft, saves the others, and keeps the wells written', async () => {
+    const store = newStore();
+    const project = await store.projects.create({ name: 'Flaky AOR' });
+    const plan = planOf(
+      csv({ licence: 'A-1', sc_plugQuality: '3' }, { licence: 'A-2', sc_plugQuality: '4' }, { licence: 'A-3', sc_plugQuality: '5' }),
+      await register(store, project.id),
+    );
+    let calls = 0;
+    const flaky: Pick<Store, 'wells' | 'assessments'> = {
+      wells: store.wells,
+      assessments: {
+        ...store.assessments,
+        saveDraft: async (wellId, input) => {
+          calls += 1;
+          if (calls === 2) throw new Error('QuotaExceededError');
+          return store.assessments.saveDraft(wellId, input);
+        },
+      },
+    };
+    const outcome = await runCsvImport(flaky, project.id, plan);
+    expect(outcome).toEqual({
+      created: 3,
+      updated: 0,
+      drafts: 2,
+      skippedRows: 0,
+      warnings: [],
+      failedDrafts: [{ licence: 'A-2', message: 'QuotaExceededError' }],
+    });
+    const wells = await store.wells.list(project.id);
+    expect(wells).toHaveLength(3);
+    const drafts = await Promise.all(wells.map((w) => store.assessments.draft(w.id)));
+    expect(drafts.filter(Boolean)).toHaveLength(2);
+  });
+});
+
 /* ---------- JSON ---------- */
 
 describe('readImportJson', () => {
@@ -213,6 +367,8 @@ describe('readImportJson', () => {
     );
   });
 });
+
+const NOW = '2026-10-21T09:00:00.000Z';
 
 describe('retargetExport', () => {
   const active: Project = {
@@ -259,5 +415,98 @@ describe('retargetExport', () => {
     );
     expect(await store.projects.get(project.id)).toEqual(project);
     expect(await store.projects.list()).toHaveLength(1);
+  });
+});
+
+describe('migrateV2Into: one v2 wells.json, several projects (fix round 1, I2)', () => {
+  it('goes into two projects, each with its finals and import history; re-importing into either changes nothing', async () => {
+    const store = newStore();
+    const a = await store.projects.create({ name: 'A AOR' });
+    const b = await store.projects.create({ name: 'B AOR' });
+    const into = async (id: string) => {
+      const project = (await store.projects.get(id))!;
+      return store.importProject(migrateV2Into({ wells: V2_WELLS, project, now: NOW, actor: 'T. Chisti' }).export, 'merge');
+    };
+
+    for (const p of [a, b]) {
+      const result = await into(p.id);
+      expect(result.wells).toEqual({ created: 2, updated: 0 });
+      expect(result.assessments).toEqual({ added: 1, skipped: 0 });
+      expect(result.auditEvents).toEqual({ added: 2, skipped: 0 });
+    }
+    for (const p of [a, b]) {
+      const again = await into(p.id);
+      expect(again.assessments).toEqual({ added: 0, skipped: 1 });
+      expect(again.auditEvents).toEqual({ added: 0, skipped: 2 });
+    }
+    for (const p of [a, b]) {
+      const wells = await store.wells.list(p.id);
+      expect(wells).toHaveLength(2);
+      const all = (await Promise.all(wells.map((w) => store.assessments.listForWell(w.id)))).flat();
+      expect(all.map((x) => x.status)).toEqual(['final']); // one final, not two
+      // The file's two well import events, once each (the store adds its own project event per import).
+      const imports = (await store.audit.list({ projectId: p.id })).filter((e) => e.action === 'import' && e.entity === 'well');
+      expect(imports).toHaveLength(2);
+    }
+  });
+
+  it('into the project the v2 migration itself makes (prj_v2_<slug>), ids stay as the migration writes them', () => {
+    const raw = migrateV2Data({
+      wells: V2_WELLS,
+      methodology: DEFAULT_METHODOLOGY,
+      projectName: 'Cutover AOR',
+      now: NOW,
+      actor: 'T. Chisti',
+    }).export;
+    const base: Project = { ...raw.project };
+    const own = migrateV2Into({ wells: V2_WELLS, project: base, now: NOW, actor: 'T. Chisti' }).export;
+    expect(own.assessments.map((x) => x.id)).toEqual(raw.assessments.map((x) => x.id));
+    expect(own.auditEvents.map((x) => x.id)).toEqual(raw.auditEvents.map((x) => x.id));
+    // Renamed since it was migrated: still a v2 project, so still the migration's ids.
+    const renamed = migrateV2Into({ wells: V2_WELLS, project: { ...base, name: 'Renamed AOR' }, now: NOW, actor: 'T. Chisti' });
+    expect(renamed.export.assessments.map((x) => x.id)).toEqual(raw.assessments.map((x) => x.id));
+
+    const other = migrateV2Into({ wells: V2_WELLS, project: { ...base, id: 'prj_other' }, now: NOW, actor: 'T. Chisti' }).export;
+    expect(other.assessments.map((x) => x.id)).toEqual(raw.assessments.map((x) => x.id.replace(/^asm_v2_/, 'asm_v2_prj_other_')));
+    expect(other.auditEvents.map((x) => x.id)).toEqual(raw.auditEvents.map((x) => x.id.replace(/^aud_v2_/, 'aud_v2_prj_other_')));
+    expect(ProjectExportSchema.safeParse(other).success).toBe(true);
+  });
+});
+
+describe('carryStoredFields (fix round 1, I3)', () => {
+  it('a matching well keeps its name, TD and construction when the newer v2 record has none', async () => {
+    const store = newStore();
+    const project = await store.projects.create({ name: 'Cutover AOR' });
+    const construction = {
+      td: 1463.3,
+      casings: [{ name: 'Surface', od_mm: 219.1, top_m: 0, shoe_m: 186.2 }],
+      plugs: [{ n: 1, kind: 'cement', top_m: 1448, bottom_m: 1463 }],
+      perforations: [],
+      formations: [],
+      packers: [],
+      zones: [],
+      notes: [],
+    };
+    const licence = (V2_WELLS[0] as { licence: string }).licence;
+    const stored = await store.wells.create(project.id, {
+      licence,
+      name: 'NAMED IN V3',
+      td_m: 1234.5,
+      operator: 'v3 operator',
+      construction,
+    });
+    const newer = V2_WELLS.map((w, i) => (i === 0 ? { ...(w as object), updatedAt: '2030-01-01T00:00:00.000Z' } : w));
+    const migrated = migrateV2Into({ wells: newer, project: (await store.projects.get(project.id))!, now: NOW, actor: 'T. Chisti' });
+    expect(migrated.export.wells[0]).toMatchObject({ licence, name: '', td_m: null, construction: null });
+
+    const exp = carryStoredFields(migrated.export, await store.wells.list(project.id));
+    expect(exp.wells[0]).toMatchObject({ name: 'NAMED IN V3', td_m: 1234.5, construction });
+    expect(exp.wells[1]).toEqual(migrated.export.wells[1]); // no stored match: unchanged
+    expect(migrated.export.wells[0]!.name).toBe(''); // the input is not changed
+
+    await store.importProject(exp, 'merge');
+    const after = (await store.wells.get(stored.id))!;
+    // The newer v2 record wins where it has a value (operator); v3-only fields survive.
+    expect(after).toMatchObject({ name: 'NAMED IN V3', td_m: 1234.5, construction, operator: 'Legacy Oil Co.' });
   });
 });

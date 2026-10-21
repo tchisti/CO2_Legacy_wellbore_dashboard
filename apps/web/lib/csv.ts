@@ -115,6 +115,27 @@ export const CSV_FIELD_LABELS: Record<CsvField, string> = {
 
 const CSV_FIELDS = Object.keys(CSV_FIELD_LABELS) as CsvField[];
 
+/** Short parameter names for the import report ("Plug quality 1→5"). */
+export const SCORE_SHORT_LABELS: Record<ParamKey, string> = {
+  plugQuality: 'Plug quality',
+  cement: 'Cement',
+  barriers: 'Barriers',
+  scvf: 'SCVF / GM',
+  age: 'Well age',
+  complexity: 'Complexity',
+  data: 'Data confidence',
+  penetration: 'Penetration',
+  plume: 'Plume / AoR',
+  usdw: 'USDW isolation',
+  access: 'Access',
+};
+
+/**
+ * The score cells a row (or the rows of one licence) gives: a value 1–5, or null for an explicit
+ * unknown ("?", "unknown", "u"). An empty cell or an absent column gives nothing.
+ */
+export type ScoreCells = Partial<Record<ParamKey, Score | null>>;
+
 /* ---------- reading and writing CSV text ---------- */
 
 /**
@@ -261,6 +282,8 @@ export type ReportRow = {
   changes: CsvField[];
   /** How many score values (1–5) the row carries. */
   scored: number;
+  /** The row's own score cells, explicit unknowns included. */
+  scores: ScoreCells;
 };
 
 export type CsvRows = {
@@ -269,8 +292,13 @@ export type CsvRows = {
    * schema defaults the rest); a stored well only the licence and the fields that change.
    */
   inputs: WellInput[];
-  /** The scores of each licence (by licenceKey) whose rows carry at least one score value. */
+  /**
+   * A first assessment's scores for each licence (by licenceKey) whose rows carry at least one
+   * score value 1–5: the cells given, every other parameter null.
+   */
   scoreDrafts: Map<string, Scores>;
+  /** What the rows of each licence (by licenceKey) say about its scores, explicit unknowns included. */
+  scoreCells: Map<string, ScoreCells>;
   report: ReportRow[];
 };
 
@@ -309,7 +337,7 @@ function readEnum<T extends string>(text: string, allowed: readonly T[]): T | nu
 
 type CellRead = {
   fields: Partial<CsvFields>;
-  scores: Partial<Record<ParamKey, Score>>;
+  scores: ScoreCells;
   errors: string[];
   warnings: string[];
 };
@@ -380,14 +408,17 @@ function readCells(row: readonly string[], map: HeaderMap, hasBase: boolean, cur
       const text = unguard((row[i] ?? '').trim()).trim();
       if (!text) continue;
       const v = scoreLabelToValue(text);
+      const before = out.scores[c.score];
       if (v === null) {
         if (!UNKNOWN_SCORE_LABELS.has(text.toLowerCase())) {
           out.warnings.push(`${map.headers[i]} "${text}" not readable; left unscored`);
+        } else if (before === undefined) {
+          out.scores[c.score] = null; // an explicit unknown, unless another column gives a value
         }
         continue;
       }
       // Two columns for one parameter (v1 files): the worse (higher) score counts.
-      out.scores[c.score] = Math.max(out.scores[c.score] ?? 0, v) as Score;
+      out.scores[c.score] = Math.max(before ?? 0, v) as Score;
     }
   }
 
@@ -410,7 +441,8 @@ type Entry = {
   stored: CsvFields | null;
   /** The record as the rows so far leave it. */
   values: Partial<CsvFields>;
-  scores: Partial<Record<ParamKey, Score>>;
+  /** The score cells as the rows so far leave them: a later row's cell (a value or "?") wins. */
+  scores: ScoreCells;
 };
 
 /**
@@ -437,6 +469,7 @@ export function rowsToWellInputs(rows: readonly (readonly string[])[], map: Head
       warnings: [],
       changes: [],
       scored: 0,
+      scores: {},
       ...rest,
     });
     if (!licence) {
@@ -456,7 +489,7 @@ export function rowsToWellInputs(rows: readonly (readonly string[])[], map: Head
     }
 
     const changes = base ? CSV_FIELDS.filter((k) => k in read.fields && read.fields[k] !== base[k]) : [];
-    const scored = Object.keys(read.scores).length;
+    const scored = Object.values(read.scores).filter((v) => v !== null).length;
     const entry: Entry = prior ?? {
       licence,
       firstRow: rowNumber,
@@ -473,20 +506,23 @@ export function rowsToWellInputs(rows: readonly (readonly string[])[], map: Head
         warnings: read.warnings,
         changes,
         scored,
+        scores: read.scores,
       }),
     );
   });
 
   const inputs: WellInput[] = [];
   const scoreDrafts = new Map<string, Scores>();
+  const scoreCells = new Map<string, ScoreCells>();
   for (const [key, e] of entries) {
     const fields = e.stored
       ? Object.fromEntries(CSV_FIELDS.filter((k) => k in e.values && e.values[k] !== e.stored![k]).map((k) => [k, e.values[k]]))
       : e.values;
     inputs.push({ licence: e.licence, ...fields });
-    if (Object.keys(e.scores).length > 0) scoreDrafts.set(key, { ...emptyScores(), ...e.scores });
+    if (Object.keys(e.scores).length > 0) scoreCells.set(key, e.scores);
+    if (Object.values(e.scores).some((v) => v !== null)) scoreDrafts.set(key, { ...emptyScores(), ...e.scores });
   }
-  return { inputs, scoreDrafts, report };
+  return { inputs, scoreDrafts, scoreCells, report };
 }
 
 /* ---------- the template ---------- */

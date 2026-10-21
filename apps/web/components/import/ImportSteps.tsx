@@ -267,7 +267,7 @@ function scoresText(r: PlannedRow): string {
     case 'new':
       return `Draft · ${plural(r.scored, 'score')}`;
     case 'reassessment':
-      return `Re-assessment draft · ${plural(r.scored, 'score')}`;
+      return 'Re-assessment draft';
     case 'kept':
       return 'Not imported';
     case 'same':
@@ -297,6 +297,10 @@ export function ValidationReport({ plan, actor }: { plan: CsvPlan; actor: string
           justifications.{' '}
           {plan.counts.drafts > 0 ? `${plural(plan.counts.drafts, 'draft')} will be saved; finalise each on its well’s page.` : ''}
         </p>
+        <p>
+          For a well with a final assessment the draft starts from that final: only the scores the file gives change
+          (“?” makes one Unknown), and every unchanged score keeps its justification.
+        </p>
         {plan.reviewerColumn ? <p>The Reviewer column is not imported: drafts are recorded under {actor}.</p> : null}
       </Notice>
       <Table aria-label="Validation report" className="text-[13px]">
@@ -322,9 +326,13 @@ export function ValidationReport({ plan, actor }: { plan: CsvPlan; actor: string
                 <div className="grid gap-0.5 text-xs">
                   {r.status === 'error' ? <p className="text-destructive">{capitalised(r.message)}</p> : null}
                   {r.status !== 'error' && r.message ? <p className="text-muted-foreground">{capitalised(r.message)}</p> : null}
-                  {r.status === 'updated' ? (
-                    <p>{r.changes.length > 0 ? `Changes: ${r.changes.map((c) => CSV_FIELD_LABELS[c]).join(', ')}` : 'No changes'}</p>
+                  {r.status === 'updated' && r.changes.length > 0 ? (
+                    <p>Changes: {r.changes.map((c) => CSV_FIELD_LABELS[c]).join(', ')}</p>
                   ) : null}
+                  {r.status === 'updated' && r.changes.length === 0 && r.scoreChanges.length === 0 && r.draft !== 'new' ? (
+                    <p className="text-muted-foreground">No changes</p>
+                  ) : null}
+                  {r.scoreChanges.length > 0 ? <p data-score-changes>Scores: {r.scoreChanges.join(' · ')}</p> : null}
                   {r.warnings.map((w, i) => (
                     <p key={i} className="flex gap-1 text-warn">
                       <TriangleAlertIcon aria-hidden="true" className="mt-0.5 size-3 shrink-0" />

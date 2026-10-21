@@ -282,21 +282,65 @@ test.describe('with the Fort Saskatchewan fixture', () => {
     expect(rows.slice(1).map((r) => r[0])).toEqual(['100/13-06-055-22W4/00', '100/03-17-056-22W4/00']);
   });
 
-  test('re-importing an exported CSV changes nothing and makes no drafts', async ({ page }) => {
+  test('a partial score CSV on a finalised well: the re-assessment draft changes only that score and carries the rest', async ({
+    page,
+  }) => {
+    const dialog = await openImport(page);
+    await pick(dialog, csvFile('plug.csv', [['Well ID / Licence', 'Abandonment & Plug Quality (1-5 or ?)'], [FIRST, '5']]));
+    await dialog.getByRole('button', { name: 'Review rows' }).click();
+    const line = dialog.getByRole('table', { name: 'Validation report' }).locator('tbody tr');
+    await expect(line).toContainText('Re-assessment draft');
+    await expect(line).toContainText('Scores: Plug quality 1→5');
+    await dialog.getByRole('button', { name: 'Import 1 well' }).click();
+    await expect(dialog.getByRole('region', { name: 'Import result' })).toContainText('1 draft saved');
+    await dialog.getByRole('button', { name: 'Done' }).click();
+
+    // Open the draft: plug quality is the file's 5, every other row is the final's score.
+    await page.goto('/wells/view?id=wel_v2_W-4A62O7');
+    await page.getByRole('region', { name: 'Well summary' }).getByRole('link', { name: 'Continue draft', exact: true }).click();
+    const sheet = page.getByRole('dialog', { name: `Score ${FIRST}` });
+    await expect(sheet).toContainText('Continuing the re-assessment draft');
+    const expected = {
+      plugQuality: '5',
+      cement: '1',
+      barriers: '1',
+      scvf: '2',
+      age: '4',
+      complexity: '4',
+      data: '1',
+      penetration: '4',
+      plume: '3',
+      usdw: '1',
+      access: '2',
+    } as const;
+    for (const [key, value] of Object.entries(expected)) {
+      await expect(sheet.locator(`[data-param="${key}"]`).getByRole('radio', { name: value, exact: true })).toHaveAttribute(
+        'aria-checked',
+        'true',
+      );
+    }
+  });
+
+  test('re-importing an exported CSV (plus one new row) changes nothing else and makes no drafts', async ({ page }) => {
     await page.getByRole('button', { name: 'Export' }).click();
     const downloading = page.waitForEvent('download');
     await page.getByRole('menuitem', { name: 'Export CSV (current view)' }).click();
     const download = await downloading;
+    // Five unchanged wells, then a new one: the unchanged matches must not end the write early.
+    const text = `${readFileSync(await download.path(), 'utf8')}\r\n102/16-30-055-21W4/00,New Operator Ltd.`;
 
     const dialog = await openImport(page);
-    await pick(dialog, { name: download.suggestedFilename(), mimeType: 'text/csv', buffer: readFileSync(await download.path()) });
+    await pick(dialog, { name: download.suggestedFilename(), mimeType: 'text/csv', buffer: Buffer.from(text, 'utf8') });
     await expect(dialog.getByText(/Not recognised/)).toContainText('Risk Index');
     await dialog.getByRole('button', { name: 'Review rows' }).click();
-    await expect(dialog.getByText('0 to create · 5 to update · 0 with errors (skipped)')).toBeVisible();
+    await expect(dialog.getByText('1 to create · 5 to update · 0 with errors (skipped)')).toBeVisible();
     await expect(dialog.getByRole('table', { name: 'Validation report' }).getByText('No changes')).toHaveCount(5);
-    await dialog.getByRole('button', { name: 'Import 5 wells' }).click();
-    await expect(dialog.getByRole('region', { name: 'Import result' })).toContainText('0 drafts saved');
+    await dialog.getByRole('button', { name: 'Import 6 wells' }).click();
+    const result = dialog.getByRole('region', { name: 'Import result' });
+    await expect(result).toContainText('1 created, 5 updated');
+    await expect(result).toContainText('0 drafts saved');
     const wells = await storeWells(page, FIXTURE_PROJECT_ID);
+    expect(wells).toHaveLength(6);
     expect(wells.every((w) => w.draft === null)).toBe(true);
   });
 });
@@ -321,6 +365,33 @@ test('import a v2 wells.json array into the active project → wells appear unde
   expect(licences).toEqual(['100/10-14-054-23W4/00', '102/03-22-054-23W4/00']);
   const projects = await page.evaluate(() => window.__lwa!.store.projects.list());
   expect(projects.map((p) => p.name)).toEqual(['V2 Target AOR']);
+});
+
+test('a v2 wells.json keeps the name and TD of a well the project already has, even when the v2 record is newer', async ({
+  page,
+}) => {
+  const projectId = await seedEmptyProject(page, 'Cutover AOR');
+  const licence = '100/10-14-054-23W4/00';
+  await page.evaluate(
+    async ({ pid, lic }) => {
+      await window.__lwa!.store.wells.create(pid, { licence: lic, name: 'NAMED IN V3', td_m: 1234.5, operator: 'v3 operator' });
+    },
+    { pid: projectId, lic: licence },
+  );
+  await page.goto('/wells');
+  const v2 = JSON.parse(readFileSync(V2_WELLS_JSON, 'utf8')) as Record<string, unknown>[];
+  v2[0] = { ...v2[0], updatedAt: '2030-01-01T00:00:00.000Z' };
+  const dialog = await openImport(page);
+  await pick(dialog, { name: 'wells.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(v2)) });
+  await dialog.getByRole('button', { name: 'Import 2 wells' }).click();
+  await expect(dialog.getByRole('region', { name: 'Import result' })).toContainText('1 created, 1 updated');
+
+  const well = await page.evaluate(
+    async ({ pid, lic }) => (await window.__lwa!.store.wells.list(pid)).find((w) => w.licence === lic) ?? null,
+    { pid: projectId, lic: licence },
+  );
+  // The newer v2 record wins where it has a value; what only v3 knows is kept.
+  expect(well).toMatchObject({ name: 'NAMED IN V3', td_m: 1234.5, operator: 'Legacy Oil Co.' });
 });
 
 test('a project file of another project imports as that project, which becomes active', async ({ page }) => {
