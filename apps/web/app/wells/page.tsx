@@ -7,7 +7,6 @@ import { Suspense, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { DownloadIcon, FilterXIcon, PlusIcon, TableIcon, TriangleAlertIcon, UploadIcon } from 'lucide-react';
-import type { Store } from '@/lib/store/store';
 import { EmptyState } from '@/components/shell/EmptyState';
 import { PageBody, PageHeader } from '@/components/shell/PageHeader';
 import { Button } from '@/components/ui/button';
@@ -20,23 +19,11 @@ import { WellTable } from '@/components/wells/WellTable';
 import { plural } from '@/lib/format';
 import { useProjects } from '@/lib/project-context';
 import { newWellHref, wellHref } from '@/lib/routes';
-import { useStoreQuery } from '@/lib/store/provider';
+import { useRegister } from '@/lib/use-register';
 import { useUrlFilters } from '@/lib/use-url-filters';
-import { DEFAULT_SORT, applyFilters, buildRows, nextSort, sortRows, type Sort, type SortKey } from '@/lib/wells-view';
+import { DEFAULT_SORT, applyFilters, nextSort, sortRows, type Sort, type SortKey, type WellRow } from '@/lib/wells-view';
 
-/** The project's wells with each one's current final and draft, and the current methodology. */
-async function loadRegister(s: Store, projectId: string) {
-  const [wells, methodology] = await Promise.all([s.wells.list(projectId), s.methodology.current()]);
-  const pairs = await Promise.all(
-    wells.map(async (w) => [w.id, await s.assessments.current(w.id), await s.assessments.draft(w.id)] as const),
-  );
-  return {
-    wells,
-    methodology,
-    current: new Map(pairs.map(([id, current]) => [id, current])),
-    drafts: new Map(pairs.map(([id, , draft]) => [id, draft])),
-  };
-}
+const NO_ROWS: WellRow[] = [];
 
 /** A toolbar action that is not wired yet: focusable, explained by a tooltip, and inert. */
 function SoonButton({ icon: Icon, label }: { icon: typeof UploadIcon; label: string }) {
@@ -70,12 +57,9 @@ function WellsRegister() {
   const [deleting, setDeleting] = useState<DeletableWell | null>(null);
   const [bulk, setBulk] = useState<DeletableWell[] | null>(null);
 
-  const register = useStoreQuery((s) => (projectId ? loadRegister(s, projectId) : Promise.resolve(null)), [projectId]);
-  const data = register.data ?? null;
-  const rows = useMemo(
-    () => (data ? buildRows(data.wells, data.current, data.drafts, data.methodology.revision) : []),
-    [data],
-  );
+  const register = useRegister(projectId);
+  const data = register.data;
+  const rows = data?.rows ?? NO_ROWS;
   const shown = useMemo(() => sortRows(applyFilters(rows, filters), sort), [rows, filters, sort]);
   const shownSelected = shown.filter((r) => selected.has(r.id));
   const rankLabels = useMemo(() => data?.methodology.matrix.bands.map((b) => b.label) ?? [], [data]);
