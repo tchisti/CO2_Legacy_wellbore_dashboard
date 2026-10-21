@@ -15,7 +15,7 @@ export default defineConfig({
       include: [MIGRATE, 'migrate-v2.ts', 'build-enbridge-site.ts'],
       reporter: [['text', { skipFull: true }], 'text-summary'],
       thresholds: {
-        [MIGRATE]: { branches: 95 },
+        [MIGRATE]: { branches: 100 },
       },
     },
   },

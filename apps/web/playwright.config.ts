@@ -43,7 +43,9 @@ export default defineConfig({
         command: `serve out --listen ${PORT} --config ../serve.json --no-clipboard --no-port-switching`,
         url: BASE_URL,
         env: { NO_UPDATE_CHECK: '1' },
-        reuseExistingServer: !CI,
+        // Never reuse: a dev server already on the port must not be tested in place of the export
+        // (with it running, the static server cannot start and the run stops).
+        reuseExistingServer: false,
         timeout: 30_000,
       }
     : {

@@ -34,6 +34,8 @@ jobs:
       # Unit tests with coverage; each package fails below its gate (vitest.config.*).
       - run: pnpm test
       - run: pnpm --filter web build
+      # The deployable export must not carry the e2e hooks (window.__lwa exposes the whole store).
+      - run: pnpm --filter web check:no-e2e-hooks
 
   e2e:
     needs: verify

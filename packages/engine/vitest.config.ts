@@ -19,9 +19,10 @@ export default defineConfig({
           functions: 100,
           perFile: true,
         },
-        // The parser keeps `?? ''` fallbacks on regex groups that always match (noUncheckedIndexedAccess)
-        // and a never-throw catch; those branches cannot run (see the Task 18a report).
-        'src/wellbore/**': { branches: 90 },
+        // At the achieved level (96.1 %): the 19 branches left are `?? ''` fallbacks on regex groups
+        // that always match (noUncheckedIndexedAccess), esc()'s null branch and the report parser's
+        // never-throw catch, none of which can run (listed in the Task 18a report / CHANGELOG).
+        'src/wellbore/**': { branches: 96 },
       },
     },
   },
