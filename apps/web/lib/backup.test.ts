@@ -6,8 +6,11 @@ import {
   describeExport,
   downloadExport,
   exportFileName,
+  exportFacts,
   exportProjectId,
+  importProjectFile,
   importSummary,
+  importedDescription,
   projectSlug,
   readExportFile,
   replaceDeletions,
@@ -266,5 +269,36 @@ describe('replacePreviewText', () => {
     [{ wells: 2, assessments: 3, finals: 2 }, '2 wells and 3 assessments (including 2 final assessments) will be deleted.'],
   ])('%j → %s', (counts, text) => {
     expect(replacePreviewText(counts)).toBe(text);
+  });
+});
+
+describe('importProjectFile', () => {
+  it('imports the file, summarises it, and names its project when that is not the active one', async () => {
+    const store = createLocalStore({ dbName: 'lwa-backup-import-file-test', actor: () => 'T. Chisti' });
+    const active = await store.projects.create({ name: 'Active AOR' });
+
+    const first = await importProjectFile(store, JSON.parse(FIXTURE), 'merge', active.id);
+    expect(first.wells).toBe('5 created, 0 updated');
+    expect(first.switchTo).toEqual({
+      id: 'prj_v2_fort-saskatchewan-wabamun-hub-aor',
+      name: 'Fort Saskatchewan / Wabamun Hub AOR',
+    });
+
+    const again = await importProjectFile(store, JSON.parse(FIXTURE), 'merge', 'prj_v2_fort-saskatchewan-wabamun-hub-aor');
+    expect(again.switchTo).toBeNull();
+    expect(importedDescription(again)).toBe('Wells: 0 created, 5 updated. 0 assessments and 0 history events added.');
+  });
+});
+
+describe('exportFacts', () => {
+  it('says what a file holds, leaving out what it lacks', () => {
+    expect(exportFacts(describeExport(JSON.parse(FIXTURE)))).toEqual([
+      'Fort Saskatchewan / Wabamun Hub AOR',
+      '5 wells',
+      '5 assessments',
+      '5 history events',
+      expect.stringMatching(/^exported \d{4}-\d{2}-\d{2} by .+$/),
+    ]);
+    expect(exportFacts(describeExport({ format: 'lwa-project', wells: [] }))).toEqual(['0 wells']);
   });
 });

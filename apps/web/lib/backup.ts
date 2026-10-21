@@ -3,7 +3,7 @@
 // kind of file" into a plain sentence before the store sees it. The store does the full validation
 // (Store.importProject throws ImportError listing every problem and writes nothing).
 import type { Assessment, ProjectExport, Well } from '@lwa/engine';
-import { plural } from '@/lib/format';
+import { fmtDate, plural } from '@/lib/format';
 import { licenceKey, type ImportMode, type ImportResult, type Store } from '@/lib/store/store';
 
 const FORMAT = 'lwa-project';
@@ -37,7 +37,8 @@ export function exportFileName(projectName: string, exportedAt: string): string 
 /** Hands a file to the user. The default saves it through a download link. */
 export type SaveFile = (blob: Blob, filename: string) => void;
 
-const saveWithLink: SaveFile = (blob, filename) => {
+/** Saves a file through a temporary download link. */
+export const saveWithLink: SaveFile = (blob, filename) => {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -70,19 +71,27 @@ export async function downloadExport(
  * message starting "Not a Legacy Well Assessment export" when the JSON is some other document.
  */
 export async function readExportFile(file: File): Promise<unknown> {
-  const text = (await file.text()).replace(/^﻿/, '');
-  let data: unknown;
-  try {
-    data = JSON.parse(text);
-  } catch {
-    throw new Error('This file is not valid JSON.');
-  }
-  if (!isRecord(data) || data.format !== FORMAT) {
+  const data = parseJsonText(await file.text());
+  if (!isProjectFile(data)) {
     throw new Error(
       'Not a Legacy Well Assessment export. Choose a project file exported from this app or made by the v2 migration.',
     );
   }
   return data;
+}
+
+/** A file's text as JSON (a leading byte-order mark is ignored); throws "This file is not valid JSON." */
+export function parseJsonText(text: string): unknown {
+  try {
+    return JSON.parse(text.replace(/^\uFEFF/, '')) as unknown;
+  } catch {
+    throw new Error('This file is not valid JSON.');
+  }
+}
+
+/** Whether parsed JSON says it is a project export (the store validates the rest). */
+export function isProjectFile(data: unknown): boolean {
+  return isRecord(data) && data.format === FORMAT;
 }
 
 /** The project id an export carries, or null when the value has none. */
@@ -125,6 +134,17 @@ export function describeExport(data: unknown): ExportSummary {
     licences: wells.flatMap((w) => (isRecord(w) && typeof w.licence === 'string' ? [w.licence] : [])),
     assessmentIds: assessments.flatMap((a) => (isRecord(a) && typeof a.id === 'string' ? [a.id] : [])),
   };
+}
+
+/** A file's summary as short facts: project, counts, when and by whom it was exported (what it lacks is left out). */
+export function exportFacts(summary: ExportSummary): string[] {
+  return [
+    summary.projectName,
+    summary.wells === null ? null : plural(summary.wells, 'well'),
+    summary.assessments === null ? null : plural(summary.assessments, 'assessment'),
+    summary.auditEvents === null ? null : plural(summary.auditEvents, 'history event'),
+    summary.exportedAt ? `exported ${fmtDate(summary.exportedAt)}${summary.exportedBy ? ` by ${summary.exportedBy}` : ''}` : null,
+  ].filter((f): f is string => f !== null && f !== '');
 }
 
 /** What a replace import would delete: wells, assessments, and how many of those are finals. */
@@ -178,4 +198,35 @@ export function importSummary(result: ImportResult, mode: ImportMode): { wells: 
     wells: `${created} created, ${updated} updated${replace ? `, ${result.removed.wells} deleted` : ''}`,
     added: replace ? `${added}, ${plural(result.removed.assessments, 'assessment')} deleted` : added,
   };
+}
+
+/** A project file imported, as Project settings and the Wells page's Import report it. */
+export type ImportedProjectFile = {
+  result: ImportResult;
+  /** importSummary's two lines. */
+  wells: string;
+  added: string;
+  /** The file's project when it is not the active one: the caller makes it the active project. */
+  switchTo: { id: string; name: string } | null;
+};
+
+/**
+ * Imports a project file's data (Store.importProject: all or nothing, ImportError listing every
+ * problem) and says what happened, including whether it was another project than the active one.
+ */
+export async function importProjectFile(
+  store: Pick<Store, 'importProject'>,
+  data: unknown,
+  mode: ImportMode,
+  activeProjectId: string,
+): Promise<ImportedProjectFile> {
+  const result = await store.importProject(data, mode);
+  const { projectId, projectName } = describeExport(data);
+  const switchTo = projectId && projectId !== activeProjectId ? { id: projectId, name: projectName ?? projectId } : null;
+  return { result, ...importSummary(result, mode), switchTo };
+}
+
+/** The toast text of an import: "Wells: 0 created, 5 updated. 0 assessments and 0 history events added." plus warnings. */
+export function importedDescription(imported: Pick<ImportedProjectFile, 'wells' | 'added' | 'result'>): string {
+  return [`Wells: ${imported.wells}.`, `${imported.added}.`, ...imported.result.warnings].join(' ');
 }

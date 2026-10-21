@@ -12,23 +12,25 @@
 // every problem is listed. A file of another project is imported as that project, which then
 // becomes the active one.
 import { useId, useRef, useState, type ChangeEvent } from 'react';
-import { DownloadIcon, FileJsonIcon, InfoIcon, UploadIcon, XIcon } from 'lucide-react';
+import { DownloadIcon, FileJsonIcon, InfoIcon, UploadIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Project } from '@lwa/engine';
 import { ImportProblems, NOT_IMPORTED } from '@/components/projects/ImportProblems';
+import { ImportResultView } from '@/components/projects/ImportResultView';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
   describeExport,
   downloadExport,
-  importSummary,
+  exportFacts,
+  importProjectFile,
+  importedDescription,
   readExportFile,
   replaceDeletions,
   replacePreviewText,
   type ExportSummary,
 } from '@/lib/backup';
-import { fmtDate, plural } from '@/lib/format';
 import { useProjectId, useProjects } from '@/lib/project-context';
 import { toError, useStore, useStoreQuery } from '@/lib/store/provider';
 import { ImportError, type ImportMode } from '@/lib/store/store';
@@ -90,22 +92,18 @@ export function BackupPanel({ project }: { project: Project }) {
   async function runImport(file: Picked, mode: ImportMode) {
     setBusy('importing');
     try {
-      const result = await store.importProject(file.data, mode);
-      const lines = importSummary(result, mode);
-      const fileProjectId = file.summary.projectId;
-      const switchTo = fileProjectId && fileProjectId !== project.id ? fileProjectId : null;
-      toast.success('Project imported', {
-        description: [`Wells: ${lines.wells}.`, `${lines.added}.`, ...result.warnings].join(' '),
-      });
+      const imported = await importProjectFile(store, file.data, mode, project.id);
+      toast.success('Project imported', { description: importedDescription(imported) });
       setPicked(null);
       setOutcome({
         kind: 'imported',
         fileName: file.fileName,
-        ...lines,
-        warnings: result.warnings,
-        switchedTo: switchTo ? (file.summary.projectName ?? switchTo) : null,
+        wells: imported.wells,
+        added: imported.added,
+        warnings: imported.result.warnings,
+        switchedTo: imported.switchTo?.name ?? null,
       });
-      if (switchTo) setProjectId(switchTo);
+      if (imported.switchTo) setProjectId(imported.switchTo.id);
     } catch (err) {
       setPicked(null);
       setOutcome(
@@ -187,7 +185,16 @@ export function BackupPanel({ project }: { project: Project }) {
           />
         ) : null}
         {outcome?.kind === 'failed' ? <ImportProblems message={outcome.message} problems={outcome.problems} /> : null}
-        {outcome?.kind === 'imported' ? <ImportResultView outcome={outcome} onDismiss={() => setOutcome(null)} /> : null}
+        {outcome?.kind === 'imported' ? (
+          <ImportResultView
+            fileName={outcome.fileName}
+            wells={outcome.wells}
+            added={outcome.added}
+            warnings={outcome.warnings}
+            switchedTo={outcome.switchedTo}
+            onDismiss={() => setOutcome(null)}
+          />
+        ) : null}
       </div>
     </div>
   );
@@ -233,13 +240,7 @@ function ImportReview({
   // Replace is enabled only once its preview is shown and the name is typed exactly.
   const confirmed = mode === 'merge' || (deletions !== null && confirmName !== '' && typed === confirmName);
 
-  const facts = [
-    summary.projectName,
-    summary.wells === null ? null : plural(summary.wells, 'well'),
-    summary.assessments === null ? null : plural(summary.assessments, 'assessment'),
-    summary.auditEvents === null ? null : plural(summary.auditEvents, 'history event'),
-    summary.exportedAt ? `exported ${fmtDate(summary.exportedAt)}${summary.exportedBy ? ` by ${summary.exportedBy}` : ''}` : null,
-  ].filter((f): f is string => f !== null && f !== '');
+  const facts = exportFacts(summary);
 
   function choose(next: ImportMode) {
     setMode(next);
@@ -351,39 +352,5 @@ function ImportReview({
         </Button>
       </div>
     </div>
-  );
-}
-
-function ImportResultView({
-  outcome,
-  onDismiss,
-}: {
-  outcome: Extract<Outcome, { kind: 'imported' }>;
-  onDismiss: () => void;
-}) {
-  return (
-    <section aria-label="Import result" className="grid gap-1 rounded-md border bg-subtle px-3 py-2.5 text-[13px]">
-      <div className="flex items-start justify-between gap-3">
-        <p className="min-w-0 font-medium">
-          Imported <span className="num break-all">{outcome.fileName}</span>
-        </p>
-        <Button variant="ghost" size="icon-xs" aria-label="Dismiss the import result" onClick={onDismiss} className="-mt-0.5 -mr-1">
-          <XIcon aria-hidden="true" />
-        </Button>
-      </div>
-      <p>
-        <span className="text-muted-foreground">Wells: </span>
-        {outcome.wells}
-      </p>
-      <p>{outcome.added}</p>
-      {outcome.warnings.length > 0 ? (
-        <ul className="mt-1 grid list-disc gap-0.5 pl-4 text-xs text-muted-foreground">
-          {outcome.warnings.map((w, i) => (
-            <li key={i}>{w}</li>
-          ))}
-        </ul>
-      ) : null}
-      {outcome.switchedTo ? <p className="text-xs text-muted-foreground">{outcome.switchedTo} is now the active project.</p> : null}
-    </section>
   );
 }

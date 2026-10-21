@@ -2,18 +2,22 @@
 
 // The Wells register (spec §4.2): every well of the active project with its current rank and
 // assessment state, filtered by chips whose state lives in the URL (so a filtered view can be
-// linked, reloaded and printed), sorted riskiest first, with record edits and guarded deletes.
+// linked, reloaded and printed), sorted riskiest first, with record edits and guarded deletes,
+// Import (CSV or JSON, with a validation report before anything is written) and Export (CSV of the
+// current view or of the selection).
 import { Suspense, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { DownloadIcon, FilterXIcon, PlusIcon, TableIcon, TriangleAlertIcon, UploadIcon } from 'lucide-react';
+import { FilterXIcon, PlusIcon, TableIcon, TriangleAlertIcon, UploadIcon } from 'lucide-react';
+import type { Assessment, Well } from '@lwa/engine';
+import { ImportDialog } from '@/components/import/ImportDialog';
 import { EmptyState } from '@/components/shell/EmptyState';
 import { PageBody, PageHeader } from '@/components/shell/PageHeader';
 import { Button } from '@/components/ui/button';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { BulkDeleteDialog } from '@/components/wells/BulkDeleteDialog';
 import { DeleteWellDialog, type DeletableWell } from '@/components/wells/DeleteWellDialog';
 import { EditWellDialog } from '@/components/wells/EditWellDialog';
+import { ExportMenu } from '@/components/wells/ExportMenu';
 import { WellFilters } from '@/components/wells/WellFilters';
 import { WellTable } from '@/components/wells/WellTable';
 import { plural } from '@/lib/format';
@@ -24,26 +28,8 @@ import { useUrlFilters } from '@/lib/use-url-filters';
 import { DEFAULT_SORT, applyFilters, nextSort, sortRows, type Sort, type SortKey, type WellRow } from '@/lib/wells-view';
 
 const NO_ROWS: WellRow[] = [];
-
-/** A toolbar action that is not wired yet: focusable, explained by a tooltip, and inert. */
-function SoonButton({ icon: Icon, label }: { icon: typeof UploadIcon; label: string }) {
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <Button
-          variant="outline"
-          aria-disabled="true"
-          onClick={(e) => e.preventDefault()}
-          className="cursor-not-allowed opacity-50"
-        >
-          <Icon aria-hidden="true" />
-          {label}
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent>Not available</TooltipContent>
-    </Tooltip>
-  );
-}
+const NO_WELLS: Well[] = [];
+const NO_FINALS: ReadonlyMap<string, Assessment | null> = new Map();
 
 function WellsRegister() {
   const router = useRouter();
@@ -56,6 +42,7 @@ function WellsRegister() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<DeletableWell | null>(null);
   const [bulk, setBulk] = useState<DeletableWell[] | null>(null);
+  const [importing, setImporting] = useState(false);
 
   const register = useRegister(projectId);
   const data = register.data;
@@ -79,14 +66,23 @@ function WellsRegister() {
       context={activeProject?.name}
       actions={
         <>
-          <SoonButton icon={UploadIcon} label="Import" />
-          <SoonButton icon={DownloadIcon} label="Export" />
+          <Button variant="outline" onClick={() => setImporting(true)} disabled={!activeProject}>
+            <UploadIcon aria-hidden="true" />
+            Import
+          </Button>
+          <ExportMenu
+            view={shown}
+            selected={shownSelected}
+            wells={data?.wells ?? NO_WELLS}
+            current={data?.current ?? NO_FINALS}
+          />
           <Button asChild>
             <Link href={newWellHref()}>
               <PlusIcon aria-hidden="true" />
               New well
             </Link>
           </Button>
+          {activeProject ? <ImportDialog open={importing} onOpenChange={setImporting} project={activeProject} /> : null}
         </>
       }
     />

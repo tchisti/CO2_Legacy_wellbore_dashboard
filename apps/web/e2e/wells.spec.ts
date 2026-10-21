@@ -274,17 +274,19 @@ test.describe('with the Fort Saskatchewan fixture', () => {
     expect(saved).toEqual({ lat: 53.79, lon: -113.21, name: 'NO COORDS 16-30 (re-entered)' });
   });
 
-  test('Import and Export are shown but not available yet', async ({ page }) => {
-    for (const name of ['Import', 'Export']) {
-      const button = page.getByRole('button', { name });
-      await expect(button).toBeDisabled();
-      await button.focus(); // still reachable from the keyboard, and it says why it does nothing
-      await expect(button).toHaveAccessibleDescription('Not available');
-      await page.keyboard.press('Enter');
-      await expect(page).toHaveURL(/\/wells$/);
-      await expect(page.getByRole('dialog')).toHaveCount(0);
-      await page.keyboard.press('Escape');
-    }
+  test('Import opens the import dialog and Export opens its menu, from the keyboard', async ({ page }) => {
+    await page.getByRole('button', { name: 'Import', exact: true }).focus();
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('dialog', { name: 'Import wells' })).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'Export' }).focus();
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('menuitem', { name: 'Export CSV (current view)' })).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('menu')).toHaveCount(0);
+    await expect(page).toHaveURL(/\/wells$/);
   });
 });
 
