@@ -2,9 +2,10 @@
 
 // The register table (spec §4.2, §7): 13 px text on 32 px rows, licences and numbers in mono with
 // tabular figures, rank as the RankBadge (the only place rank colours appear), the assessment state
-// as a state badge (neutral; amber for a stale revision). Every row is focusable: Enter or a click opens the well, ↑/↓ move between rows;
-// the checkbox and the actions menu do not open it. The licence is a real link to the well, so it can
-// be opened in a new tab; it stays out of the tab order (the row is the keyboard stop). Rows arrive filtered and sorted (lib/wells-view);
+// as a state badge (neutral; amber for a stale revision). Every row is focusable: Enter or a click
+// opens the well, ↑/↓ move between rows; the checkbox and the actions menu do not open it. The
+// licence is a real link to the well, so it can be opened in a new tab; it stays out of the tab
+// order (the row is the keyboard stop). Rows arrive filtered and sorted (lib/wells-view);
 // clicking a sortable header asks for a new sort. Columns are TanStack Table definitions; the
 // selection, sort and row actions reach the cells through context so the definitions stay static.
 import { createContext, useContext, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react';
