@@ -19,6 +19,7 @@ import {
   type ProjectExport,
   type Well,
 } from '@lwa/engine';
+import { fmtDateTime } from '../format';
 import { ImportError, licenceKey, type ImportMode, type ImportResult } from './store';
 
 /* ---------- JSON helpers, shared with local-store.ts ---------- */
@@ -133,6 +134,18 @@ const atOrAfter = (a: string, b: string): boolean => Date.parse(a) >= Date.parse
 const after = (a: string, b: string): boolean => Date.parse(a) > Date.parse(b);
 
 /**
+ * The audit event that wrote a stored well as it is now: the store stamps a well's create or
+ * update event with the well's new updatedAt (an import brings the other browser's events along,
+ * re-pointed to the stored id). Undefined when the stored copy has no such event (a file without
+ * history wrote it).
+ */
+async function eventThatWrote(db: ImportTables, well: Well): Promise<AuditEvent | undefined> {
+  const at = Date.parse(well.updatedAt);
+  const events = await db.auditEvents.where('entityId').equals(well.id).toArray();
+  return events.find((e) => e.entity === 'well' && e.action !== 'delete' && Date.parse(e.at) === at);
+}
+
+/**
  * Writes a validated file into the store. Must run inside one read-write transaction over the
  * five tables (the caller's), so a failure part-way leaves the store as it was.
  */
@@ -174,14 +187,35 @@ export async function applyImport(db: ImportTables, file: ProjectExport, mode: I
 
   const wellIdMap = new Map<string, string>(); // file well id → store well id
   const licenceOf = new Map<string, string>(); // store well id → licence, for warnings
+  const fileEventIds = new Set(file.auditEvents.map((e) => e.id));
   for (const incoming of file.wells) {
     const match = storedByKey.get(licenceKey(incoming.licence));
     if (match) {
       result.wells.updated += 1;
       wellIdMap.set(incoming.id, match.id);
       licenceOf.set(match.id, match.licence);
-      if (replace || atOrAfter(incoming.updatedAt, match.updatedAt)) {
+      if (replace) {
         await db.wells.put(asStored(WellSchema, { ...incoming, id: match.id, projectId: pid }));
+      } else if (atOrAfter(incoming.updatedAt, match.updatedAt)) {
+        // Merge is newest-wins for the whole record, but the well was created here: its creation
+        // stamps stay. When the stored copy holds a change the file does not have (the edit that
+        // wrote it is not in the file's history, or it was made after the export), say it was lost.
+        const merged = asStored(WellSchema, {
+          ...incoming,
+          id: match.id,
+          projectId: pid,
+          createdAt: match.createdAt,
+          createdBy: match.createdBy,
+        });
+        if (!jsonEqual(merged, match)) {
+          const wrote = await eventThatWrote(db, match);
+          if ((wrote !== undefined && !fileEventIds.has(wrote.id)) || after(match.updatedAt, file.exportedAt)) {
+            result.warnings.push(
+              `Well ${match.licence} was edited here on ${fmtDateTime(match.updatedAt)} and in the file on ${fmtDateTime(incoming.updatedAt)}; the file's copy replaced it${wrote ? ' (History keeps the earlier record)' : ''}.`,
+            );
+          }
+          await db.wells.put(merged);
+        }
       }
     } else {
       const idTaken = (await db.wells.get(incoming.id)) !== undefined;
@@ -195,12 +229,22 @@ export async function applyImport(db: ImportTables, file: ProjectExport, mode: I
 
   // Assessments: added when new. A stored draft with the same id may be overtaken (finalised or
   // edited in the other browser); finals never change. Finals go first so that a draft finalised
-  // elsewhere frees its well for an incoming draft.
+  // elsewhere frees its well for an incoming draft. An id that belongs to another well here is
+  // never taken over: that would move the other well's assessment (and could give one well two
+  // drafts).
   const ordered = [...file.assessments].sort((a, b) => Number(a.status === 'draft') - Number(b.status === 'draft'));
   for (const incoming of ordered) {
     const wellId = wellIdMap.get(incoming.wellId) ?? incoming.wellId;
     const record = asStored(AssessmentSchema, { ...incoming, wellId });
     const stored = await db.assessments.get(incoming.id);
+    if (stored && stored.wellId !== wellId) {
+      const other = await db.wells.get(stored.wellId);
+      result.assessments.skipped += 1;
+      result.warnings.push(
+        `Assessment ${incoming.id} for well ${licenceOf.get(wellId) ?? wellId} was not imported: this browser already has an assessment with that id for well ${other?.licence ?? stored.wellId}.`,
+      );
+      continue;
+    }
     if (stored) {
       const overtakes =
         stored.status === 'draft' &&

@@ -107,6 +107,11 @@ async function dump(s: Store, projectId: string) {
   };
 }
 
+/** A timestamp as import warnings print it: "2026-01-01 00:00 UTC". */
+function utcMinute(iso: string): string {
+  return `${iso.slice(0, 10)} ${iso.slice(11, 16)} UTC`;
+}
+
 async function rejection(p: Promise<unknown>): Promise<unknown> {
   return p.then(
     () => {
@@ -777,6 +782,113 @@ export function runStoreContract(makeStore: StoreFactory): void {
       await b.importProject(clone(await a.exportProject(p.id)), 'merge');
       expect(await b.wells.get(w.id)).toEqual(newer);
     });
+
+    it('importProject merge warns when the file\'s copy of a well replaces a local edit the file does not have; History keeps the replaced record', async () => {
+      const a = open();
+      const p = await newProject(a);
+      const w = await a.wells.create(p.id, { licence: LICENCE, name: 'Original' });
+      const b = open();
+      await b.importProject(clone(await a.exportProject(p.id)), 'merge');
+
+      // The file's copy descends from the stored one: it replaces it without a warning.
+      const fromA1 = await a.wells.update(w.id, { name: 'Edited in A' });
+      const quiet = await b.importProject(clone(await a.exportProject(p.id)), 'merge');
+      expect(quiet.warnings).toEqual([]);
+      expect(await b.wells.get(w.id)).toEqual(fromA1);
+
+      // Both browsers edit; A's edit is the newer, so A's copy wins and B's edit is lost: say so.
+      const local = await b.wells.update(w.id, { operator: 'Edited in B' });
+      const fromA2 = await a.wells.update(w.id, { name: 'Edited in A again' });
+      const result = await b.importProject(clone(await a.exportProject(p.id)), 'merge');
+      expect(result.wells).toEqual({ created: 0, updated: 1 });
+      expect(await b.wells.get(w.id)).toEqual(fromA2);
+      expect(result.warnings).toEqual([
+        `Well ${LICENCE} was edited here on ${utcMinute(local.updatedAt)} and in the file on ${utcMinute(fromA2.updatedAt)}; the file's copy replaced it (History keeps the earlier record).`,
+      ]);
+      // ... and History does keep it: B's update event holds the record the import replaced.
+      const edit = (await b.audit.list({ entityId: w.id })).find((e) => e.action === 'update' && e.at === local.updatedAt);
+      expect(edit?.diff.after).toEqual(local);
+    });
+
+    it('importProject merge keeps the stored createdAt and createdBy when the file\'s copy of a licence match wins', async () => {
+      actorName = 'A. Author';
+      const a = open();
+      const p = await newProject(a);
+      const aWell = await a.wells.create(p.id, { licence: LICENCE, name: 'From A' });
+      const b = open();
+      await b.importProject({ ...clone(await a.exportProject(p.id)), wells: [], assessments: [], auditEvents: [] }, 'merge');
+      actorName = 'B. Reviewer';
+      const bWell = await b.wells.create(p.id, { licence: LICENCE_VARIANT, name: 'Typed in B' });
+      actorName = 'A. Author';
+      const fromA = await a.wells.update(aWell.id, { operator: 'Operator from A' });
+
+      const result = await b.importProject(clone(await a.exportProject(p.id)), 'merge');
+      expect(result.wells).toEqual({ created: 0, updated: 1 });
+      const stored = await b.wells.get(bWell.id);
+      expect(stored).toEqual({ ...fromA, id: bWell.id, createdAt: bWell.createdAt, createdBy: 'B. Reviewer' });
+      // B's own record was replaced by A's copy, which never saw it.
+      expect(result.warnings).toHaveLength(1);
+      expect(result.warnings[0]).toContain(`Well ${bWell.licence} was edited here on ${utcMinute(bWell.updatedAt)}`);
+    });
+
+    it('importProject merge warns, without pointing to History, when a stored copy with no history here changed after the file was exported', async () => {
+      const a = open();
+      const p = await newProject(a);
+      await a.wells.create(p.id, { licence: LICENCE, name: 'Original' });
+      const file = clone(await a.exportProject(p.id));
+      const later = (iso: string): string => new Date(Date.parse(iso) + 60_000).toISOString();
+
+      // A copy written by a file without history, stamped after `file` was exported (another browser's clock).
+      const b = open();
+      const other = { ...file.wells[0]!, name: 'Other copy', updatedAt: later(file.exportedAt) };
+      await b.importProject({ ...clone(file), wells: [other], auditEvents: [] }, 'merge');
+      // A file whose copy is newer still.
+      const skewed = clone(file);
+      skewed.wells[0] = { ...skewed.wells[0]!, name: 'Skewed copy', updatedAt: later(other.updatedAt) };
+
+      const result = await b.importProject(skewed, 'merge');
+      expect((await b.wells.get(other.id))?.name).toBe('Skewed copy');
+      expect(result.warnings).toEqual([
+        `Well ${LICENCE} was edited here on ${utcMinute(other.updatedAt)} and in the file on ${utcMinute(skewed.wells[0]!.updatedAt)}; the file's copy replaced it.`,
+      ]);
+    });
+
+    it.each(['merge', 'replace'] as const)(
+      'importProject %s: an incoming assessment whose id belongs to another well is skipped with a warning; that well keeps its draft, and no well gets two drafts',
+      async (mode) => {
+        const a = open();
+        const p = await newProject(a);
+        const w1 = await a.wells.create(p.id, { licence: LICENCE });
+        const d1 = await a.assessments.saveDraft(w1.id, draftInput({ ...emptyScores(), age: 1 }, { age: 'Spudded 2012' }));
+        const q = await newProject(a, 'Second AOR');
+        const w2 = await a.wells.create(q.id, { licence: LICENCE_2 });
+        const d2 = await a.assessments.saveDraft(w2.id, draftInput(emptyScores()));
+        const b = open();
+        await b.importProject(clone(await a.exportProject(p.id)), 'merge');
+        await b.importProject(clone(await a.exportProject(q.id)), 'merge');
+
+        // A file of the second project whose (newer) draft for w2 carries d1's id: two projects seeded
+        // from the same v2 register share ids, and a hand-edited file can do the same.
+        const file = clone(await a.exportProject(q.id));
+        file.assessments = file.assessments.map((x) => (x.id === d2.id ? { ...x, id: d1.id } : x));
+        expect(Date.parse(file.assessments[0]!.updatedAt)).toBeGreaterThan(Date.parse(d1.updatedAt));
+
+        const result = await b.importProject(file, mode);
+        expect(result.assessments).toEqual({ added: 0, skipped: 1 });
+        expect(result.warnings).toHaveLength(1);
+        expect(result.warnings[0]).toContain(d1.id);
+        expect(result.warnings[0]).toContain(LICENCE_2);
+        expect(result.warnings[0]).toContain(LICENCE);
+        // w1's draft is where it was, unchanged.
+        expect(await b.assessments.draft(w1.id)).toEqual(d1);
+        expect(await b.assessments.listForWell(w1.id)).toEqual([d1]);
+        // At most one draft per well.
+        for (const well of [w1, w2]) {
+          const drafts = (await b.assessments.listForWell(well.id)).filter((x) => x.status === 'draft');
+          expect(drafts.length).toBeLessThanOrEqual(1);
+        }
+      },
+    );
 
     it('importProject replace: removes wells not in the file', async () => {
       const a = open();
