@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "vitest run --passWithNoTests",
+    "test": "vitest run --coverage --passWithNoTests",
     "typecheck": "next typegen && tsc --noEmit",
     "e2e": "playwright test"
   },

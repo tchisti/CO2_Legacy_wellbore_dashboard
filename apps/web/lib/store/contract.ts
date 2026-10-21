@@ -22,6 +22,7 @@ import {
   DuplicateLicenceError,
   FinaliseError,
   ImportError,
+  NotFoundError,
   licenceKey,
   type DraftInput,
   type Store,
@@ -199,6 +200,14 @@ export function runStoreContract(makeStore: StoreFactory): void {
       expect(await s.projects.get(p.id)).toEqual(u);
     });
 
+    it('projects.update that changes nothing returns the stored project and writes nothing', async () => {
+      const s = open();
+      const p = await newProject(s);
+      expect(await s.projects.update(p.id, { name: p.name, description: undefined })).toEqual(p);
+      expect(await s.projects.get(p.id)).toEqual(p);
+      expect((await s.audit.list({ entityId: p.id })).map((e) => e.action)).toEqual(['create']);
+    });
+
     it('projects.remove deletes the project, its wells, assessments and audit events, then writes one "delete" event', async () => {
       const s = open();
       const p = await newProject(s);
@@ -280,6 +289,39 @@ export function runStoreContract(makeStore: StoreFactory): void {
       await expect(s.wells.update(w.id, { lat: 123 })).rejects.toThrow();
       expect(await s.wells.get(w.id)).toEqual(u);
       expect(await s.audit.list({ entityId: w.id })).toHaveLength(2);
+    });
+
+    it('wells.update that changes nothing returns the stored well and writes no audit event', async () => {
+      const s = open();
+      const p = await newProject(s);
+      const w = await s.wells.create(p.id, { licence: LICENCE, name: 'MANNING 13-6' });
+      expect(await s.wells.update(w.id, { name: 'MANNING 13-6', notes: undefined })).toEqual(w);
+      expect((await s.audit.list({ entityId: w.id })).map((e) => e.action)).toEqual(['create']);
+    });
+
+    it('a write to a project, well or assessment the store does not have rejects with NotFoundError and writes nothing', async () => {
+      const s = open();
+      const p = await newProject(s);
+      const before = await s.audit.list({});
+      const missing: [string, () => Promise<unknown>][] = [
+        ['projects.update', () => s.projects.update('prj_missing', { name: 'X' })],
+        ['projects.remove', () => s.projects.remove('prj_missing')],
+        ['wells.create', () => s.wells.create('prj_missing', { licence: LICENCE })],
+        ['wells.upsertByLicence', () => s.wells.upsertByLicence('prj_missing', [{ licence: LICENCE }])],
+        ['wells.update', () => s.wells.update('wel_missing', { name: 'X' })],
+        ['wells.remove', () => s.wells.remove('wel_missing')],
+        ['assessments.saveDraft', () => s.assessments.saveDraft('wel_missing', draftInput(emptyScores()))],
+        ['assessments.finalise', () => s.assessments.finalise('asm_missing')],
+        ['assessments.discardDraft', () => s.assessments.discardDraft('asm_missing')],
+        ['exportProject', () => s.exportProject('prj_missing')],
+      ];
+      for (const [name, call] of missing) {
+        const err = await rejection(call());
+        expect(err, name).toBeInstanceOf(NotFoundError);
+        expect((err as Error).message, name).toMatch(/^No (project|well|assessment) with id (prj|wel|asm)_missing$/);
+      }
+      expect(await s.audit.list({})).toEqual(before);
+      expect(await s.wells.list(p.id)).toEqual([]);
     });
 
     it('wells.create rejects a duplicate licence (case and spaces ignored) with DuplicateLicenceError', async () => {
@@ -839,6 +881,61 @@ export function runStoreContract(makeStore: StoreFactory): void {
       expect(latErr).toBeInstanceOf(ImportError);
       expect((latErr as ImportError).problems.join('\n')).toMatch(/wells\.0\.lat/);
       expect(await b.audit.list({})).toEqual(before.events);
+    });
+
+    it('importProject rejects wells and audit events of another project and an invalid methodology record, listing each', async () => {
+      const a = open();
+      const p = await newProject(a);
+      await a.wells.create(p.id, { licence: LICENCE });
+      const file = clone(await a.exportProject(p.id));
+      file.wells[0].projectId = 'prj_other';
+      file.auditEvents[0].projectId = 'prj_other';
+      file.methodologies[0] = { ...file.methodologies[0], methodology: { ...file.methodologies[0].methodology, revision: '2.0.0', params: [] } };
+
+      const b = open();
+      const err = await rejection(b.importProject(file, 'merge'));
+      expect(err).toBeInstanceOf(ImportError);
+      const problems = (err as ImportError).problems;
+      expect(problems.some((m) => m.startsWith(`well ${file.wells[0].id}`) && m.includes('belongs to project prj_other'))).toBe(true);
+      expect(problems.some((m) => m.startsWith(`audit event ${file.auditEvents[0].id}`) && m.includes('belongs to project prj_other'))).toBe(true);
+      expect(problems.some((m) => m.startsWith('methodology record 2.0.0: missing param'))).toBe(true);
+      expect(await b.projects.list()).toEqual([]);
+    });
+
+    it('importProject merge keeps the stored project when the file\'s copy is older', async () => {
+      const a = open();
+      const p = await newProject(a);
+      const old = clone(await a.exportProject(p.id));
+      const b = open();
+      await b.importProject(old, 'merge');
+      const renamed = await b.projects.update(p.id, { name: 'Renamed in B' });
+      await b.importProject(old, 'merge');
+      expect(await b.projects.get(p.id)).toEqual(renamed);
+      await b.importProject(old, 'replace'); // replace makes the file the truth
+      expect((await b.projects.get(p.id))?.name).toBe(p.name);
+    });
+
+    it('two finals at the same instant: the one that supersedes the other is newer, whatever their ids', async () => {
+      const a = open();
+      const p = await newProject(a);
+      const { well, final: first } = await scoredWell(a, p.id, LICENCE);
+      const d = await a.assessments.saveDraft(well.id, draftInput(scoresAll(4), justifyAll()));
+      const second = await a.assessments.finalise(d.id);
+      expect(second.supersedesId).toBe(first.id);
+
+      // The same pair as another tool might write it: one shared instant, ids in the opposite order.
+      const file = clone(await a.exportProject(p.id));
+      const at = file.assessments[0].assessedAt;
+      for (const x of file.assessments) {
+        x.assessedAt = at;
+        x.updatedAt = at ?? x.updatedAt;
+        if (x.id === first.id) x.id = 'asm_z_first';
+        if (x.id === second.id) Object.assign(x, { id: 'asm_a_second', supersedesId: 'asm_z_first' });
+      }
+      const b = open();
+      await b.importProject(file, 'merge');
+      expect((await b.assessments.listForWell(well.id)).map((x) => x.id)).toEqual(['asm_a_second', 'asm_z_first']);
+      expect((await b.assessments.current(well.id))?.id).toBe('asm_a_second');
     });
 
     it('importProject merge: a draft finalised in the other browser arrives as the final', async () => {

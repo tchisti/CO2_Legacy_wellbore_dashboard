@@ -25,6 +25,23 @@ describe('LocalStore (IndexedDB)', () => {
     expect((await second.methodology.list()).map((r) => r.revision).sort()).toEqual(['2.0.0', '2.1.0']);
   });
 
+  it('without a dbName the store opens the app database, "lwa"', async () => {
+    const actor = () => 'T. Chisti';
+    const p = await createLocalStore({ actor }).projects.create({ name: 'Default database' });
+    expect(await createLocalStore({ dbName: 'lwa', actor }).projects.get(p.id)).toEqual(p);
+  });
+
+  it('a clock reading that is not a timestamp fails the write and leaves nothing behind', async () => {
+    let reading = '2026-01-01T00:00:00.000Z';
+    const store = createLocalStore({ dbName: freshDbName(), actor: () => 'T. Chisti', now: () => reading });
+    const p = await store.projects.create({ name: 'Clock' });
+    reading = 'not a time';
+    await expect(store.projects.update(p.id, { description: 'edited' })).rejects.toThrow(
+      'Clock returned an invalid timestamp: not a time',
+    );
+    expect(await store.projects.get(p.id)).toEqual(p);
+  });
+
   it('timestamps never repeat or go backwards within one store, even when the clock does', async () => {
     const store = createLocalStore({ dbName: freshDbName(), actor: () => 'T. Chisti', now: () => '2026-01-01T00:00:00.000Z' });
     const p = await store.projects.create({ name: 'Frozen clock' });

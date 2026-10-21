@@ -128,6 +128,16 @@ function definedOnly<T extends object>(patch: T): Partial<T> {
   return Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined)) as Partial<T>;
 }
 
+/**
+ * Dexie re-wraps an error thrown inside a transaction when its name is also an IndexedDB error name
+ * (NotFoundError is one) as a DexieError holding the original in `inner`. The store hands its own
+ * error back, so a caller can rely on `instanceof NotFoundError`.
+ */
+function storeError(e: unknown): unknown {
+  const inner = typeof e === 'object' && e !== null ? (e as { inner?: unknown }).inner : undefined;
+  return inner instanceof NotFoundError ? inner : e;
+}
+
 function assertProjectRules(p: Pick<Project, 'injectors' | 'formations'>): void {
   const problems = projectProblems(p);
   if (problems.length > 0) throw new Error(`Invalid project: ${problems.join('; ')}`);
@@ -178,7 +188,12 @@ export function createLocalStore(opts: LocalStoreOptions): Store {
   /** Runs `fn` in one read-write transaction over every table, then notifies once. */
   async function commit<T>(fn: () => Promise<T>): Promise<T> {
     await init();
-    const result = await db.transaction('rw', db.tables, fn);
+    let result: T;
+    try {
+      result = await db.transaction('rw', db.tables, fn);
+    } catch (e) {
+      throw storeError(e); // from this native async function, so Dexie cannot wrap it again
+    }
     notify();
     return result;
   }
