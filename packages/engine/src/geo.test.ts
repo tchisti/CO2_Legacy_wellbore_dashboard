@@ -68,6 +68,18 @@ describe('nearestInjector', () => {
     expect(r?.insideAoR).toBe(false);
   });
 
+  it('ignores injectors with non-finite coordinates, for the nearest one and for insideAoR', () => {
+    const broken: Injector[] = [
+      { name: 'No lat', lat: Number.NaN, lon: WELL.lon, aorRadius_m: 1e9 },
+      { name: 'No lon', lat: WELL.lat, lon: Number.POSITIVE_INFINITY, aorRadius_m: 1e9 },
+    ];
+    const r = nearestInjector({ ...WELL, injectors: [...broken, injectorAt('Real', 5000, 1000)] });
+    expect(r?.name).toBe('Real');
+    expect(r?.distance_m).toBeCloseTo(5000, 3);
+    expect(r?.insideAoR).toBe(false);
+    expect(nearestInjector({ ...WELL, injectors: broken })).toBeNull();
+  });
+
   it('insideAoR is true when the well is inside a farther injector AoR but outside the nearest one', () => {
     const r = nearestInjector({
       ...WELL,

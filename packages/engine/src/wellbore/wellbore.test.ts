@@ -719,3 +719,127 @@ describe('note-only depths that do not read become null; finite rows are kept (v
     expect(storable(wellbore)).toBe(true);
   });
 });
+
+describe('empty input and less common report wording (v3)', () => {
+  it('parseDepth: null, undefined, blank and a lone comma are unreadable', () => {
+    expect([W.parseDepth(null), W.parseDepth(undefined), W.parseDepth('   '), W.parseDepth(','), W.parseDepth(',,, m')]).toEqual([
+      null,
+      null,
+      null,
+      null,
+      null,
+    ]);
+  });
+
+  it('a zero td maps every depth to the surface and gives the single 0 tick', () => {
+    const s = W.depthScale(0, 500);
+    expect([s.yOf(0), s.yOf(100)]).toEqual([0, 0]);
+    expect(s.ticks('m')).toEqual([{ m: 0, label: '0' }]);
+  });
+
+  it('null, empty and blank text parse to nothing, with no warnings', () => {
+    const noIntervals = { plugs: [], perforations: [], notes: [], warnings: [] };
+    expect([W.parseIntervalsText(null), W.parseIntervalsText(''), W.parseIntervalsText('  \n ')]).toEqual([noIntervals, noIntervals, noIntervals]);
+    expect(W.parseCasingText(undefined)).toEqual({ casings: [], openHole: null, notes: [], warnings: [] });
+    expect(W.parseCasingText(' ')).toEqual({ casings: [], openHole: null, notes: [], warnings: [] });
+    expect(W.parseWellboreReport('  ')).toEqual({ wellbore: { plugs: [], perforations: [], notes: [], casings: [] }, warnings: [] });
+  });
+
+  it('a bridge plug gets kind "bridge"', () => {
+    expect(W.parseIntervalsText('Bridge plug at 1200 m').plugs).toEqual([
+      { top_m: 1200, bottom_m: 1200, kind: 'bridge', source: 'parsed', verbatim: 'Bridge plug at 1200 m' },
+    ]);
+  });
+
+  it('a continuation additive is appended to the plug’s own additive', () => {
+    const { plugs, warnings } = W.parseIntervalsText('Plug #1\n100-110 m 2% CaCl2\ncement class G');
+    expect(plugs.map((p) => [p.n, p.additives])).toEqual([[1, '2% CaCl2; cement class G']]);
+    expect(warnings).toEqual([]);
+  });
+
+  it('a continuation line naming the plug kind sets it, but never overwrites the plug’s own kind', () => {
+    expect(W.parseIntervalsText('Plug #1\n100–110 m\nCIBP').plugs.map((p) => [p.n, p.kind])).toEqual([[1, 'cibp']]);
+    expect(W.parseIntervalsText('Plug #1\nCIBP at 100 m\nbridge').plugs.map((p) => [p.n, p.kind])).toEqual([[1, 'cibp']]);
+  });
+
+  it('a formation in brackets on a line with no depth becomes a note without a depth', () => {
+    const { plugs, notes } = W.parseIntervalsText('Plug #1 (Viking)\n100–110 m');
+    expect(plugs.map((p) => [p.n, p.top_m, p.bottom_m])).toEqual([[1, 100, 110]]);
+    expect(notes).toEqual([{ depth_m: null, text: 'Formation: Viking', source: 'parsed', verbatim: 'Plug #1 (Viking)' }]);
+  });
+
+  it('casing OD written with a fraction character (8⅝") is read in inches', () => {
+    expect(W.parseCasingText('Surface 8⅝" J55 @ 610 m').casings).toEqual([
+      { type: 'surface', od_mm: 219.07, grade: 'J55', shoe_m: 610, source: 'parsed', verbatim: 'Surface 8⅝" J55 @ 610 m' },
+    ]);
+  });
+
+  it('a conductor casing gets type "conductor"', () => {
+    expect(W.parseCasingText('Conductor 0–20 m').casings).toEqual([
+      { type: 'conductor', top_m: 0, shoe_m: 20, source: 'parsed', verbatim: 'Conductor 0–20 m' },
+    ]);
+  });
+
+  it('a "no plug records" statement is a warning, never a note', () => {
+    expect(W.parseWellboreReport('No plug records on file')).toEqual({
+      wellbore: { plugs: [], perforations: [], notes: [], casings: [] },
+      warnings: ['No records: "No plug records on file"', 'Unparsed casing line: "No plug records on file"'],
+    });
+  });
+
+  it('the same unreadable casing line in two chunks is warned about once on the casing side', () => {
+    const { wellbore, warnings } = W.parseWellboreReport('foo bar\n\nfoo bar');
+    expect(warnings).toEqual(['Unparsed interval line: "foo bar"', 'Unparsed casing line: "foo bar"', 'Unparsed interval line: "foo bar"']);
+    expect(wellbore.notes.map((n) => n.text)).toEqual(['foo bar', 'foo bar']);
+  });
+
+  it('a new Plug # header starts a new block even without a blank line between them', () => {
+    const { wellbore } = W.parseWellboreReport('Plug #1\n100–110 m\nPlug #2\n200–210 m');
+    expect(wellbore.plugs.map((p) => [p.n, p.top_m, p.bottom_m])).toEqual([
+      [1, 100, 110],
+      [2, 200, 210],
+    ]);
+  });
+
+  it('bridge cementTop goes to the deepest shoe; a casing with no shoe depth counts as the surface', () => {
+    const wb = W.wellboreFrom3D({
+      td: 1500,
+      productionCasing: 'J55 production casing',
+      intermediateCasing: '9⅝" intermediate @ 800 m',
+      cementTop: 400,
+    })!;
+    expect(wb.casings.map((c) => [c.type, c.shoe_m, c.toc_m])).toEqual([
+      ['production', undefined, undefined],
+      ['intermediate', 800, 400],
+    ]);
+  });
+
+  it('the schematic labels a missing name, kind, text or depth with "—" and draws an undated note at the surface', () => {
+    const svg = W.renderWellboreSVG(
+      {
+        td: 1000,
+        casings: [{ shoe_m: 300 }],
+        zones: [{ kind: 'hydrocarbon', top_m: 100, bottom_m: 200 }, { bottom_m: 300 }],
+        formations: [{ top_m: 400 }],
+        notes: [{ text: 'no depth' }, { depth_m: 500 }],
+      },
+      { unit: 'm' },
+    );
+    const labels = [...svg.matchAll(/<g data-kind="(?:casing|zone|formation|note)" data-id="([a-z]+:\d+)" aria-label="([^"]*)"/g)].map(
+      (m) => [m[1], m[2]],
+    );
+    expect(labels).toEqual([
+      ['casing:0', 'Casing — top 0 m, shoe 300 m, OD —, grade —'],
+      ['zone:0', 'Zone (hydrocarbon) — 100 m to 200 m'],
+      ['zone:1', 'Zone (—) — — to 300 m'],
+      ['formation:0', 'Formation top: — at 400 m'],
+      ['note:0', 'Note at —: no depth'],
+      ['note:1', 'Note at 500 m: —'],
+    ]);
+    // hydrocarbon zones are amber, any other kind lilac; an undated note sits at the surface (y = TOP + 3)
+    expect(svg).toMatch(/data-id="zone:0"[^]*?fill="#e6c78a"/);
+    expect(svg).toMatch(/data-id="zone:1"[^]*?fill="#b9a7e6"/);
+    expect(svg).toMatch(/data-id="note:0"[^]*?<text x="\d+" y="59"/);
+    expect(svg).toContain('>—</text>'); // the unnamed formation's label in the right gutter
+  });
+});

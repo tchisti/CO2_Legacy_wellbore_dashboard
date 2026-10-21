@@ -32,6 +32,9 @@ function bridged<T extends object>(row: T): T & { source: 'bridge' } {
 
 const warningNote = (warning: string): WellboreNote => ({ depth_m: null, text: '[bridge] ' + warning, source: 'bridge' });
 
+/** A 3D text field as v2 read it, through String(): a stray number or object is read the same way. */
+const textOf = (v: unknown): string => String(v);
+
 /** Returns null when the record has no positive td (or tvd fallback). */
 export function wellboreFrom3D(r: Bridge3DRecord): BridgeWellbore | null {
   const td = typeof r.td === 'number' && r.td > 0 ? r.td : typeof r.tvd === 'number' && r.tvd > 0 ? r.tvd : null;
@@ -61,7 +64,7 @@ export function wellboreFrom3D(r: Bridge3DRecord): BridgeWellbore | null {
   // Production, then intermediate casing text; parser warnings fold into notes (Finding 2).
   for (const casingText of [r.productionCasing, r.intermediateCasing]) {
     if (!casingText) continue;
-    const pc = parseCasingTextDetail(String(casingText));
+    const pc = parseCasingTextDetail(textOf(casingText));
     wb.casings.push(...pc.casings.map(bridged));
     if (pc.openHole) openHoleSignal = true;
     for (const note of pc.notes) wb.notes.push({ depth_m: null, text: note.text, source: 'bridge', verbatim: note.verbatim });
@@ -75,7 +78,7 @@ export function wellboreFrom3D(r: Bridge3DRecord): BridgeWellbore | null {
   }
 
   if (r.plugIntervals) {
-    const iv = parseIntervalsText(String(r.plugIntervals));
+    const iv = parseIntervalsText(textOf(r.plugIntervals));
     wb.plugs.push(...iv.plugs.map(bridged));
     wb.perforations.push(...iv.perforations.map(bridged));
     wb.notes.push(...iv.notes.map(bridged));
@@ -83,7 +86,7 @@ export function wellboreFrom3D(r: Bridge3DRecord): BridgeWellbore | null {
   }
 
   if (r.perfIntervals) {
-    const iv = parseIntervalsText(String(r.perfIntervals));
+    const iv = parseIntervalsText(textOf(r.perfIntervals));
     wb.perforations.push(...iv.perforations.map(bridged));
     wb.notes.push(...iv.notes.map(bridged));
     for (const warning of iv.warnings) wb.notes.push(warningNote(warning));
@@ -101,7 +104,7 @@ export function wellboreFrom3D(r: Bridge3DRecord): BridgeWellbore | null {
 
   // The penetrated formation has no depth: a note, not a formation marker.
   if (r.formationPenetrated) {
-    wb.notes.push({ depth_m: null, text: String(r.formationPenetrated), source: 'bridge' });
+    wb.notes.push({ depth_m: null, text: textOf(r.formationPenetrated), source: 'bridge' });
   }
 
   return wb;

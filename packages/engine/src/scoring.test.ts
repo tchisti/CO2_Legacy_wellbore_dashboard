@@ -47,7 +47,7 @@ interface MutableMethodology {
   }>;
   matrix: { bands: Array<{ min: number; max: number }> };
 }
-const mutable = (): MutableMethodology => clone(rawMethodology) as MutableMethodology;
+const mutable = (): MutableMethodology => clone(rawMethodology);
 const param = (m: MutableMethodology, i: number) => {
   const p = m.params[i];
   if (!p) throw new Error(`no param at index ${i}`);
@@ -140,6 +140,14 @@ describe('methodology', () => {
     const badUnknown = mutable();
     param(badUnknown, 1).unknownScore = 7;
     expect(validateMethodology(badUnknown).errors).toEqual(['cement: unknownScore must be 1–5']);
+  });
+
+  it('labels a structural problem at the root "methodology": an array carrying a params list is not a methodology', () => {
+    const arrayLike = Object.assign([], { params: [] });
+    expect(validateMethodology(arrayLike)).toEqual({
+      ok: false,
+      errors: ['methodology: Invalid input: expected object, received array'],
+    });
   });
 
   it('validateMethodology bounds the band-coverage loop: a huge band max returns promptly with the v2 coverage error', () => {
@@ -321,6 +329,11 @@ describe('computeWell golden vectors', () => {
     expect(label(99)).toBe('Very High');
     expect(label(0)).toBe('Very High');
   });
+
+  it('bandFor throws a clear error when the methodology has no matrix bands', () => {
+    const noBands = { ...clone(M), matrix: { bands: [] } };
+    expect(() => bandFor(5, noBands)).toThrow('methodology has no matrix bands');
+  });
 });
 
 describe('v1 migration', () => {
@@ -390,6 +403,14 @@ describe('v1 migration', () => {
     expect(pen({ depthR: 2.5 })).toBeNull(); // max(2.5, 1) = 2.5, not an integer 1..5
     expect(pen({ depthR: 2.5, depthC: 4 })).toBe(4); // max(2.5, 4) = 4, an integer 1..5
     expect(pen({ depthR: 2.5, depthC: 2.5 })).toBeNull();
+  });
+
+  it('migrateV1 of a record without scores: every param unknown, flagged for review, an empty legacy snapshot', () => {
+    const m = migrateV1({ id: 'W-NOSCORES', licence: '100/01-01-050-20W4/00' });
+    expect(m.scores).toEqual(emptyScores());
+    expect(m.computed).toEqual({ L: 4.24, C: 3.6, Lr: 4, Cr: 4, cell: 16, riskIndex: 15.26, rankLabel: 'High', integrity: 41 });
+    expect([m.scoredUnder, m.needsReview, m.legacy]).toEqual(['1.0.0', true, { scores: {}, total: undefined }]);
+    expect(m.licence).toBe('100/01-01-050-20W4/00');
   });
 
   it('isV1Well is true only for a scores object carrying the v1 "plug" key', () => {
@@ -513,6 +534,16 @@ describe('bumpRevision', () => {
     reweighted.params[0]!.weight = 0.3;
     expect(bumpRevision(later, reweighted)).toBe('2.4.0');
   });
+
+  it('a methodology with no revision text bumps from 2.0.0', () => {
+    const unnamed = { ...clone(M), revision: '' };
+    const reworded = clone(unnamed);
+    reworded.params[0]!.desc = 'reworded';
+    expect(bumpRevision(unnamed, reworded)).toBe('2.0.1');
+    const reweighted = clone(unnamed);
+    reweighted.params[0]!.weight = 0.3;
+    expect(bumpRevision(unnamed, reweighted)).toBe('2.1.0');
+  });
 });
 
 describe('self test and helpers', () => {
@@ -533,6 +564,15 @@ describe('self test and helpers', () => {
     expect(result.pass).toBe(false);
     expect(result.failures.some((f) => f.startsWith('unknown-heavy:'))).toBe(true);
     expect(result.summary).toMatch(/golden-vector failure\(s\)$/);
+  });
+
+  it('runSelfTest reports an invalid methodology even when every golden vector still matches', () => {
+    const result = runSelfTest({ ...clone(M), revision: 'draft' });
+    expect(result).toEqual({
+      pass: false,
+      failures: ['methodology invalid: revision must be semver (e.g. 2.0.0)'],
+      summary: '1 golden-vector failure(s)',
+    });
   });
 
   it('GOLDEN_VECTORS are the five v2 vectors', () => {

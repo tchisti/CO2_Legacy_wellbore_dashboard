@@ -125,19 +125,18 @@ export function paramsOf(m: Methodology, axis?: 'L' | 'C'): Param[] {
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null;
 
 /** Label for params[idx] in an error message: its key when the input has one, else its position. */
-function paramLabel(input: Record<string, unknown>, idx: number): string {
-  const list: unknown[] = Array.isArray(input.params) ? input.params : [];
-  const p = list[idx];
+function paramLabel(params: readonly unknown[], idx: number): string {
+  const p = params[idx];
   return isRecord(p) && typeof p.key === 'string' ? p.key : `params[${idx}]`;
 }
 
 const BAND_BOUNDS_MESSAGE = 'matrix band bounds must be whole numbers';
 
 /** Turn a structural Zod issue into one error line, using v2's wording where v2 had a check. */
-function describeIssue(issue: z.ZodError['issues'][number], input: Record<string, unknown>): string {
+function describeIssue(issue: z.ZodError['issues'][number], params: readonly unknown[]): string {
   const [root, idx, field, sub] = issue.path;
   if (root === 'params' && typeof idx === 'number') {
-    const label = paramLabel(input, idx);
+    const label = paramLabel(params, idx);
     if (field === 'unknownScore') return `${label}: unknownScore must be 1–5`;
     if (field === 'anchors' && (sub === undefined || sub === '1' || sub === '3' || sub === '5')) {
       return `${label}: anchors for 1/3/5 are required`;
@@ -160,9 +159,10 @@ export function validateMethodology(m: unknown): ValidationResult {
   if (!isRecord(m) || !Array.isArray(m.params)) {
     return { ok: false, errors: ['methodology is not a valid object'] };
   }
+  const params: readonly unknown[] = m.params;
   const parsed = MethodologySchema.safeParse(m);
   if (!parsed.success) {
-    const errors = [...new Set(parsed.error.issues.map((issue) => describeIssue(issue, m)))];
+    const errors = [...new Set(parsed.error.issues.map((issue) => describeIssue(issue, params)))];
     return { ok: false, errors };
   }
   const meth = parsed.data;
@@ -177,17 +177,13 @@ export function validateMethodology(m: unknown): ValidationResult {
   for (const p of meth.params) {
     if (!(p.anchors['1'] && p.anchors['3'] && p.anchors['5'])) errors.push(p.key + ': anchors for 1/3/5 are required');
   }
-  const covered = Array.from({ length: 26 }, () => 0);
-  for (const b of meth.matrix.bands) {
-    // Bounds are whole numbers (BandSchema), so this visits exactly the cells v2's loop did. Only
-    // 1..25 is counted, so bound the loop to that window: a structurally valid band such as
-    // max: 1e12 (imported from a user file) must not make validation spin.
-    const last = Math.min(25, b.max);
-    for (let v = Math.max(1, b.min); v <= last; v++) covered[v] = (covered[v] ?? 0) + 1;
-  }
+  // Bounds are whole numbers (BandSchema), so counting, for each cell 1..25, the bands that hold it
+  // gives exactly the counts v2's per-band loop did. Only the 25 cells are visited: a structurally
+  // valid band such as max: 1e12 (imported from a user file) must not make validation spin.
   for (let v = 1; v <= 25; v++) {
-    if (covered[v] !== 1) {
-      errors.push('matrix bands must cover 1–25 exactly once (value ' + v + ' covered ' + (covered[v] ?? 0) + '×)');
+    const covered = meth.matrix.bands.filter((b) => b.min <= v && v <= b.max).length;
+    if (covered !== 1) {
+      errors.push('matrix bands must cover 1–25 exactly once (value ' + v + ' covered ' + covered + '×)');
       break;
     }
   }
@@ -238,6 +234,8 @@ export function anchorText(p: Param, v: Score | null | undefined): string {
 
 export function scoreLabelToValue(s: unknown): Score | null {
   if (s === null || s === undefined) return null;
+  // As v2, any value is read through String(): a CSV cell is already text, and 3 reads as "3".
+  // eslint-disable-next-line @typescript-eslint/no-base-to-string
   const v = String(s).trim().toLowerCase();
   if (!v || v === '?' || v === 'unknown' || v === 'u') return null;
   if (v === '1' || v === 'low' || v === 'l' || v.startsWith('1')) return 1;
@@ -375,7 +373,7 @@ export function runSelfTest(m: Methodology = DEFAULT_METHODOLOGY): SelfTestResul
     if (v.v1) {
       c = migrateV1({ ...v.v1 }, m).computed;
     } else {
-      const fill = FILL[v.scores ?? 'all-null'];
+      const fill = FILL[v.scores];
       const scores: Partial<Record<ParamKey, number | null>> = {};
       for (const k of PARAM_KEYS) scores[k] = fill;
       c = computedBlock(scores, m);

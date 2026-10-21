@@ -32,7 +32,7 @@ import {
   validateMethodology,
   type Methodology,
 } from './scoring';
-import { PARAM_KEYS, type ParamKey, type Score, type Scores, type V2WellLike } from './types';
+import { PARAM_KEYS, type ParamKey, type Score, type Scores } from './types';
 import { WellboreSchema, wellboreFrom3D, type Wellbore } from './wellbore';
 
 /** Spec §8.2: the project name unless the caller chooses one. */
@@ -377,7 +377,7 @@ function migrateV2Well(entry: V2Entry, ctx: Context, actor: string): Migrated {
   const { raw, licence, updatedAt } = entry;
   const m = ctx.methodology;
   // v1-shaped records become v2 (scores mapped, scoredUnder 1.0.0, legacy kept) exactly as v2 did on load.
-  const n = normalizeWell(raw as V2WellLike, m);
+  const n = normalizeWell(raw, m);
   const suffix = uniqueSuffix(ctx, trimmed(raw.id), licence);
   const site = ctx.siteWells.get(entry.key);
   const editor = trimmed(raw.updatedBy) || trimmed(raw.reviewer) || 'v2 import';

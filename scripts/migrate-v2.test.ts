@@ -601,6 +601,180 @@ describe('migrateV2Data with browser exports', () => {
   });
 });
 
+/* ---------- loose and invalid v2 input ---------- */
+
+describe('migrateV2Data on loose or invalid input', () => {
+  const INJ = { id: 'inj-1', name: 'Pine', lat: 53.7, lon: -113.2, aorRadius_m: 3200 };
+  const FM = { id: 'fm-1', name: 'Nisku', top_m: 1400, base_m: 1450, role: 'reservoir', order: 0 };
+
+  it.each([
+    ['now is not a timestamp', { now: 'soon' }, 'now: "soon" is not a timestamp'],
+    ['the methodology date is not a timestamp', { methodology: { ...V2_METHODOLOGY, updatedAt: 'yesterday' } }, 'methodology: updatedAt "yesterday" is not a timestamp'],
+    ['the project name is blank', { projectName: '   ' }, 'projectName: must not be empty'],
+    ['wells is not an array', { wells: { W1: {} } }, 'wells: expected the v2 wells.json array of well records'],
+    ['a well is not a record', { wells: [V2_WELLS[0], 42] }, 'wells.json, well 2: not a well record'],
+    ['a well has no licence', { wells: [{ ...V2_WELLS[0], licence: '  ' }] }, 'wells.json, well 1: no licence'],
+    [
+      'a well has neither a valid updatedAt nor createdAt',
+      { wells: [{ ...V2_WELLS[0], updatedAt: 'later', createdAt: true }] },
+      `wells.json, well 1 (${MANNING}): no valid updatedAt or createdAt`,
+    ],
+    ['the site file is not an object', { site: 'enbridge' as unknown as SiteConfig }, 'site: (root): Invalid input: expected object, received string'],
+    [
+      'the site file repeats an id',
+      { site: { injectors: [INJ, { ...INJ, name: 'Oak' }], formations: [FM, FM], wellsByUwi: {} } as unknown as SiteConfig },
+      'site: duplicate ids: injector inj-1, formation fm-1',
+    ],
+  ] as const)('rejects the run when %s, with a readable error', (_label, overrides, message) => {
+    expect(() => migrateV2Data(args(overrides as Partial<MigrateV2Args>))).toThrow(message);
+  });
+
+  it('never returns an export that does not validate: a 3D well dated in the year 10000 aborts the run', () => {
+    const farFuture = { uwi: '100/01-01-001-01W4/00', updatedAt: Date.parse('9999-12-31T00:00:00Z') + 86_400_000 };
+    expect(() => migrateV2Data(args({ browserExports: [{ schemaVersion: 1, wells: [farFuture] }] }))).toThrow(
+      /^the migration built an invalid project export: wells\.5\.createdAt: Invalid ISO datetime/,
+    );
+  });
+
+  it('timestamps: a bare date is read as UTC midnight, epoch ms as UTC, and a missing or unreadable one falls back', () => {
+    const [a, b] = v2Wells();
+    if (!a || !b) throw new Error('fixture has fewer than 2 wells');
+    a.updatedAt = 1e20 as unknown as string; // epoch ms outside the Date range: unreadable
+    a.createdAt = '2026-03-01';
+    b.updatedAt = Date.parse('2026-04-01T10:00:00Z') as unknown as string;
+    b.createdAt = true as unknown as string;
+    const r = migrateV2Data(args({ wells: [a, b] }));
+    expect([wellOf(r.export.wells, a.licence).createdAt, wellOf(r.export.wells, a.licence).updatedAt]).toEqual([
+      '2026-03-01T00:00:00.000Z',
+      '2026-03-01T00:00:00.000Z',
+    ]);
+    expect([wellOf(r.export.wells, b.licence).createdAt, wellOf(r.export.wells, b.licence).updatedAt]).toEqual([
+      '2026-04-01T10:00:00.000Z',
+      '2026-04-01T10:00:00.000Z',
+    ]);
+    // a 3D record without createdAt is created when it was last updated
+    const threeD = { uwi: '100/04-04-060-22W4/00', updatedAt: Date.parse('2026-05-05T00:00:00Z') };
+    const r3 = migrateV2Data(args({ browserExports: [{ schemaVersion: 1, wells: [threeD] }] }));
+    expect(wellOf(r3.export.wells, threeD.uwi).createdAt).toBe('2026-05-05T00:00:00.000Z');
+  });
+
+  it('coordinates given as numeric text are read as numbers; blank text is no coordinate', () => {
+    const [a, b] = v2Wells();
+    if (!a || !b) throw new Error('fixture has fewer than 2 wells');
+    Object.assign(a, { lat: ' 53.75 ', lon: '-113.3' });
+    Object.assign(b, { lat: '', lon: '  ' });
+    const r = migrateV2Data(args({ wells: [a, b] }));
+    expect([wellOf(r.export.wells, a.licence).lat, wellOf(r.export.wells, a.licence).lon]).toEqual([53.75, -113.3]);
+    expect([wellOf(r.export.wells, b.licence).lat, wellOf(r.export.wells, b.licence).lon]).toEqual([null, null]);
+  });
+
+  it('ids: a well without a v2 id takes them from its licence ("well" when that has no letters or digits); a clash appends the licence', () => {
+    const [a, b, c, d] = v2Wells();
+    if (!a || !b || !c || !d) throw new Error('fixture has fewer than 4 wells');
+    delete (a as Partial<V2Well>).id;
+    delete (b as Partial<V2Well>).id;
+    b.licence = '###';
+    c.id = 'W-SAME';
+    d.id = 'W-SAME';
+    const r = migrateV2Data(args({ wells: [a, b, c, d] }));
+    expect(r.export.wells.map((w) => w.id)).toEqual([
+      'wel_v2_100-13-06-055-22w4-00',
+      'wel_v2_well',
+      'wel_v2_W-SAME',
+      `wel_v2_W-SAME_${d.licence.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+    ]);
+    expect(r.warnings).toContain(`${d.licence}: id W-SAME is already used by another well; its ids get the licence appended`);
+  });
+
+  it('a licence repeated inside one file keeps its newest copy, with a warning (wells.json and a 3D export alike)', () => {
+    const [manning] = v2Wells();
+    if (!manning) throw new Error('fixture is empty');
+    const newer = { ...manning, notes: 'the later copy', updatedAt: '2026-09-09T00:00:00.000Z' };
+    const r = migrateV2Data(args({ wells: [manning, newer] }));
+    expect(r.export.wells).toHaveLength(1);
+    expect(r.export.wells[0]?.notes).toBe('the later copy');
+    expect(r.warnings).toContain(`wells.json: licence ${MANNING} appears more than once; the newest copy is used`);
+    expect(r.parity[0]?.note).toBeUndefined(); // the newer copy came from the same file
+
+    const uwi = '100/05-05-060-22W4/00';
+    const first = { uwi, wellName: 'FIRST', updatedAt: Date.parse('2026-01-01T00:00:00Z') };
+    const second = { uwi, wellName: 'SECOND', updatedAt: Date.parse('2026-02-01T00:00:00Z') };
+    const r3 = migrateV2Data(args({ browserExports: [{ schemaVersion: 1, wells: [first, second] }] }));
+    expect(wellOf(r3.export.wells, uwi).name).toBe('SECOND');
+    expect(r3.warnings).toContain(`browser export 1: licence ${uwi} appears more than once; the newest copy is used`);
+  });
+
+  it('the v1 legacy block: missing → none; not { scores, total } → none, with a warning; non-numeric scores dropped, with a warning', () => {
+    const [a, b, c] = v2Wells();
+    if (!a || !b || !c) throw new Error('fixture has fewer than 3 wells');
+    delete (a as Partial<V2Well>).legacy;
+    (b as Record<string, unknown>).legacy = { scores: 'lost', total: 11 };
+    c.legacy = { scores: { plug: 5, cement: 'n/a' as unknown as number, age: 3 }, total: 21 };
+    const r = migrateV2Data(args({ wells: [a, b, c] }));
+    expect(r.export.wells.map((w) => w.legacyV1)).toEqual([null, null, { scores: { plug: 5, age: 3 }, total: 21 }]);
+    expect(r.warnings).toEqual([
+      `${b.licence}: the v1 legacy block is not { scores, total }; legacyV1 left empty`,
+      `${c.licence}: non-numeric v1 legacy scores were dropped from legacyV1`,
+    ]);
+  });
+
+  it('a stored v2 computed block that cannot be read is a parity mismatch, with a note', () => {
+    const [a, b] = v2Wells();
+    if (!a || !b) throw new Error('fixture has fewer than 2 wells');
+    (a as Record<string, unknown>).computed = 'n/a';
+    (b as Record<string, unknown>).computed = { L: 1, C: 1 };
+    const r = migrateV2Data(args({ wells: [a, b] }));
+    expect(r.mismatches.map((p) => [p.licence, p.status, p.v2, p.note])).toEqual([
+      [a.licence, 'mismatch', null, 'the stored v2 computed block is incomplete'],
+      [b.licence, 'mismatch', null, 'the stored v2 computed block is incomplete'],
+    ]);
+  });
+
+  it('a browser-only v2 well without scores is imported unscored and noted in parity', () => {
+    const extra = { ...v2Wells()[0], id: 'W-NOSCORE', licence: '100/06-06-055-22W4/00', scores: null, computed: undefined };
+    const r = migrateV2Data(args({ browserExports: [[extra]] }));
+    expect(r.export.assessments.some((a) => a.wellId === 'wel_v2_W-NOSCORE')).toBe(false);
+    expect(find(r.parity, (p) => p.licence === extra.licence, extra.licence)).toEqual({
+      licence: extra.licence,
+      status: 'browser-only',
+      v2: null,
+      v3: null,
+      note: 'only in browser export 1; no scores',
+    });
+  });
+
+  it('a v2 well with no editor, classification or scoredUnder: "v2 import", "Type 1" with a warning, and the methodology revision', () => {
+    const [a] = v2Wells();
+    if (!a) throw new Error('fixture is empty');
+    const bare = a as Partial<V2Well>;
+    delete bare.updatedBy;
+    delete bare.reviewer;
+    delete bare.klass;
+    delete bare.scoredUnder;
+    const r = migrateV2Data(args({ wells: [a] }));
+    const well = wellOf(r.export.wells, MANNING);
+    expect([well.createdBy, well.updatedBy, well.classification]).toEqual(['v2 import', 'v2 import', 'Type 1']);
+    expect(r.warnings).toContain(`${MANNING}: classification null is not Type 1..9; set to "Type 1", review it before scoring`);
+    expect(assessmentOf(r.export.assessments, well).methodologyRevision).toBe('2.0.0');
+  });
+
+  it('a 3D scenario with no UWI is skipped and named by its position', () => {
+    const r = migrateV2Data(args({ browserExports: [{ schemaVersion: 1, wells: [{ isScenario: true, updatedAt: 1753200000000 }] }] }));
+    expect(r.warnings).toContain('(no UWI, well 1) (browser export 1): a 3D scenario (what-if) well; not imported');
+    expect(r.parity.at(-1)).toMatchObject({ licence: '(no UWI, well 1)', status: '3d-skipped (scenario)' });
+  });
+
+  it('with no wells the project dates from the methodology, and a name with no letters or digits gives id prj_v2_project', () => {
+    const r = migrateV2Data(args({ wells: [], projectName: '###' }));
+    expect(r.export.wells).toEqual([]);
+    expect([r.export.project.id, r.export.project.name]).toEqual(['prj_v2_project', '###']);
+    expect([r.export.project.createdAt, r.export.project.updatedAt]).toEqual([
+      '2026-07-28T00:00:00Z',
+      '2026-07-28T00:00:00Z',
+    ]);
+  });
+});
+
 /* ---------- CLI ---------- */
 
 describe('migrate-v2 CLI', () => {

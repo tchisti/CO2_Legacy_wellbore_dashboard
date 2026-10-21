@@ -163,6 +163,14 @@ describe('recommend: each action is gated on its own driver', () => {
   ] as const)('dropping %s keeps the either/or action', (_label, overrides) => {
     expect(recommend(scoresOf(5, overrides), M).actions).toEqual(ALL_ACTIONS);
   });
+
+  it('a param the methodology does not define is never a driver and never triggers its action', () => {
+    const withoutData: Methodology = { ...M, params: M.params.filter((p) => p.key !== 'data') };
+    const r = recommend(scoresOf(5), withoutData);
+    expect(['high', 'crit']).toContain(r.tier);
+    expect(r.drivers).toEqual(withoutData.params.map((p) => p.name));
+    expect(r.actions).toEqual(ALL_ACTIONS.filter((a) => a !== A_DATA));
+  });
 });
 
 describe('recommendationText', () => {

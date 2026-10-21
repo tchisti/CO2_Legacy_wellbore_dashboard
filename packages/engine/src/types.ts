@@ -97,13 +97,18 @@ export type GoldenWant = {
   integrity: number;
 };
 
-export type GoldenVector = {
-  name: string;
-  /** Fill every param with this value ('all-null' = every param unknown). */
-  scores?: 'all-1' | 'all-3' | 'all-5' | 'all-null';
-  /** Or migrate this v1 well and check its computed block. */
-  v1?: V2WellLike;
-  want: GoldenWant;
-};
+/** A golden vector fills every param with one value, or migrates a v1 well; either way `want` is checked. */
+export type GoldenVector = { name: string; want: GoldenWant } & (
+  | {
+      /** Fill every param with this value ('all-null' = every param unknown). */
+      scores: 'all-1' | 'all-3' | 'all-5' | 'all-null';
+      v1?: undefined;
+    }
+  | {
+      /** Migrate this v1 well and check its computed block. */
+      v1: V2WellLike;
+      scores?: undefined;
+    }
+);
 
 export type SelfTestResult = { pass: boolean; failures: string[]; summary: string };
