@@ -15,8 +15,14 @@
 // by the browser's Back button; a reload or tab close asks first (beforeunload). Finalise saves the
 // draft and finalises it under the current methodology; it stays disabled until every parameter
 // is decided (a score, or a deliberate Unknown) and every scored parameter has a justification.
-import { useEffect, useId, useReducer, useRef, useState } from 'react';
+//
+// "Show schematic" (spec §4.4: the schematic is viewable in a split pane while scoring) widens the
+// sheet to the full viewport with the well's saved construction drawn, read-only and in metres,
+// in a left column beside the rows (stacked above them below 1280 px). A well with neither a
+// construction record nor a TD has nothing to draw, so the toggle is unavailable and says why.
+import { useEffect, useId, useMemo, useReducer, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { LayersIcon } from 'lucide-react';
 import {
   nearestInjector,
   paramsOf,
@@ -29,12 +35,14 @@ import {
   type Project,
   type Well,
 } from '@lwa/engine';
+import { Schematic } from '@/components/construction/Schematic';
 import { LiveResult } from '@/components/score/LiveResult';
 import { OverrideField } from '@/components/score/OverrideField';
 import { ScoreRow } from '@/components/score/ScoreRow';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { schematicInput } from '@/lib/construction-edit';
 import { fmtDate } from '@/lib/format';
 import {
   carriedNote,
@@ -52,6 +60,7 @@ import {
 } from '@/lib/score-flow';
 import { toError, useStore } from '@/lib/store/provider';
 import { FinaliseError } from '@/lib/store/store';
+import { cn } from '@/lib/utils';
 
 const AXES: readonly { axis: Axis; name: string }[] = [
   { axis: 'L', name: 'Likelihood' },
@@ -77,6 +86,34 @@ function modeText(mode: ScoreMode, prev: Assessment | null, revision: string): s
     return `Re-assessing the final of ${fmtDate(prev.assessedAt)}${under}`;
   }
   return 'First assessment';
+}
+
+/** What the sheet focuses first: the first tab stop among the scoring rows. */
+const FIRST_FOCUS =
+  'button:not([disabled]):not([tabindex="-1"]), [href], input:not([disabled]), textarea:not([disabled]), [tabindex="0"]';
+
+/** Shows or hides the schematic pane; unavailable (still focusable, with the reason) when there is nothing to draw. */
+function SchematicToggle({ pressed, available, onToggle }: { pressed: boolean; available: boolean; onToggle: () => void }) {
+  const button = (
+    <Button
+      variant="outline"
+      size="sm"
+      aria-pressed={available ? pressed : false}
+      aria-disabled={available ? undefined : true}
+      onClick={available ? onToggle : undefined}
+      className="aria-disabled:cursor-not-allowed aria-disabled:opacity-50 aria-pressed:border-primary/40 aria-pressed:bg-accent aria-disabled:active:translate-y-0"
+    >
+      <LayersIcon aria-hidden="true" />
+      Show schematic
+    </Button>
+  );
+  if (available) return button;
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{button}</TooltipTrigger>
+      <TooltipContent side="bottom">No construction records yet</TooltipContent>
+    </Tooltip>
+  );
 }
 
 export function ScoreSheet({
@@ -130,6 +167,12 @@ export function ScoreSheet({
   const [open, setOpen] = useState(true);
   const [busy, setBusy] = useState<Busy>(null);
   const [tipOpen, setTipOpen] = useState(false);
+  const [showSchematic, setShowSchematic] = useState(false);
+  const [schematicHover, setSchematicHover] = useState<string | null>(null);
+  const drawing = useMemo(() => schematicInput(well.construction, well.td_m), [well.construction, well.td_m]);
+  const canShowSchematic = drawing !== null;
+  /** The scoring rows: the sheet opens with focus on their first control, as before the header had a button. */
+  const rowsRef = useRef<HTMLDivElement>(null);
 
   // Leaving without the close handler (the browser's Back button) must not lose the reviewer's
   // work either: on unmount, unsaved changes are saved as the draft. `settled` is set once a close
@@ -262,7 +305,16 @@ export function ScoreSheet({
     >
       <SheetContent
         side="right"
-        className="gap-0 p-0 data-[side=right]:w-full data-[side=right]:sm:max-w-none data-[side=right]:xl:w-[54rem]"
+        onOpenAutoFocus={(e) => {
+          const first = rowsRef.current?.querySelector<HTMLElement>(FIRST_FOCUS);
+          if (!first) return;
+          e.preventDefault();
+          first.focus();
+        }}
+        className={cn(
+          'gap-0 p-0 data-[side=right]:w-full data-[side=right]:sm:max-w-none',
+          !showSchematic && 'data-[side=right]:xl:w-[54rem]',
+        )}
       >
         <SheetHeader className="gap-2 border-b px-5 py-4 pr-14">
           <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-2">
@@ -276,45 +328,71 @@ export function ScoreSheet({
                 {modeText(opening.mode, opening.prev, methodology.revision)}
               </SheetDescription>
             </div>
-            <LiveResult computed={computed} className="pt-0.5" />
+            <div className="flex flex-wrap items-center gap-3">
+              <LiveResult computed={computed} className="pt-0.5" />
+              <SchematicToggle
+                pressed={showSchematic}
+                available={canShowSchematic}
+                onToggle={() => setShowSchematic((v) => !v)}
+              />
+            </div>
           </div>
         </SheetHeader>
 
-        <div className="flex-1 overflow-y-auto px-5 pb-6">
-          {AXES.map(({ axis, name }) => {
-            const headingId = `${sectionId}-${axis}`;
-            return (
-              <section key={axis} aria-labelledby={headingId} className="pt-5">
-                <h3
-                  id={headingId}
-                  className="border-b pb-1.5 text-xs font-semibold tracking-wide text-ink uppercase"
-                >
-                  {name} <span className="font-normal text-muted-foreground normal-case">({axis})</span>
-                </h3>
-                {paramsOf(methodology, axis).map((p) => (
-                  <ScoreRow
-                    key={p.key}
-                    param={p}
-                    score={state.scores[p.key]}
-                    decided={state.decided.has(p.key)}
-                    justification={state.justifications[p.key] ?? ''}
-                    suggestion={visibleSuggestion(state, p.key)}
-                    carried={carriedNote(state, p.key)}
-                    info={p.key === 'plume' ? opening.nearest : undefined}
-                    onScore={(score) => dispatch({ type: 'set', key: p.key, score })}
-                    onJustify={(text) => dispatch({ type: 'justify', key: p.key, text })}
-                    onApplySuggestion={(suggestion) => dispatch({ type: 'applySuggestion', key: p.key, suggestion })}
-                  />
-                ))}
-              </section>
-            );
-          })}
-          <div className="pt-5">
-            <OverrideField
-              autoTitle={automatic.title}
-              value={state.override}
-              onChange={(text) => dispatch({ type: 'override', text })}
-            />
+        <div
+          className={cn(
+            'flex-1 overflow-y-auto',
+            showSchematic && 'xl:grid xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] xl:overflow-hidden',
+          )}
+        >
+          {showSchematic ? (
+            <div className="border-b px-5 py-4 xl:overflow-y-auto xl:border-r xl:border-b-0">
+              <Schematic
+                wellbore={drawing}
+                unit="m"
+                size="sheet"
+                highlightId={schematicHover}
+                onHover={setSchematicHover}
+                hint="The saved construction, read-only. Edit it on the Construction tab."
+              />
+            </div>
+          ) : null}
+          <div ref={rowsRef} className={cn('px-5 pb-6', showSchematic && 'xl:overflow-y-auto')}>
+            {AXES.map(({ axis, name }) => {
+              const headingId = `${sectionId}-${axis}`;
+              return (
+                <section key={axis} aria-labelledby={headingId} className="pt-5">
+                  <h3
+                    id={headingId}
+                    className="border-b pb-1.5 text-xs font-semibold tracking-wide text-ink uppercase"
+                  >
+                    {name} <span className="font-normal text-muted-foreground normal-case">({axis})</span>
+                  </h3>
+                  {paramsOf(methodology, axis).map((p) => (
+                    <ScoreRow
+                      key={p.key}
+                      param={p}
+                      score={state.scores[p.key]}
+                      decided={state.decided.has(p.key)}
+                      justification={state.justifications[p.key] ?? ''}
+                      suggestion={visibleSuggestion(state, p.key)}
+                      carried={carriedNote(state, p.key)}
+                      info={p.key === 'plume' ? opening.nearest : undefined}
+                      onScore={(score) => dispatch({ type: 'set', key: p.key, score })}
+                      onJustify={(text) => dispatch({ type: 'justify', key: p.key, text })}
+                      onApplySuggestion={(suggestion) => dispatch({ type: 'applySuggestion', key: p.key, suggestion })}
+                    />
+                  ))}
+                </section>
+              );
+            })}
+            <div className="pt-5">
+              <OverrideField
+                autoTitle={automatic.title}
+                value={state.override}
+                onChange={(text) => dispatch({ type: 'override', text })}
+              />
+            </div>
           </div>
         </div>
 

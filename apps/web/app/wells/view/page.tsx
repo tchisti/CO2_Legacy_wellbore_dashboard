@@ -8,7 +8,8 @@
 import { Suspense, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { ArrowLeftIcon, FileQuestionIcon, LayersIcon } from 'lucide-react';
+import { ArrowLeftIcon, FileQuestionIcon } from 'lucide-react';
+import { ConstructionEditor, DiscardConstructionDialog } from '@/components/construction/ConstructionEditor';
 import { ScoreSheet } from '@/components/score/ScoreSheet';
 import { EmptyState } from '@/components/shell/EmptyState';
 import { PageBody } from '@/components/shell/PageHeader';
@@ -20,7 +21,7 @@ import { WellTabs } from '@/components/well/WellTabs';
 import { EditWellDialog } from '@/components/wells/EditWellDialog';
 import { assessmentState } from '@/lib/derived';
 import { useProjects } from '@/lib/project-context';
-import { wellHref, wellsHref } from '@/lib/routes';
+import { wellHref, wellsHref, type WellTab } from '@/lib/routes';
 import { useStoreQuery } from '@/lib/store/provider';
 import type { Store } from '@/lib/store/store';
 import { useWellTab } from '@/lib/use-well-tab';
@@ -80,21 +81,19 @@ function NotFound({ reason }: { reason: string }) {
   );
 }
 
-/** Construction records arrive with the schematic (a later task); the tab is reserved for them. */
-function ConstructionPlaceholder() {
-  return (
-    <EmptyState icon={LayersIcon} title="Construction records">
-      Casing, cement, plugs and perforations for this well will be shown here, beside its wellbore schematic.
-    </EmptyState>
-  );
-}
-
 function WellView({ id }: { id: string }) {
   const { activeProject } = useProjects();
   const router = useRouter();
   const scoring = useSearchParams().get('score') === '1';
   const [tab, setTab] = useWellTab(id);
   const [editing, setEditing] = useState(false);
+  // Leaving the Construction tab with unsaved changes asks first (the tab unmounts its working copy).
+  const [constructionDirty, setConstructionDirty] = useState(false);
+  const [pendingTab, setPendingTab] = useState<WellTab | null>(null);
+  const changeTab = (next: WellTab) => {
+    if (tab === 'construction' && next !== tab && constructionDirty) setPendingTab(next);
+    else setTab(next);
+  };
   const page = useStoreQuery((s) => (id ? loadWell(s, id) : Promise.resolve(null)), [id]);
 
   if (page.loading) return <Loading />;
@@ -124,7 +123,7 @@ function WellView({ id }: { id: string }) {
       </div>
       <WellTabs
         tab={tab}
-        onTabChange={setTab}
+        onTabChange={changeTab}
         panels={{
           assessment: (
             <AssessmentView
@@ -135,8 +134,17 @@ function WellView({ id }: { id: string }) {
               methodologies={{ records, current: methodology }}
             />
           ),
-          construction: <ConstructionPlaceholder />,
+          construction: <ConstructionEditor well={well} onDirtyChange={setConstructionDirty} />,
           history: <HistoryTab well={well} />,
+        }}
+      />
+      <DiscardConstructionDialog
+        open={pendingTab !== null}
+        onKeep={() => setPendingTab(null)}
+        onDiscard={() => {
+          if (pendingTab) setTab(pendingTab);
+          setPendingTab(null);
+          setConstructionDirty(false);
         }}
       />
       <EditWellDialog
