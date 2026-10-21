@@ -12,6 +12,7 @@ import {
   initialScoreState,
   isDirty,
   liveComputed,
+  missingDecisions,
   missingJustifications,
   nearestInjectorLine,
   scoreReducer,
@@ -78,6 +79,7 @@ describe('initialScoreState', () => {
     expect(s.suggestions).toEqual(SUGGESTIONS);
     expect(s.carriedFrom).toBeNull();
     expect(s.touched.size).toBe(0);
+    expect(s.decided.size).toBe(0); // no default score: nothing is decided yet
   });
 
   it('a first assessment ignores any previous assessment passed in', () => {
@@ -96,6 +98,12 @@ describe('initialScoreState', () => {
     expect(s.touched.size).toBe(0);
   });
 
+  it('a re-assessment counts every carried row as decided, Unknown rows included', () => {
+    const s = initialScoreState(final({ scores: { ...FT_SASK_SCORES, scvf: null } }), {}, 'reassess');
+    expect([...s.decided].sort()).toEqual([...PARAM_KEYS].sort());
+    expect(missingDecisions(s)).toEqual([]);
+  });
+
   it('continuing a draft prefills from it and marks nothing carried', () => {
     const draft = final({ status: 'draft', computed: null, assessedAt: null });
     const s = initialScoreState(draft, SUGGESTIONS, 'draft');
@@ -103,6 +111,13 @@ describe('initialScoreState', () => {
     expect(s.override).toBe('Re-enter and re-plug');
     expect(s.carriedFrom).toBeNull();
     for (const k of PARAM_KEYS) expect(carriedNote(s, k)).toBeNull();
+  });
+
+  it('continuing a draft counts only its scored rows as decided; its Unknown rows must be chosen again', () => {
+    const draft = final({ status: 'draft', computed: null, assessedAt: null, scores: { ...emptyScores(), cement: 2, usdw: 4 } });
+    const s = initialScoreState(draft, {}, 'draft');
+    expect([...s.decided].sort()).toEqual(['cement', 'usdw']);
+    expect(missingDecisions(s)).toEqual(PARAM_KEYS.filter((k) => k !== 'cement' && k !== 'usdw'));
   });
 
   it('does not share the previous assessment\'s objects', () => {
@@ -115,11 +130,31 @@ describe('initialScoreState', () => {
 });
 
 describe('scoreReducer', () => {
-  it('set changes one score and marks the row touched', () => {
+  it('set changes one score and marks the row touched and decided', () => {
     const s = scoreReducer(fresh(), { type: 'set', key: 'cement', score: 4 });
     expect(s.scores.cement).toBe(4);
     expect(s.scores.plugQuality).toBeNull();
     expect([...s.touched]).toEqual(['cement']);
+    expect([...s.decided]).toEqual(['cement']);
+  });
+
+  it('choosing Unknown (?) on an undecided row records the decision without changing the score', () => {
+    const s0 = fresh();
+    const s = scoreReducer(s0, { type: 'set', key: 'scvf', score: null });
+    expect(s).not.toBe(s0);
+    expect(s.scores.scvf).toBeNull();
+    expect(s.decided.has('scvf')).toBe(true);
+    expect(missingDecisions(s)).not.toContain('scvf');
+    expect(isDirty(s)).toBe(false); // nothing the store holds has changed
+    // Choosing it again is no change.
+    expect(scoreReducer(s, { type: 'set', key: 'scvf', score: null })).toBe(s);
+  });
+
+  it('a justification is not a decision', () => {
+    const s = scoreReducer(fresh(), { type: 'justify', key: 'age', text: 'Spud date unknown' });
+    expect(s.decided.has('age')).toBe(false);
+    expect(missingDecisions(s)).toContain('age');
+    expect(scoreReducer(s, { type: 'override', text: 'Re-enter' }).decided.size).toBe(0);
   });
 
   it('set to the score already chosen is no change', () => {
@@ -148,6 +183,7 @@ describe('scoreReducer', () => {
     expect(s.scores.penetration).toBe(5);
     expect(s.justifications.penetration).toBe('Suggested: from Type 3');
     expect(s.touched.has('penetration')).toBe(true);
+    expect(s.decided.has('penetration')).toBe(true);
 
     const blank = scoreReducer(fresh(), { type: 'justify', key: 'penetration', text: '   ' });
     const applied = scoreReducer(blank, { type: 'applySuggestion', key: 'penetration', suggestion });
@@ -170,12 +206,14 @@ describe('scoreReducer', () => {
 
   it('never mutates the state it is given', () => {
     const s0 = fresh();
-    const snapshot = JSON.stringify({ ...s0, touched: [...s0.touched] });
+    const plain = (s: ScoreState) => JSON.stringify({ ...s, touched: [...s.touched], decided: [...s.decided] });
+    const snapshot = plain(s0);
     scoreReducer(s0, { type: 'set', key: 'cement', score: 4 });
     scoreReducer(s0, { type: 'justify', key: 'cement', text: 'x' });
     scoreReducer(s0, { type: 'applySuggestion', key: 'age', suggestion: SUGGESTIONS.age! });
     scoreReducer(s0, { type: 'override', text: 'x' });
-    expect(JSON.stringify({ ...s0, touched: [...s0.touched] })).toBe(snapshot);
+    scoreReducer(s0, { type: 'set', key: 'age', score: null });
+    expect(plain(s0)).toBe(snapshot);
   });
 });
 
@@ -205,6 +243,20 @@ describe('re-assessment: carried rows', () => {
   it('a first assessment carries nothing', () => {
     const s = fresh();
     for (const k of PARAM_KEYS) expect(carriedNote(s, k)).toBeNull();
+  });
+});
+
+describe('missingDecisions', () => {
+  it('lists the parameters not yet decided, in methodology (PARAM_KEYS) order', () => {
+    let s = fresh();
+    expect(missingDecisions(s)).toEqual([...PARAM_KEYS]);
+    s = scoreReducer(s, { type: 'set', key: 'usdw', score: 2 });
+    s = scoreReducer(s, { type: 'set', key: 'plugQuality', score: null });
+    s = scoreReducer(s, { type: 'applySuggestion', key: 'penetration', suggestion: SUGGESTIONS.penetration! });
+    s = scoreReducer(s, { type: 'justify', key: 'cement', text: 'CBL 1998' });
+    expect(missingDecisions(s)).toEqual(
+      PARAM_KEYS.filter((k) => !['usdw', 'plugQuality', 'penetration'].includes(k)),
+    );
   });
 });
 

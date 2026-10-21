@@ -5,14 +5,16 @@
 // live result; the body lists the Likelihood parameters, then Consequence, in methodology order,
 // and ends with the recommended action and its override; the footer saves a draft or finalises.
 //
-// What the sheet starts from is fixed when it opens: a first assessment starts all Unknown; a
-// draft is continued as saved; a re-assessment starts from the current final with every row
-// "carried from <date>". Suggestions are derived once, from the record and the project's
-// injectors, and saved with the draft; none is ever applied without a click.
+// What the sheet starts from is fixed when it opens: a first assessment starts with nothing
+// decided; a draft is continued as saved (its Unknown rows undecided again); a re-assessment
+// starts from the current final with every row decided and "carried from <date>". Suggestions are
+// derived once, from the record and the project's injectors, and saved with the draft; none is
+// ever applied without a click.
 //
-// Closing (the X, Escape, the overlay) with unsaved changes saves the draft first. Finalise saves
-// the draft and finalises it under the current methodology; it stays disabled while any scored
-// parameter lacks a justification.
+// Closing (the X, Escape, the overlay) with unsaved changes saves the draft first; so does leaving
+// by the browser's Back button; a reload or tab close asks first (beforeunload). Finalise saves the
+// draft and finalises it under the current methodology; it stays disabled until every parameter
+// is decided (a score, or a deliberate Unknown) and every scored parameter has a justification.
 import { useEffect, useId, useReducer, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import {
@@ -39,6 +41,7 @@ import {
   initialScoreState,
   isDirty,
   liveComputed,
+  missingDecisions,
   missingJustifications,
   nearestInjectorLine,
   scoreReducer,
@@ -60,6 +63,11 @@ type Busy = 'save' | 'finalise' | 'close' | null;
 /** "11 justifications missing", "1 justification missing". */
 function missingText(n: number): string {
   return `${n} ${n === 1 ? 'justification' : 'justifications'} missing`;
+}
+
+/** "11 parameters not yet scored", "1 parameter not yet scored". */
+function undecidedText(n: number): string {
+  return `${n} ${n === 1 ? 'parameter' : 'parameters'} not yet scored`;
 }
 
 function modeText(mode: ScoreMode, prev: Assessment | null, revision: string): string {
@@ -91,6 +99,7 @@ export function ScoreSheet({
 }) {
   const store = useStore();
   const sectionId = useId();
+  const undecidedHelpId = useId();
   const finaliseHelpId = useId();
   const finaliseNamesId = useId();
 
@@ -142,11 +151,39 @@ export function ScoreSheet({
     };
   }, [store, well.id]);
 
+  // A reload or tab close cannot wait for a save, so the browser asks first while anything is unsaved.
+  useEffect(() => {
+    const last = latest;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (!isDirty(last.current)) return;
+      e.preventDefault();
+      e.returnValue = true; // older engines
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, []);
+
   const computed = liveComputed(state, methodology);
   const automatic = recommend(state.scores, methodology);
+  const undecided = missingDecisions(state);
   const missing = missingJustifications(state);
   const nameOf = (key: ParamKey): string => methodology.params.find((p) => p.key === key)?.name ?? key;
-  const blocked = missing.length > 0 || busy !== null;
+  const reasons = undecided.length + missing.length > 0;
+  const blocked = reasons || busy !== null;
+  /** Why Finalise is blocked, in words: both lists, for the screen-reader description. */
+  const blockedText = [
+    undecided.length > 0 ? `Not yet scored: ${undecided.map(nameOf).join(', ')}.` : '',
+    missing.length > 0 ? `Justification missing for: ${missing.map(nameOf).join(', ')}.` : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+  const describedBy = [
+    undecided.length > 0 ? undecidedHelpId : null,
+    missing.length > 0 ? finaliseHelpId : null,
+    reasons ? finaliseNamesId : null,
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   /** Saves what is entered as the well's draft; the reducer then treats it as saved. */
   const save = async (): Promise<Assessment> => {
@@ -259,6 +296,7 @@ export function ScoreSheet({
                     key={p.key}
                     param={p}
                     score={state.scores[p.key]}
+                    decided={state.decided.has(p.key)}
                     justification={state.justifications[p.key] ?? ''}
                     suggestion={visibleSuggestion(state, p.key)}
                     carried={carriedNote(state, p.key)}
@@ -285,21 +323,26 @@ export function ScoreSheet({
             Save draft
           </Button>
           <div className="flex flex-wrap items-center justify-end gap-3">
-            {missing.length > 0 ? (
-              <>
-                <p id={finaliseHelpId} className="text-xs text-muted-foreground">
-                  {missingText(missing.length)}
-                </p>
-                <span id={finaliseNamesId} className="sr-only">
-                  {`Justification missing for: ${missing.map(nameOf).join(', ')}`}
-                </span>
-              </>
+            {undecided.length > 0 ? (
+              <p id={undecidedHelpId} className="text-xs text-muted-foreground">
+                {undecidedText(undecided.length)}
+              </p>
             ) : null}
-            <Tooltip open={tipOpen && missing.length > 0} onOpenChange={setTipOpen}>
+            {missing.length > 0 ? (
+              <p id={finaliseHelpId} className="text-xs text-muted-foreground">
+                {missingText(missing.length)}
+              </p>
+            ) : null}
+            {reasons ? (
+              <span id={finaliseNamesId} className="sr-only">
+                {blockedText}
+              </span>
+            ) : null}
+            <Tooltip open={tipOpen && reasons} onOpenChange={setTipOpen}>
               <TooltipTrigger asChild>
                 <Button
                   aria-disabled={blocked}
-                  aria-describedby={missing.length > 0 ? `${finaliseHelpId} ${finaliseNamesId}` : undefined}
+                  aria-describedby={describedBy || undefined}
                   onClick={() => void onFinalise()}
                   className="aria-disabled:cursor-not-allowed aria-disabled:opacity-50 aria-disabled:hover:bg-primary aria-disabled:active:translate-y-0"
                 >
@@ -307,13 +350,27 @@ export function ScoreSheet({
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="top" align="end" className="max-w-sm">
-                <div className="grid gap-1">
-                  <p className="font-medium">Justification missing for:</p>
-                  <ul className="grid list-disc gap-0.5 pl-4">
-                    {missing.map((k) => (
-                      <li key={k}>{nameOf(k)}</li>
-                    ))}
-                  </ul>
+                <div className="grid gap-2">
+                  {undecided.length > 0 ? (
+                    <div className="grid gap-1">
+                      <p className="font-medium">Not yet scored (choose a score or ?):</p>
+                      <ul className="grid list-disc gap-0.5 pl-4">
+                        {undecided.map((k) => (
+                          <li key={k}>{nameOf(k)}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                  {missing.length > 0 ? (
+                    <div className="grid gap-1">
+                      <p className="font-medium">Justification missing for:</p>
+                      <ul className="grid list-disc gap-0.5 pl-4">
+                        {missing.map((k) => (
+                          <li key={k}>{nameOf(k)}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
                 </div>
               </TooltipContent>
             </Tooltip>

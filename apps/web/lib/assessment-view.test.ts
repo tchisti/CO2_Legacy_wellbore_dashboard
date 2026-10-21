@@ -16,6 +16,7 @@ import {
   attribution,
   axisSubtotals,
   diffSummary,
+  isReconfirmation,
   methodologyForRevision,
   priorFinals,
   revisionNote,
@@ -312,12 +313,12 @@ describe('wellHistory', () => {
   const events = [imported, otherWell, finalised, projectImport, updated, otherAssessment, discarded];
 
   it("keeps the well's own events and its assessments' (including a discarded draft), newest first", () => {
-    const entries = wellHistory(events, 'wel_1', new Set(['asm_1']));
+    const entries = wellHistory(events, 'wel_1', [assessment({ id: 'asm_1' })]);
     expect(entries.map((e) => e.id)).toEqual([discarded.id, updated.id, finalised.id, imported.id]);
   });
 
   it('labels the action and entity, and summarises the change', () => {
-    const entries = wellHistory(events, 'wel_1', new Set(['asm_1']));
+    const entries = wellHistory(events, 'wel_1', [assessment({ id: 'asm_1' })]);
     expect(entries.map(({ action, entity, actor, summary }) => ({ action, entity, actor, summary }))).toEqual([
       { action: 'Deleted draft', entity: 'Assessment', actor: 'Tahir Chisti', summary: 'removed' },
       { action: 'Updated', entity: 'Well', actor: 'Tahir Chisti', summary: 'operator' },
@@ -329,10 +330,78 @@ describe('wellHistory', () => {
   it('labels creates and exports, and shows a blank actor as a dash', () => {
     const created = event({ action: 'create', actorName: '', diff: { before: null, after: wellBefore } });
     const exported = event({ action: 'export', diff: { before: null, after: { wells: 1 } } });
-    const entries = wellHistory([created, exported], 'wel_1', new Set());
+    const entries = wellHistory([created, exported], 'wel_1', []);
     expect(entries.map((e) => [e.action, e.actor])).toEqual([
       ['Created', '—'],
       ['Exported', 'Tahir Chisti'],
     ]);
+  });
+});
+
+/* ---------- re-confirmation ---------- */
+
+describe('isReconfirmation', () => {
+  const previous = assessment({
+    id: 'asm_prev',
+    scores: FT_SASK_SCORES,
+    justifications: { plugQuality: 'Seven plugs, tagged', cement: 'CBL 1998' },
+    recommendedAction: { auto: 'Targeted Diagnostics + Watchlist', override: 'Re-enter' },
+  });
+  const same = assessment({
+    id: 'asm_next',
+    supersedesId: 'asm_prev',
+    scores: { ...FT_SASK_SCORES },
+    justifications: { cement: 'CBL 1998', plugQuality: 'Seven plugs, tagged' },
+    recommendedAction: { auto: 'something else', override: 'Re-enter' },
+    methodologyRevision: '2.1.0',
+  });
+
+  it('is true when the scores, justifications and override equal those of the final it supersedes', () => {
+    expect(isReconfirmation(same, previous)).toBe(true);
+    // Blank and missing justifications are the same; so are surrounding spaces and a blank override.
+    expect(
+      isReconfirmation(
+        { ...same, justifications: { ...same.justifications, age: '  ' }, recommendedAction: { auto: '', override: ' Re-enter ' } },
+        previous,
+      ),
+    ).toBe(true);
+  });
+
+  it('is false when any score, justification or the override differs, or there is no previous final', () => {
+    expect(isReconfirmation({ ...same, scores: { ...FT_SASK_SCORES, scvf: null } }, previous)).toBe(false);
+    expect(isReconfirmation({ ...same, justifications: { ...same.justifications, cement: 'CBL 2001' } }, previous)).toBe(false);
+    expect(isReconfirmation({ ...same, justifications: { ...same.justifications, age: 'Spud 1953' } }, previous)).toBe(false);
+    expect(isReconfirmation({ ...same, recommendedAction: { auto: '', override: null } }, previous)).toBe(false);
+    expect(isReconfirmation(same, null)).toBe(false);
+  });
+});
+
+describe('wellHistory: re-confirmation', () => {
+  const first = assessment({ id: 'asm_a', scores: FT_SASK_SCORES, justifications: { plugQuality: 'Tagged' } });
+  const second = assessment({
+    id: 'asm_b',
+    supersedesId: 'asm_a',
+    scores: { ...FT_SASK_SCORES },
+    justifications: { plugQuality: 'Tagged' },
+    assessedAt: '2026-10-20T10:00:00.000Z',
+  });
+  const third = assessment({
+    id: 'asm_c',
+    supersedesId: 'asm_b',
+    scores: { ...FT_SASK_SCORES, age: 5 },
+    justifications: { plugQuality: 'Tagged', age: 'Spud 1953' },
+    assessedAt: '2026-10-20T11:00:00.000Z',
+  });
+  const finalise = (id: string, at: string) =>
+    event({ at, entity: 'assessment', entityId: id, action: 'finalise', diff: { before: { id, wellId: 'wel_1' }, after: { id, wellId: 'wel_1' } } });
+
+  it('labels a finalise that changed nothing "Re-confirmed", and one that changed something "Finalised"', () => {
+    const events = [
+      finalise('asm_a', '2026-08-07T16:16:21.843Z'),
+      finalise('asm_b', '2026-10-20T10:00:00.000Z'),
+      finalise('asm_c', '2026-10-20T11:00:00.000Z'),
+    ];
+    const entries = wellHistory(events, 'wel_1', [third, second, first]);
+    expect(entries.map((e) => e.action)).toEqual(['Finalised', 'Re-confirmed', 'Finalised']);
   });
 });

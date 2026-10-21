@@ -1,8 +1,10 @@
 // The well page as data (spec §4.3): the score table of an assessment (parameter, score, anchor
 // text, justification, weighted contribution, grouped L then C with axis subtotals), which
 // methodology to show it under, the recommended action split into title, paragraphs and lists,
-// earlier finals, and the well's history from the audit trail. Pure: the page loads the records.
+// earlier finals, and the well's history from the audit trail (a finalise that changed nothing
+// reads "Re-confirmed", spec §5.1). Pure: the page loads the records.
 import {
+  PARAM_KEYS,
   anchorText,
   paramsOf,
   resolveScore,
@@ -133,7 +135,7 @@ export type HistoryEntry = {
   id: string;
   /** ISO-8601 UTC. */
   at: string;
-  /** "Created", "Updated", "Finalised", "Deleted draft", "Imported", "Exported", … */
+  /** "Created", "Updated", "Finalised", "Re-confirmed", "Deleted draft", "Imported", "Exported", … */
   action: string;
   /** "Well" or "Assessment". */
   entity: string;
@@ -196,6 +198,27 @@ export function diffSummary(before: unknown, after: unknown): string {
   return changed.length === 0 ? 'no field changes' : changed.map((k) => FIELD_LABEL[k] ?? k).join(', ');
 }
 
+/**
+ * Whether a final re-confirms the final it supersedes (spec §5.1: "the reviewer may finalise
+ * without changes, logged as a re-confirmation"): the same scores, justifications and override.
+ * Blank and missing justifications count as the same, as do surrounding spaces; a blank override
+ * is no override. The automatic text and the revision are the engine's, not the reviewer's, so
+ * they are not compared.
+ */
+export function isReconfirmation(
+  final: Pick<Assessment, 'scores' | 'justifications' | 'recommendedAction'>,
+  previous: Pick<Assessment, 'scores' | 'justifications' | 'recommendedAction'> | null | undefined,
+): boolean {
+  if (!previous) return false;
+  const text = (j: Assessment['justifications'], k: (typeof PARAM_KEYS)[number]) => j[k]?.trim() ?? '';
+  const override = (a: Pick<Assessment, 'recommendedAction'>) => a.recommendedAction.override?.trim() || null;
+  return (
+    PARAM_KEYS.every((k) => (final.scores[k] ?? null) === (previous.scores[k] ?? null)) &&
+    PARAM_KEYS.every((k) => text(final.justifications, k) === text(previous.justifications, k)) &&
+    override(final) === override(previous)
+  );
+}
+
 const wellIdOf = (side: unknown): string | null =>
   isRecord(side) && typeof side.wellId === 'string' ? side.wellId : null;
 
@@ -206,22 +229,38 @@ function isAboutWell(e: AuditEvent, wellId: string, assessmentIds: ReadonlySet<s
   return assessmentIds.has(e.entityId) || wellIdOf(e.diff.before) === wellId || wellIdOf(e.diff.after) === wellId;
 }
 
+/** The label of an event: a discarded draft and a re-confirming finalise get their own. */
+function actionLabel(e: AuditEvent, byId: ReadonlyMap<string, Assessment>): string {
+  if (e.entity !== 'assessment') return ACTION_LABEL[e.action];
+  if (e.action === 'delete') return 'Deleted draft';
+  if (e.action === 'finalise') {
+    const final = byId.get(e.entityId);
+    const previous = final?.supersedesId ? byId.get(final.supersedesId) : undefined;
+    if (final && isReconfirmation(final, previous)) return 'Re-confirmed';
+  }
+  return ACTION_LABEL[e.action];
+}
+
 /**
- * The well's audit trail, newest first: its own events and those of its assessments. An assessment
- * that no longer exists (a discarded draft) is recognised by the well id in its diff.
+ * The well's audit trail, newest first: its own events and those of its assessments (`assessments`
+ * are the well's, as the store lists them). An assessment that no longer exists (a discarded
+ * draft) is recognised by the well id in its diff. A finalise that changed nothing against the
+ * final it supersedes reads "Re-confirmed".
  */
 export function wellHistory(
   events: readonly AuditEvent[],
   wellId: string,
-  assessmentIds: ReadonlySet<string>,
+  assessments: readonly Assessment[],
 ): HistoryEntry[] {
+  const byId = new Map(assessments.map((a) => [a.id, a]));
+  const ids: ReadonlySet<string> = new Set(byId.keys());
   return events
-    .filter((e) => isAboutWell(e, wellId, assessmentIds))
+    .filter((e) => isAboutWell(e, wellId, ids))
     .sort((a, b) => Date.parse(b.at) - Date.parse(a.at))
     .map((e) => ({
       id: e.id,
       at: e.at,
-      action: e.entity === 'assessment' && e.action === 'delete' ? 'Deleted draft' : ACTION_LABEL[e.action],
+      action: actionLabel(e, byId),
       entity: ENTITY_LABEL[e.entity],
       actor: e.actorName.trim() || MISSING,
       summary: diffSummary(e.diff.before, e.diff.after),

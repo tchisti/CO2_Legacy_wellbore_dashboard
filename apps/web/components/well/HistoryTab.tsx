@@ -1,9 +1,9 @@
 'use client';
 
 // The History tab (spec §4.3): the audit trail of the record and of every assessment of the well,
-// newest first: what happened, to what, who did it, when (UTC), and which fields changed. Never
-// the raw diff. Read from the project's audit events so a discarded draft, whose assessment no
-// longer exists, still shows.
+// newest first: what happened (a finalise that changed nothing reads "Re-confirmed", spec §5.1),
+// to what, who did it, when (UTC), and which fields changed. Never the raw diff. Read from the
+// project's audit events so a discarded draft, whose assessment no longer exists, still shows.
 import { HistoryIcon, TriangleAlertIcon } from 'lucide-react';
 import type { Well } from '@lwa/engine';
 import { EmptyState } from '@/components/shell/EmptyState';
@@ -27,7 +27,7 @@ export function HistoryTab({ well }: { well: Pick<Well, 'id' | 'projectId'> }) {
         s.audit.list({ projectId: well.projectId }),
         s.assessments.listForWell(well.id),
       ]);
-      return wellHistory(events, well.id, new Set(assessments.map((a) => a.id)));
+      return wellHistory(events, well.id, assessments);
     },
     [well.id, well.projectId],
   );

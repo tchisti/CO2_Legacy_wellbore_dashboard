@@ -2,9 +2,12 @@
 // over it. Pure: the sheet (components/score/ScoreSheet.tsx) loads the records, owns the reducer
 // and saves through the store.
 //
-// - No default score: a first assessment starts with every parameter Unknown (null).
-// - Re-assessment starts from the current final, and each row reads "carried from <date>" until
-//   the reviewer changes that row's score or justification.
+// - No default score (spec §4.4): a first assessment starts with every parameter undecided. An
+//   undecided parameter is stored as null and counts as Unknown in the live result, but Unknown
+//   is a deliberate click: finalise needs every parameter decided, as a score or as Unknown.
+// - Re-assessment starts from the current final with every parameter decided, and each row reads
+//   "carried from <date>" until the reviewer changes that row's score or justification. A draft
+//   is continued with its scored rows decided; its Unknown rows must be chosen again.
 // - Suggestions are shown, never applied by themselves: only applySuggestion (a reviewer's click)
 //   turns one into a score.
 // - Finalise needs a justification for every parameter that has a score; Unknown never does.
@@ -45,6 +48,8 @@ export type ScoreState = {
   carriedFrom: string | null;
   /** Rows whose score or justification the reviewer has changed since the sheet opened. */
   touched: ReadonlySet<ParamKey>;
+  /** Rows the reviewer has decided: a score or a deliberate Unknown. A justification is not a decision. */
+  decided: ReadonlySet<ParamKey>;
   /** What the store holds for this flow (as opened, or as last saved). */
   baseline: Entered;
 };
@@ -66,9 +71,10 @@ const blank = (text: string | null | undefined): boolean => !text?.trim();
 const normalOverride = (text: string | null): string | null => text?.trim() || null;
 
 /**
- * The flow's opening state. `new` starts every parameter Unknown with nothing written, whatever
+ * The flow's opening state. `new` starts every parameter undecided with nothing written, whatever
  * `prev` is; `draft` and `reassess` copy the scores, justifications and override of `prev` (the
- * draft or the current final), and `reassess` marks every row carried from the final's date.
+ * draft or the current final). `reassess` counts every row as decided and carried from the final's
+ * date; `draft` counts only the rows with a score as decided.
  */
 export function initialScoreState(prev: Assessment | null, suggestions: Suggestions, mode: ScoreMode): ScoreState {
   const from = mode === 'new' ? null : prev;
@@ -82,22 +88,31 @@ export function initialScoreState(prev: Assessment | null, suggestions: Suggesti
     suggestions: { ...suggestions },
     carriedFrom: mode === 'reassess' && from ? from.assessedAt : null,
     touched: new Set(),
+    decided: new Set(
+      mode === 'reassess' && from ? PARAM_KEYS : PARAM_KEYS.filter((k) => entered.scores[k] !== null),
+    ),
     baseline: entered,
   };
 }
 
-function touch(touched: ReadonlySet<ParamKey>, key: ParamKey): ReadonlySet<ParamKey> {
-  return touched.has(key) ? touched : new Set([...touched, key]);
+function add(keys: ReadonlySet<ParamKey>, key: ParamKey): ReadonlySet<ParamKey> {
+  return keys.has(key) ? keys : new Set([...keys, key]);
 }
 
 export function scoreReducer(state: ScoreState, action: ScoreAction): ScoreState {
   switch (action.type) {
     case 'set': {
-      if (state.scores[action.key] === action.score) return state;
+      const { key, score } = action;
+      if (state.scores[key] === score) {
+        // Choosing the value a row already holds changes nothing, except that choosing Unknown on
+        // an undecided row is the deliberate Unknown the reviewer owes (spec §4.4).
+        return state.decided.has(key) ? state : { ...state, decided: add(state.decided, key) };
+      }
       return {
         ...state,
-        scores: { ...state.scores, [action.key]: action.score },
-        touched: touch(state.touched, action.key),
+        scores: { ...state.scores, [key]: score },
+        touched: add(state.touched, key),
+        decided: add(state.decided, key),
       };
     }
     case 'justify': {
@@ -105,7 +120,7 @@ export function scoreReducer(state: ScoreState, action: ScoreAction): ScoreState
       return {
         ...state,
         justifications: { ...state.justifications, [action.key]: action.text },
-        touched: touch(state.touched, action.key),
+        touched: add(state.touched, action.key),
       };
     }
     case 'applySuggestion': {
@@ -117,7 +132,8 @@ export function scoreReducer(state: ScoreState, action: ScoreAction): ScoreState
         ...state,
         scores: { ...state.scores, [key]: suggestion.score },
         justifications,
-        touched: touch(state.touched, key),
+        touched: add(state.touched, key),
+        decided: add(state.decided, key),
       };
     }
     case 'override':
@@ -148,12 +164,17 @@ export function nearestInjectorLine(nearest: NearestInjector | null): string {
   return `Nearest injector: ${nearest.name} · ${km} km (${nearest.insideAoR ? 'inside' : 'outside'} the AoR)`;
 }
 
+/** Parameters the reviewer has not yet decided (neither scored nor chosen Unknown), in methodology (PARAM_KEYS) order. */
+export function missingDecisions(state: Pick<ScoreState, 'decided'>): ParamKey[] {
+  return PARAM_KEYS.filter((k) => !state.decided.has(k));
+}
+
 /** Parameters with a score but no justification, in methodology (PARAM_KEYS) order. Unknown never counts. */
 export function missingJustifications(state: Pick<ScoreState, 'scores' | 'justifications'>): ParamKey[] {
   return PARAM_KEYS.filter((k) => state.scores[k] !== null && blank(state.justifications[k]));
 }
 
-/** L, C, cell and rank of the scores as they stand, under `m` (the current methodology). */
+/** L, C, cell and rank of the scores as they stand, under `m` (the current methodology); undecided counts as Unknown. */
 export function liveComputed(state: Pick<ScoreState, 'scores'>, m: Methodology): Computed {
   return computeWell(state.scores, m);
 }

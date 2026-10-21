@@ -33,6 +33,14 @@ const radio = (sheet: Locator, key: ParamKey, value: '1' | '2' | '3' | '4' | '5'
 const justification = (sheet: Locator, key: ParamKey) => sheet.getByLabel(`Justification for ${nameOf(key)}`, { exact: true });
 const liveResult = (sheet: Locator) => sheet.locator('[data-live-result]');
 const finaliseButton = (sheet: Locator) => sheet.getByRole('button', { name: 'Finalise assessment' });
+const notYetScored = (sheet: Locator) => sheet.getByText(/^\d+ parameters? not yet scored$/);
+
+/** Chooses Unknown (?) on each of `keys`: the deliberate Unknown finalise needs (spec §4.4). */
+async function chooseUnknown(sheet: Locator, keys: readonly ParamKey[]): Promise<void> {
+  for (const key of keys) await radio(sheet, key, 'Unknown').click();
+}
+
+const keysExcept = (...skip: ParamKey[]): ParamKey[] => PARAMS.map((p) => p.key).filter((k) => !skip.includes(k));
 const historyActions = (page: Page) =>
   page.getByRole('table', { name: 'History' }).locator('tbody tr td[data-column="action"]');
 
@@ -78,7 +86,7 @@ test.describe('score flow', () => {
     await seedFixture(page);
   });
 
-  test('score an unscored well: Unknown by default; clicking 3 on every row shows live "L 3.0 × C 3.0 → cell 9 · Moderate"; Finalise is blocked with "11 justifications missing"; after filling them Finalise succeeds and the header shows Moderate, assessed by T. Chisti', async ({
+  test('score an unscored well: nothing chosen by default ("11 parameters not yet scored", Finalise blocked); clicking 3 on every row shows live "L 3.0 × C 3.0 → cell 9 · Moderate"; Finalise is blocked with "11 justifications missing"; after filling them Finalise succeeds and the header shows Moderate, assessed by T. Chisti', async ({
     page,
   }) => {
     const id = await addWell(page, NEW_WELL);
@@ -89,18 +97,30 @@ test.describe('score flow', () => {
     const axes = await sheet.locator('[data-param]').evaluateAll((rows) => rows.map((r) => r.getAttribute('data-axis')));
     expect(axes).toEqual(['L', 'L', 'L', 'L', 'L', 'L', 'L', 'C', 'C', 'C', 'C']);
     await expect(sheet.getByRole('heading', { name: /^(Likelihood|Consequence)/ })).toHaveText([/^Likelihood/, /^Consequence/]);
+    // No default score: no option is chosen, not even Unknown, and Finalise waits for all 11.
     for (const p of PARAMS) {
       await expect(row(sheet, p.key).getByRole('radiogroup', { name: `Score for ${p.name}` })).toBeVisible();
-      await expect(radio(sheet, p.key, 'Unknown')).toHaveAttribute('aria-checked', 'true');
-      await expect(row(sheet, p.key).getByRole('radio', { checked: true })).toHaveCount(1);
+      await expect(row(sheet, p.key).getByRole('radio', { checked: true })).toHaveCount(0);
+      await expect(radio(sheet, p.key, 'Unknown')).toHaveAttribute('aria-checked', 'false');
     }
-    await expect(row(sheet, 'plugQuality').locator('[data-anchor]')).toHaveText('Unknown — scores as 5');
-    await expect(row(sheet, 'scvf').locator('[data-anchor]')).toHaveText('Unknown — scores as 3');
+    await expect(row(sheet, 'plugQuality').locator('[data-anchor]')).toHaveText(
+      'Not yet scored — counts as Unknown (scores as 5)',
+    );
+    await expect(row(sheet, 'scvf').locator('[data-anchor]')).toHaveText('Not yet scored — counts as Unknown (scores as 3)');
+    // Undecided rows count as Unknown in the live result.
     await expect(liveResult(sheet)).toHaveText('L 4.2 × C 3.6 → cell 16 · High');
-    // Unknown needs no justification: nothing is missing yet, but nothing has been chosen either.
+    await expect(sheet.getByText('11 parameters not yet scored', { exact: true })).toBeVisible();
     await expect(sheet.getByText(/justifications? missing/)).toHaveCount(0);
+    await expect(finaliseButton(sheet)).toBeDisabled();
+
+    // A deliberate Unknown is a decision; it needs no justification.
+    await radio(sheet, 'plugQuality', 'Unknown').click();
+    await expect(radio(sheet, 'plugQuality', 'Unknown')).toHaveAttribute('aria-checked', 'true');
+    await expect(row(sheet, 'plugQuality').locator('[data-anchor]')).toHaveText('Unknown — scores as 5');
+    await expect(sheet.getByText('10 parameters not yet scored', { exact: true })).toBeVisible();
 
     for (const p of PARAMS) await radio(sheet, p.key, '3').click();
+    await expect(notYetScored(sheet)).toHaveCount(0);
     await expect(liveResult(sheet)).toHaveText('L 3.0 × C 3.0 → cell 9 · Moderate');
     await expect(row(sheet, 'plugQuality').locator('[data-anchor]')).toContainText(
       'Era-standard abandonment; plugs present but unverified (no tag/log)',
@@ -162,7 +182,7 @@ test.describe('score flow', () => {
     await expect(chip).toBeVisible(); // differs again (Unknown ≠ 5)
   });
 
-  test('re-assess a final well: rows marked "carried from <date>"; finalising unchanged creates a second final; History shows two finalise events', async ({
+  test('re-assess a final well: rows marked "carried from <date>"; finalising unchanged creates a second final; History shows one "Finalised" and one "Re-confirmed"', async ({
     page,
   }) => {
     const id = await addWell(page, NEW_WELL);
@@ -171,6 +191,10 @@ test.describe('score flow', () => {
     await justification(sheet, 'plugQuality').fill('Two cement plugs, one tagged.');
     await radio(sheet, 'usdw', '4').click();
     await justification(sheet, 'usdw').fill('Surface casing short of the BGWP base.');
+    await expect(sheet.getByText('9 parameters not yet scored', { exact: true })).toBeVisible();
+    await expect(finaliseButton(sheet)).toBeDisabled();
+    await chooseUnknown(sheet, keysExcept('plugQuality', 'usdw'));
+    await expect(notYetScored(sheet)).toHaveCount(0);
     await finalise(page, sheet);
 
     const assessedOn = await page.evaluate(async (wellId) => {
@@ -183,8 +207,9 @@ test.describe('score flow', () => {
     await expect(radio(sheet, 'plugQuality', '2')).toHaveAttribute('aria-checked', 'true');
     await expect(justification(sheet, 'plugQuality')).toHaveValue('Two cement plugs, one tagged.');
     await expect(radio(sheet, 'usdw', '4')).toHaveAttribute('aria-checked', 'true');
-    await expect(radio(sheet, 'cement', 'Unknown')).toHaveAttribute('aria-checked', 'true');
+    await expect(radio(sheet, 'cement', 'Unknown')).toHaveAttribute('aria-checked', 'true'); // carried rows are decided
     await expect(sheet.getByText(/justifications? missing/)).toHaveCount(0);
+    await expect(notYetScored(sheet)).toHaveCount(0);
 
     // Changing a row drops its "carried" mark; changing it back keeps the row as the reviewer's own.
     await radio(sheet, 'cement', '3').click();
@@ -194,7 +219,11 @@ test.describe('score flow', () => {
 
     await finalise(page, sheet);
     await page.getByRole('tab', { name: 'History' }).click();
-    await expect(historyActions(page).filter({ hasText: /^Finalised$/ })).toHaveCount(2);
+    // spec §5.1: finalising without changes is logged as a re-confirmation.
+    await expect(historyActions(page).filter({ hasText: /^(Finalised|Re-confirmed)$/ })).toHaveText([
+      'Re-confirmed',
+      'Finalised',
+    ]);
     await page.getByRole('tab', { name: 'Assessment' }).click();
     await expect(page.getByRole('button', { name: /Prior assessments \(1\)/ })).toBeVisible();
   });
@@ -205,6 +234,7 @@ test.describe('score flow', () => {
     await expect(liveResult(sheet)).toHaveText('L 1.8 × C 2.6 → cell 6 · Moderate');
     await expect(finaliseButton(sheet)).toBeDisabled();
     await expect(sheet.getByText('11 justifications missing', { exact: true })).toBeVisible();
+    await expect(notYetScored(sheet)).toHaveCount(0); // carried rows are decided
 
     // The reason is reachable by keyboard: the blocked button stays focusable and describes itself.
     await finaliseButton(sheet).focus();
@@ -230,6 +260,8 @@ test.describe('score flow', () => {
     await expect(sheet.getByText('Recommended action (automatic): Re-entry + Mitigation Required')).toBeVisible();
     await sheet.getByRole('button', { name: 'Override', exact: true }).click();
     await sheet.getByLabel('Reviewer override').fill('Re-enter and re-plug before injection start-up.');
+    await expect(finaliseButton(sheet)).toBeDisabled(); // nothing decided yet
+    await chooseUnknown(sheet, keysExcept());
     await finalise(page, sheet);
 
     const action = page.getByRole('region', { name: 'Recommended action' });
@@ -255,6 +287,9 @@ test.describe('score flow', () => {
 
     await radio(sheet, 'plume', '3').click();
     await justification(sheet, 'plume').fill('No coordinates on file; corridor position unknown, scored mid.');
+    await expect(sheet.getByText('10 parameters not yet scored', { exact: true })).toBeVisible();
+    await expect(finaliseButton(sheet)).toBeDisabled();
+    await chooseUnknown(sheet, keysExcept('plume'));
     await finalise(page, sheet);
     await expect(verdict(page).locator('[data-rank]')).toBeVisible();
     await expect(verdict(page)).toContainText('by T. Chisti');
@@ -279,7 +314,9 @@ test.describe('score flow', () => {
     await expect(radio(sheet, 'plugQuality', '2')).toHaveAttribute('aria-checked', 'true');
     await expect(radio(sheet, 'cement', '4')).toHaveAttribute('aria-checked', 'true');
     await expect(justification(sheet, 'cement')).toHaveValue('No CBL on file.');
-    await expect(radio(sheet, 'barriers', 'Unknown')).toHaveAttribute('aria-checked', 'true');
+    // The draft's Unknown rows are undecided again: nothing chosen, and they still count.
+    await expect(row(sheet, 'barriers').getByRole('radio', { checked: true })).toHaveCount(0);
+    await expect(sheet.getByText('9 parameters not yet scored', { exact: true })).toBeVisible();
     await expect(sheet.getByText(/carried from/)).toHaveCount(0);
 
     // Closing with nothing changed saves nothing.
@@ -308,6 +345,17 @@ test.describe('score flow', () => {
   test('keyboard: focus a row, press 4 sets 4, press ? sets Unknown', async ({ page }) => {
     const id = await addWell(page, NEW_WELL);
     const sheet = await openScore(page, id, NEW_WELL.licence, 'Score');
+
+    // An undecided group has no chosen option; its tab stop is the first option, and ? records a
+    // deliberate Unknown.
+    const scvfUnknown = radio(sheet, 'scvf', 'Unknown');
+    await expect(scvfUnknown).toHaveAttribute('tabindex', '0');
+    await expect(scvfUnknown).toHaveAttribute('aria-checked', 'false');
+    await scvfUnknown.focus();
+    await page.keyboard.press('?');
+    await expect(scvfUnknown).toHaveAttribute('aria-checked', 'true');
+    await expect(sheet.getByText('10 parameters not yet scored', { exact: true })).toBeVisible();
+
     const unknown = radio(sheet, 'plugQuality', 'Unknown');
     await unknown.focus();
     await page.keyboard.press('4');
@@ -316,11 +364,13 @@ test.describe('score flow', () => {
     await expect(unknown).toHaveAttribute('aria-checked', 'false');
     await expect(row(sheet, 'plugQuality').locator('[data-anchor]')).toContainText('Judgment call between the 3 and 5 anchors');
     await expect(sheet.getByText('1 justification missing', { exact: true })).toBeVisible();
+    await expect(sheet.getByText('9 parameters not yet scored', { exact: true })).toBeVisible();
 
     await page.keyboard.press('?');
     await expect(unknown).toHaveAttribute('aria-checked', 'true');
     await expect(unknown).toBeFocused();
     await expect(row(sheet, 'plugQuality').locator('[data-anchor]')).toHaveText('Unknown — scores as 5');
+    await expect(sheet.getByText('9 parameters not yet scored', { exact: true })).toBeVisible();
 
     // Arrow keys move through the options (and choose, as radios do); one tab stop per group.
     await page.keyboard.press('ArrowRight');
@@ -342,5 +392,36 @@ test.describe('score flow', () => {
     await expect(radio(sheet, 'plugQuality', '2')).toHaveAttribute('aria-checked', 'true');
     await expect(justification(sheet, 'plugQuality')).toHaveValue('Two plugs, tagged. 1953');
     await expect(sheet.getByText(/justifications? missing/)).toHaveCount(0);
+
+    // On an undecided group, arrows move from the focused option.
+    await radio(sheet, 'cement', 'Unknown').focus();
+    await page.keyboard.press('ArrowLeft');
+    await expect(radio(sheet, 'cement', '5')).toHaveAttribute('aria-checked', 'true');
+    await expect(radio(sheet, 'cement', '5')).toBeFocused();
+  });
+
+  test('leaving the page (reload, tab close) with unsaved changes asks first; with nothing unsaved it does not', async ({
+    page,
+  }) => {
+    const id = await addWell(page, NEW_WELL);
+    const sheet = await openScore(page, id, NEW_WELL.licence, 'Score');
+    const dialogs: string[] = [];
+    page.on('dialog', (dialog) => {
+      dialogs.push(dialog.type());
+      void dialog.dismiss(); // stay on the page
+    });
+
+    await radio(sheet, 'scvf', '5').click();
+    await page.close({ runBeforeUnload: true });
+    await expect.poll(() => dialogs).toEqual(['beforeunload']);
+    expect(page.isClosed()).toBe(false);
+    await expect(radio(sheet, 'scvf', '5')).toHaveAttribute('aria-checked', 'true'); // nothing lost
+
+    // Back to what the store holds (scvf null): nothing to lose, so no prompt.
+    await radio(sheet, 'scvf', 'Unknown').click();
+    const closed = page.waitForEvent('close');
+    await page.close({ runBeforeUnload: true });
+    await closed;
+    expect(dialogs).toEqual(['beforeunload']);
   });
 });

@@ -1,13 +1,17 @@
 'use client';
 
 // One parameter in the score flow (spec §4.4): its name and weight; the score as a radio group
-// "? 1 2 3 4 5" (Unknown first, and a deliberate choice like any other); the methodology's anchor
-// for the chosen value, always visible under the buttons; a derived suggestion beside the buttons
-// while it differs from the choice; and the justification, required once the parameter has a score.
+// "? 1 2 3 4 5"; the methodology's anchor for the chosen value, always visible under the buttons;
+// a derived suggestion beside the buttons while it differs from the choice; and the justification,
+// required once the parameter has a score.
 //
-// Keyboard (spec §7): one tab stop per group (roving tabindex on the chosen option); with the group
-// focused, 1–5 choose that score, ? chooses Unknown, arrow keys move through the options and choose
-// them, as radios do; Tab moves on to the justification.
+// No default score: until the reviewer decides, no option is chosen (not even ?), and the anchor
+// line says the row is not yet scored and counts as Unknown. Unknown is a deliberate choice like
+// any other, and finalise waits until every row is decided.
+//
+// Keyboard (spec §7): one tab stop per group (roving tabindex on the chosen option, or the first
+// option while undecided); with the group focused, 1–5 choose that score, ? chooses Unknown, and
+// arrow keys move from the focused option and choose, as radios do; Tab moves on to the justification.
 import { useId, useRef, type KeyboardEvent, type ReactNode } from 'react';
 import { CornerDownRightIcon } from 'lucide-react';
 import { anchorText, type Param, type Score, type Suggestion } from '@lwa/engine';
@@ -23,14 +27,19 @@ const DIGIT = /^[1-5]$/;
 function ScoreButtons({
   param,
   value,
+  decided,
   onChange,
 }: {
   param: Param;
   value: Score | null;
+  /** False until the reviewer chooses: then no option is checked. */
+  decided: boolean;
   onChange: (score: Score | null) => void;
 }) {
   const buttons = useRef<(HTMLButtonElement | null)[]>([]);
-  const index = Math.max(0, OPTIONS.indexOf(value));
+  /** The chosen option, or -1 while undecided. */
+  const index = decided ? OPTIONS.indexOf(value) : -1;
+  const tabStop = Math.max(0, index);
 
   const choose = (i: number) => {
     const option = OPTIONS[i];
@@ -41,11 +50,13 @@ function ScoreButtons({
 
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
     if (e.altKey || e.ctrlKey || e.metaKey) return;
+    const focused = buttons.current.findIndex((b) => b !== null && b === e.target);
+    const from = focused >= 0 ? focused : tabStop;
     let next: number | null = null;
     if (DIGIT.test(e.key)) next = Number(e.key);
     else if (e.key === '?') next = 0;
-    else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next = (index + 1) % OPTIONS.length;
-    else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') next = (index - 1 + OPTIONS.length) % OPTIONS.length;
+    else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next = (from + 1) % OPTIONS.length;
+    else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') next = (from - 1 + OPTIONS.length) % OPTIONS.length;
     else if (e.key === 'Home') next = 0;
     else if (e.key === 'End') next = OPTIONS.length - 1;
     if (next === null) return;
@@ -73,7 +84,7 @@ function ScoreButtons({
             aria-checked={checked}
             aria-label={option === null ? 'Unknown' : undefined}
             title={option === null ? anchorText(param, null) : `${option} — ${anchorText(param, option)}`}
-            tabIndex={checked ? 0 : -1}
+            tabIndex={i === tabStop ? 0 : -1}
             data-value={option ?? 'unknown'}
             onClick={() => choose(i)}
             className={cn(
@@ -95,6 +106,7 @@ function ScoreButtons({
 export function ScoreRow({
   param,
   score,
+  decided,
   justification,
   suggestion,
   carried,
@@ -105,6 +117,8 @@ export function ScoreRow({
 }: {
   param: Param;
   score: Score | null;
+  /** Whether the reviewer has chosen this row's score (or Unknown); an undecided row's score is null. */
+  decided: boolean;
   /** As typed. */
   justification: string;
   /** Shown only when it differs from `score` (the caller decides; see visibleSuggestion). */
@@ -151,18 +165,22 @@ export function ScoreRow({
             from the buttons goes straight to the justification (spec §7). */}
         <div className="flex flex-wrap items-center justify-end gap-2">
           {suggestion ? <SuggestionChip suggestion={suggestion} onApply={onApplySuggestion} /> : null}
-          <ScoreButtons param={param} value={score} onChange={onScore} />
+          <ScoreButtons param={param} value={score} decided={decided} onChange={onScore} />
         </div>
       </div>
 
       <p
         data-anchor
+        data-decided={decided}
         className={cn(
           'border-l-2 pl-2.5 text-[13px] text-pretty',
-          score === null ? 'border-line text-muted-foreground' : 'border-primary/60 text-ink',
+          score === null ? 'text-muted-foreground' : 'border-primary/60 text-ink',
+          score === null && (decided ? 'border-line-strong' : 'border-dashed border-line-strong'),
         )}
       >
-        {score === null ? (
+        {!decided ? (
+          `Not yet scored — counts as Unknown (scores as ${param.unknownScore})`
+        ) : score === null ? (
           anchorText(param, null)
         ) : (
           <>
