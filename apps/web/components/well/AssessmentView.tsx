@@ -21,8 +21,12 @@ import { cn } from '@/lib/utils';
 
 type Methodologies = { records: readonly MethodologyRecord[]; current: Methodology };
 
+/** How the score table's last column is worked out (under the Scores heading, on screen and in print). */
+export const CONTRIBUTION_CAPTION =
+  "Contribution = weight × score; an unknown (?) counts at the parameter's unknown score.";
+
 /** The note shown when an assessment's own revision is not in the project. */
-function RevisionNote({ assessed, current }: { assessed: string; current: string }) {
+export function RevisionNote({ assessed, current }: { assessed: string; current: string }) {
   return (
     <p role="note" className="text-xs text-muted-foreground">
       Anchors and weights shown from rev {current}; rev {assessed} is not available in this project.
@@ -31,7 +35,7 @@ function RevisionNote({ assessed, current }: { assessed: string; current: string
 }
 
 /** One assessment's score table under the methodology it was assessed with (or the current one). */
-function AssessmentScores({
+export function AssessmentScores({
   assessment,
   methodologies,
   label,
@@ -203,9 +207,7 @@ export function AssessmentView({
           <h2 id={scoresHeading} className="text-sm font-medium">
             Scores
           </h2>
-          <p className="text-xs text-muted-foreground">
-            Contribution = weight × score; an unknown (?) counts at the parameter&apos;s unknown score.
-          </p>
+          <p className="text-xs text-muted-foreground">{CONTRIBUTION_CAPTION}</p>
         </div>
         <AssessmentScores assessment={current} methodologies={methodologies} labelledBy={scoresHeading} />
       </section>

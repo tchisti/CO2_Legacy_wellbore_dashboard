@@ -2,7 +2,7 @@
 // else the automatic text, labelled so a reader always knows which they are reading. The automatic
 // text is the engine's (recommendationText): a title line, then paragraphs and "- " action lists.
 // An override is the reviewer's own words and keeps its line breaks; the automatic text stays one
-// click away beneath it.
+// click away beneath it, or (`foldAutomatic={false}`, the printed dossier) is shown beneath it.
 import { useId } from 'react';
 import type { Assessment } from '@lwa/engine';
 import { actionText } from '@/lib/assessment-view';
@@ -30,7 +30,14 @@ function AutomaticText({ text, headingLevel }: { text: string; headingLevel: 'h3
   );
 }
 
-export function RecommendedAction({ action }: { action: Assessment['recommendedAction'] }) {
+export function RecommendedAction({
+  action,
+  foldAutomatic = true,
+}: {
+  action: Assessment['recommendedAction'];
+  /** Under an override, the automatic text is folded into a disclosure; false shows it (print has no clicks). */
+  foldAutomatic?: boolean;
+}) {
   const headingId = useId();
   const override = action.override?.trim() ? action.override : null;
   return (
@@ -49,7 +56,12 @@ export function RecommendedAction({ action }: { action: Assessment['recommendedA
       {override ? (
         <>
           <p className="max-w-[80ch] whitespace-pre-line text-pretty text-ink">{override}</p>
-          {action.auto ? (
+          {action.auto && !foldAutomatic ? (
+            <div data-automatic className="grid gap-1.5 border-l-2 pl-3 text-muted-foreground">
+              <p className="text-xs">Automatic recommendation</p>
+              <AutomaticText text={action.auto} headingLevel="p" />
+            </div>
+          ) : action.auto ? (
             <details className="group text-muted-foreground">
               <summary className="w-fit cursor-pointer rounded-sm text-xs outline-none select-none hover:text-ink focus-visible:ring-3 focus-visible:ring-ring/50">
                 Automatic recommendation

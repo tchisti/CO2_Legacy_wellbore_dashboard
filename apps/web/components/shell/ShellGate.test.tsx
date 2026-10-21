@@ -7,9 +7,13 @@ import { StoreProvider } from '@/lib/store/provider';
 import type { Store } from '@/lib/store/store';
 
 const router = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn() }));
-vi.mock('next/navigation', () => ({ useRouter: () => router, usePathname: () => '/portfolio' }));
+const nav = vi.hoisted(() => ({ pathname: '/portfolio' }));
+vi.mock('next/navigation', () => ({ useRouter: () => router, usePathname: () => nav.pathname }));
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  nav.pathname = '/portfolio';
+});
 
 let dbCount = 0;
 async function renderShell(seed?: (s: Store) => Promise<void>) {
@@ -54,6 +58,17 @@ describe('ShellGate', () => {
     expect(screen.getByRole('navigation').textContent).toBe('PortfolioWellsMethodologyProject settings');
     expect(screen.getByRole('button', { name: /Test AOR/ })).toBeTruthy();
     expect(screen.getByRole('button', { name: /TC/ })).toBeTruthy();
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('renders a report route bare: no top bar, no navigation, no profile dialog (even with no profile set)', async () => {
+    nav.pathname = '/report/well';
+    await renderShell(async (s) => {
+      await s.projects.create({ name: 'Test AOR' });
+    });
+    expect(await screen.findByText('Page content')).toBeTruthy();
+    expect(screen.queryByRole('navigation')).toBeNull();
+    expect(screen.queryByText('Legacy Well Assessment')).toBeNull();
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 });

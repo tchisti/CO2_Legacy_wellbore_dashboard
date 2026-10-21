@@ -84,6 +84,14 @@ export function buildRows(
 export const ASSESSMENT_FILTER_STATES = ['unscored', 'draft', 'final', 'stale'] as const;
 export type AssessmentFilterState = (typeof ASSESSMENT_FILTER_STATES)[number];
 
+/** How the Assessment filter names each state (its chip menu, and a printed report's filter line). */
+export const STATE_LABELS: Record<AssessmentFilterState, string> = {
+  unscored: 'Unscored',
+  draft: 'Draft',
+  final: 'Final',
+  stale: 'Stale revision',
+};
+
 export type Filters = {
   /** One case-insensitive substring of the licence, name or operator. */
   text: string;

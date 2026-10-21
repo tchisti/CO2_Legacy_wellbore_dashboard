@@ -16,8 +16,10 @@ import {
   reviveKeptCopy,
   reviveRows,
   rowForSvgId,
+  rowName,
   rowSource,
   rowsFromWellbore,
+  rowsNotDrawn,
   safeColour,
   sameConstruction,
   schematicExport,
@@ -492,5 +494,60 @@ describe('a kept working copy', () => {
     expect(Object.keys(reordered)).not.toEqual(Object.keys(FULL));
     expect(restoreDecision({ base: constructionKey(reordered), rows }, FULL, null)).toBe('restore');
     expect(restoreDecision({ base: 'stale', rows: rowsFromWellbore(FULL) }, FULL, null)).toBe('drop');
+  });
+});
+
+describe('rows not drawn (for the printed dossier)', () => {
+  it('rowName is the editor\'s name for a row: singular and 1-based index', () => {
+    expect(rowName('plugs', 0)).toBe('Plug 1');
+    expect(rowName('formations', 2)).toBe('Formation top 3');
+  });
+
+  it('lists every stored row the depth rules leave out of the drawing, with why, its depths and its source text', () => {
+    const stored: Wellbore = WellboreSchema.parse({
+      td: 1500,
+      plugs: [
+        { n: 1, kind: 'cement', top_m: 1400, bottom_m: 1450 },
+        { n: 2, kind: 'cement', top_m: 1463, bottom_m: 1448, source: 'extractor', verbatim: 'Plug 2: 1463/1448 m' },
+      ],
+      casings: [{ name: 'Surface', top_m: -5, shoe_m: 186 }],
+      formations: [{ name: 'Nisku', top_m: 1100 }],
+    });
+    const rows = rowsFromWellbore(stored);
+    const result = wellboreFromRows(rows, null);
+    expect(rowsNotDrawn(rows, result.errors)).toEqual([
+      { name: 'Casing 1', reasons: ['Top (m) must be 0 or more.'], depths: 'Top (m) -5, Shoe (m) 186', verbatim: null },
+      {
+        name: 'Plug 2',
+        reasons: ['Top (m) is deeper than Bottom (m).'],
+        depths: 'Top (m) 1463, Bottom (m) 1448',
+        verbatim: 'Plug 2: 1463/1448 m',
+      },
+    ]);
+    // ... and the drawing indeed leaves them out, keeping the other rows' indices.
+    expect(result.drawing.plugs?.[1]).toBeNull();
+    expect(result.drawing.casings?.[0]).toBeNull();
+  });
+
+  it('is empty when every row is drawn', () => {
+    const rows = rowsFromWellbore(FULL);
+    expect(rowsNotDrawn(rows, wellboreFromRows(rows, null).errors)).toEqual([]);
+  });
+
+  it('names a record-wide error too, so nothing is ever left out silently', () => {
+    const rows = rowsFromWellbore(FULL);
+    const errors = [{ list: null, rowKey: null, field: 'record', kind: 'input' as const, message: 'The construction record does not read: x' }];
+    expect(rowsNotDrawn(rows, errors)).toEqual([
+      { name: 'Construction record', reasons: ['The construction record does not read: x'], depths: '', verbatim: null },
+    ]);
+  });
+});
+
+describe('schematicExport at a given size', () => {
+  it('draws at the size asked for, in the light palette', () => {
+    const svg = schematicExport({ td: 1500, packers: [{ depth_m: 1000 }] }, 'm', { width: 420, height: 640 });
+    expect(svg).toContain('viewBox="0 0 420 640"');
+    expect(svg).toContain(`fill="${LIGHT_COLOURS.ink}"`);
+    expect(svg).not.toContain('var(--');
   });
 });

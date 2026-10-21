@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   ROUTES,
   WELL_TABS,
+  isReportPath,
   isWellTabUrl,
   newWellHref,
   parseWellTab,
@@ -98,6 +99,17 @@ describe('parseWellTab', () => {
     for (const tab of WELL_TABS) {
       const query = new URLSearchParams(wellHref('wel_1', { tab }).split('?')[1]);
       expect(parseWellTab(query.get('tab'))).toBe(tab);
+    }
+  });
+});
+
+describe('isReportPath', () => {
+  it('is true for the report routes only, however the static export serves them', () => {
+    for (const p of ['/report', '/report/', '/report/well', '/report/well/', '/report/well.html', '/report/portfolio']) {
+      expect(isReportPath(p)).toBe(true);
+    }
+    for (const p of ['/', '/reports', '/reporting/well', '/wells/view', '/portfolio', '']) {
+      expect(isReportPath(p)).toBe(false);
     }
   });
 });

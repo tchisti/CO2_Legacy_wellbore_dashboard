@@ -25,19 +25,13 @@ import { cn } from '@/lib/utils';
 import {
   ASSESSMENT_FILTER_STATES,
   EMPTY_FILTERS,
+  STATE_LABELS,
   applyFilters,
   hasActiveFilters,
   type AssessmentFilterState,
   type Filters,
   type WellRow,
 } from '@/lib/wells-view';
-
-export const STATE_LABELS: Record<AssessmentFilterState, string> = {
-  unscored: 'Unscored',
-  draft: 'Draft',
-  final: 'Final',
-  stale: 'Stale revision',
-};
 
 /** "Unknown ≥ n" choices offered in the menu (a link may carry any n from 1 to 11). */
 const UNKNOWN_STEPS = [1, 2, 3, 4, 5] as const;

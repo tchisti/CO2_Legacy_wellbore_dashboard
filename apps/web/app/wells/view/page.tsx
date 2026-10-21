@@ -21,29 +21,11 @@ import { WellTabs } from '@/components/well/WellTabs';
 import { EditWellDialog } from '@/components/wells/EditWellDialog';
 import { clearUnsavedConstruction } from '@/lib/construction-session';
 import { assessmentState } from '@/lib/derived';
+import { loadWell } from '@/lib/load-well';
 import { useProjects } from '@/lib/project-context';
 import { wellHref, wellsHref, type WellTab } from '@/lib/routes';
 import { useStoreQuery } from '@/lib/store/provider';
-import type { Store } from '@/lib/store/store';
 import { useWellTab } from '@/lib/use-well-tab';
-
-/**
- * The well with its project (injectors, for the score flow), its assessments and the methodologies
- * needed to show them; null when there is no such well.
- */
-async function loadWell(s: Store, id: string) {
-  const well = await s.wells.get(id);
-  if (!well) return null;
-  const [project, current, draft, assessments, records, methodology] = await Promise.all([
-    s.projects.get(well.projectId),
-    s.assessments.current(id),
-    s.assessments.draft(id),
-    s.assessments.listForWell(id),
-    s.methodology.list(),
-    s.methodology.current(),
-  ]);
-  return { well, project, current, draft, assessments, records, methodology };
-}
 
 const BackToWells = () => (
   <Link

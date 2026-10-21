@@ -3,12 +3,12 @@
 // The Wells register (spec §4.2): every well of the active project with its current rank and
 // assessment state, filtered by chips whose state lives in the URL (so a filtered view can be
 // linked, reloaded and printed), sorted riskiest first, with record edits and guarded deletes,
-// Import (CSV or JSON, with a validation report before anything is written) and Export (CSV of the
-// current view or of the selection).
+// Import (CSV or JSON, with a validation report before anything is written), Export (CSV of the
+// current view or of the selection) and Report (the portfolio report of the current filter).
 import { Suspense, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { FilterXIcon, PlusIcon, TableIcon, TriangleAlertIcon, UploadIcon } from 'lucide-react';
+import { FileTextIcon, FilterXIcon, PlusIcon, TableIcon, TriangleAlertIcon, UploadIcon } from 'lucide-react';
 import type { Assessment, Well } from '@lwa/engine';
 import { ImportDialog } from '@/components/import/ImportDialog';
 import { EmptyState } from '@/components/shell/EmptyState';
@@ -22,10 +22,19 @@ import { WellFilters } from '@/components/wells/WellFilters';
 import { WellTable } from '@/components/wells/WellTable';
 import { plural } from '@/lib/format';
 import { useProjects } from '@/lib/project-context';
-import { newWellHref, wellHref } from '@/lib/routes';
+import { newWellHref, portfolioReportHref, wellHref } from '@/lib/routes';
 import { useRegister } from '@/lib/use-register';
 import { useUrlFilters } from '@/lib/use-url-filters';
-import { DEFAULT_SORT, applyFilters, nextSort, sortRows, type Sort, type SortKey, type WellRow } from '@/lib/wells-view';
+import {
+  DEFAULT_SORT,
+  applyFilters,
+  filtersToQuery,
+  nextSort,
+  sortRows,
+  type Sort,
+  type SortKey,
+  type WellRow,
+} from '@/lib/wells-view';
 
 const NO_ROWS: WellRow[] = [];
 const NO_WELLS: Well[] = [];
@@ -76,6 +85,12 @@ function WellsRegister() {
             wells={data?.wells ?? NO_WELLS}
             current={data?.current ?? NO_FINALS}
           />
+          <Button asChild variant="outline">
+            <Link href={portfolioReportHref(filtersToQuery(filters))} prefetch={false}>
+              <FileTextIcon aria-hidden="true" />
+              Report
+            </Link>
+          </Button>
           <Button asChild>
             <Link href={newWellHref()}>
               <PlusIcon aria-hidden="true" />

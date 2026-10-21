@@ -59,6 +59,15 @@ export function isWellTabUrl(url: URL, id: string, tab: WellTab): boolean {
   );
 }
 
+/**
+ * Whether a pathname is one of the print reports (/report/well, /report/portfolio). They render
+ * without the app's chrome (spec §7: report routes are documents). The static export may serve
+ * them as /report/well, /report/well/ or /report/well.html.
+ */
+export function isReportPath(pathname: string): boolean {
+  return pathname === '/report' || pathname.startsWith('/report/') || pathname.startsWith('/report.');
+}
+
 export function wellReportHref(id: string): string {
   return `/report/well${queryString({ id })}`;
 }

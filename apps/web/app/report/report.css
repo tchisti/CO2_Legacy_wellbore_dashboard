@@ -1,0 +1,110 @@
+/*
+ * The print reports' own stylesheet (spec §7), imported by app/report/layout.tsx only. Next.js does
+ * not unload a route's global CSS when the user navigates away, so nothing here may touch another
+ * page: every rule is scoped to a document that holds the report root (.report-root, rendered by
+ * components/report/ReportFrame.tsx), and the page box is the named page `report`, never the
+ * unnamed @page. The report's own text for the page margins (project, subject, attribution) is
+ * written by the page itself (lib/report.ts pageMarginCss); the page numbers are here.
+ */
+
+/*
+ * Reports always read and print in the light palette, whatever theme the user picked: the light
+ * value of every token the dark theme changes (app/globals.css; a unit test keeps them equal).
+ * `html:has(.report-root)` (0,1,1) outranks `[data-theme="dark"]` (0,1,0) on the same element, and
+ * the shadcn names (--background, --card, …) follow, since they are declared from these on :root.
+ */
+html:has(.report-root) {
+  color-scheme: light;
+
+  --bg: #f7f8f9;
+  --surface: #ffffff;
+  --subtle: #f1f3f5;
+  --hover: #eaedf1;
+  --line: #e1e5ea;
+  --line-strong: #b4bcc6;
+  --ink: #15191e;
+  --muted: #5d6773;
+  --accent: #2557c7;
+  --accent-ink: #ffffff;
+  --danger: #b42318;
+  --warn-fg: #7a4a00;
+  --warn-bg: #fdf6dc;
+  --warn-line: #e0bd55;
+}
+
+/* Every box of a report is on the named page `report` (the body's descendants follow it). */
+html:has(.report-root) body,
+.report-root {
+  page: report;
+}
+
+/* Rank colours, badges and table fills print as they are on screen. */
+.report-root {
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+@page report {
+  size: letter;
+  margin: 18mm;
+
+  @top-left {
+    font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+    font-size: 7.5pt;
+    color: #5d6773;
+    vertical-align: bottom;
+    padding-bottom: 4mm;
+  }
+  @top-right {
+    font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+    font-size: 7.5pt;
+    color: #5d6773;
+    vertical-align: bottom;
+    padding-bottom: 4mm;
+  }
+  @bottom-left {
+    font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+    font-size: 7.5pt;
+    color: #5d6773;
+    vertical-align: top;
+    padding-top: 4mm;
+  }
+  @bottom-right {
+    content: "Page " counter(page) " of " counter(pages);
+    font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+    font-size: 7.5pt;
+    color: #5d6773;
+    vertical-align: top;
+    padding-top: 4mm;
+  }
+}
+
+/*
+ * Tables that scroll sideways on a narrow screen fit the sheet instead: a report is as wide as its
+ * page. (Unlayered, so this outranks the components' min-width utilities.)
+ */
+.report-root table {
+  min-width: 0;
+}
+.report-root [data-slot="table-container"] {
+  overflow: visible;
+}
+
+@media print {
+  html:has(.report-root),
+  html:has(.report-root) body {
+    background: #ffffff;
+  }
+
+  /* Keep a row, a figure and a block marked data-keep on one page; a heading stays with what follows. */
+  .report-root tr,
+  .report-root figure,
+  .report-root [data-keep] {
+    break-inside: avoid;
+  }
+  .report-root h2,
+  .report-root h3,
+  .report-root [data-keep-with-next] {
+    break-after: avoid;
+  }
+}

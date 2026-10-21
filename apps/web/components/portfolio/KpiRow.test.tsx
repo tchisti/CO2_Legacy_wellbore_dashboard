@@ -68,4 +68,24 @@ describe('KpiRow', () => {
     render(<KpiRow stats={{ ...STATS, total: 1 }} rankLabels={RANKS} />);
     expect(tile('1 well').textContent).toContain('1well');
   });
+
+  it('with linked={false} (print) shows the same counts with no link, so nothing in a report is interactive', () => {
+    const { container } = render(<KpiRow stats={STATS} rankLabels={RANKS} linked={false} />);
+    expect(screen.queryAllByRole('link')).toHaveLength(0);
+    expect(container.querySelectorAll('a')).toHaveLength(0);
+    const counts = [...container.querySelectorAll('[data-kpi-count]')];
+    expect(counts.map((c) => c.textContent)).toEqual(['7', '4', '1', '0', '0', '2', '0', '1', '0']);
+    expect(container.querySelector('[data-kpi="stale"]')?.getAttribute('data-tone')).toBe('warn');
+    expect(container.querySelector('[data-kpi="rank:High"]')?.hasAttribute('data-zero')).toBe(true);
+    expect(container.textContent).toContain('Unknown-heavy');
+  });
+
+  it('stacked keeps the state counts on a row of their own at any window width', () => {
+    const { container, rerender } = render(<KpiRow stats={STATS} rankLabels={RANKS} />);
+    const states = () => container.querySelector('[data-kpi="unscored"]')!.parentElement!;
+    expect(states().className).toContain('xl:basis-auto');
+    rerender(<KpiRow stats={STATS} rankLabels={RANKS} stacked />);
+    expect(states().className).not.toContain('xl:');
+    expect(states().className).toContain('basis-full');
+  });
 });

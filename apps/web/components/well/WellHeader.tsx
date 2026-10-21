@@ -60,6 +60,37 @@ function ReasonedBadge({
   );
 }
 
+/** The verdict's figures: the rank badge with its cell, "L 1.8 × C 2.6", "Cell 6", "Index 4.6" (also the printed dossier's). */
+export function VerdictFigures({
+  computed,
+  className,
+}: {
+  computed: NonNullable<Assessment['computed']>;
+  className?: string;
+}) {
+  return (
+    <div className={cn('flex flex-wrap items-center gap-x-3 gap-y-1', className)}>
+      <RankBadge label={computed.rank} cell={computed.cell} className="h-6 px-2 text-sm" />
+      <span className="num text-sm whitespace-nowrap text-ink">
+        L {fmt1(computed.L)} × C {fmt1(computed.C)}
+      </span>
+      {/* Each separator travels with the figure after it, so a wrapped line never ends on a dot. */}
+      <span className="inline-flex items-center gap-3">
+        <span aria-hidden="true" className="text-line-strong">
+          ·
+        </span>
+        <span className="num text-sm whitespace-nowrap text-ink">Cell {computed.cell}</span>
+      </span>
+      <span className="inline-flex items-center gap-3">
+        <span aria-hidden="true" className="text-line-strong">
+          ·
+        </span>
+        <span className="num text-sm whitespace-nowrap text-ink">Index {fmt1(computed.riskIndex)}</span>
+      </span>
+    </div>
+  );
+}
+
 export function WellHeader({
   well,
   current,
@@ -123,25 +154,7 @@ export function WellHeader({
         <div role="group" aria-label="Verdict" className="grid gap-1.5 lg:justify-items-end lg:text-right">
           {computed ? (
             <>
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 lg:justify-end">
-                <RankBadge label={computed.rank} cell={computed.cell} className="h-6 px-2 text-sm" />
-                <span className="num text-sm whitespace-nowrap text-ink">
-                  L {fmt1(computed.L)} × C {fmt1(computed.C)}
-                </span>
-                {/* Each separator travels with the figure after it, so a wrapped line never ends on a dot. */}
-                <span className="inline-flex items-center gap-3">
-                  <span aria-hidden="true" className="text-line-strong">
-                    ·
-                  </span>
-                  <span className="num text-sm whitespace-nowrap text-ink">Cell {computed.cell}</span>
-                </span>
-                <span className="inline-flex items-center gap-3">
-                  <span aria-hidden="true" className="text-line-strong">
-                    ·
-                  </span>
-                  <span className="num text-sm whitespace-nowrap text-ink">Index {fmt1(computed.riskIndex)}</span>
-                </span>
-              </div>
+              <VerdictFigures computed={computed} className="lg:justify-end" />
               {current ? <p className="text-xs text-muted-foreground">{attribution(current)}</p> : null}
             </>
           ) : (

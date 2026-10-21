@@ -33,6 +33,7 @@ import {
   TD_FIELD,
   numberText,
   rowForSvgId,
+  rowName,
   rowSource,
   sourceLabel,
   svgIdOf,
@@ -182,7 +183,7 @@ function RowBody({
 }) {
   const baseId = useId();
   const spec = LISTS[list];
-  const name = `${spec.singular} ${index + 1}`;
+  const name = rowName(list, index);
   const id = svgIdOf(list, index);
   const verbatim = typeof row.original.verbatim === 'string' && row.original.verbatim ? row.original.verbatim : null;
   const type = typeof row.original.type === 'string' ? row.original.type : undefined;

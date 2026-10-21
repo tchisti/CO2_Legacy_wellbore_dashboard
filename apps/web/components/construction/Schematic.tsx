@@ -29,8 +29,11 @@ const MIN_HEIGHT = 320;
 /** Tick labels are 11 px; closer than this they run into each other. */
 const TICK_SPACING = 11;
 
-/** The pixel size to draw at: the box, but tall enough for the (denser) foot ticks in either unit. */
-function drawingSize(box: { w: number; h: number } | null, td: number | null | undefined) {
+/**
+ * The pixel size to draw at: the box, but tall enough for the (denser) foot ticks in either unit.
+ * The printed dossier draws at this size too, for a box of its own.
+ */
+export function drawingSize(box: { w: number; h: number } | null, td: number | null | undefined) {
   if (!box) return {};
   const ticks = typeof td === 'number' && td > 0 ? depthScale(td, 1).ticks('ft').length : 0;
   return {

@@ -99,4 +99,13 @@ describe('ParamTable', () => {
     expect(rowOf(table, 'barriers').querySelector('[data-column="unknown"]')!.textContent).toBe('3');
     expect(table.querySelector('[data-rank]')).toBeNull();
   });
+
+  it('compact (print) fits its page: no sideways scroll region or minimum width, the same rows and sums', () => {
+    const table = renderTable(<ParamTable methodology={DEFAULT_METHODOLOGY} labelledBy="h" compact />);
+    expect(table.className).not.toMatch(/min-w-/);
+    expect(table.className).toContain('text-[11px]');
+    expect(screen.queryByRole('group')).toBeNull();
+    expect(table.querySelectorAll('tr[data-param]')).toHaveLength(11);
+    expect(table.querySelectorAll('tr[data-sum]')).toHaveLength(2);
+  });
 });

@@ -24,6 +24,7 @@ import {
   type Wellbore,
   type WellboreInput,
   type WellboreSource,
+  type WellboreSvgOptions,
 } from '@lwa/engine';
 import { fmtDepth } from '@/lib/format';
 
@@ -450,6 +451,46 @@ export function wellboreFromRows(rows: ConstructionRows, fallbackTd: number | nu
   return { wellbore, record: asRecord.data, drawing, errors, warnings };
 }
 
+/** A row's name in the editor and in reports: "Plug 1" (1-based, in list order). */
+export function rowName(list: ListKey, index: number): string {
+  return `${LISTS[list].singular} ${index + 1}`;
+}
+
+/** A row the depth rules leave out of the drawing, for a printed record (never left out silently). */
+export type RowNotDrawn = {
+  /** "Plug 2", or "Construction record" for an error in the record as a whole. */
+  name: string;
+  /** The errors' messages: "Top (m) is deeper than Bottom (m)." */
+  reasons: string[];
+  /** The row's depths as entered: "Top (m) 1463, Bottom (m) 1448"; '' when it has none. */
+  depths: string;
+  /** The text the row was read from, when it was parsed or imported. */
+  verbatim: string | null;
+};
+
+/**
+ * The rows `errors` (wellboreFromRows) keep out of the record and the drawing, in editor order
+ * (lists as in LIST_KEYS, rows in list order), each once with every reason it has.
+ */
+export function rowsNotDrawn(rows: ConstructionRows, errors: readonly FieldError[]): RowNotDrawn[] {
+  const out: RowNotDrawn[] = errors
+    .filter((e) => e.list === null)
+    .map((e) => ({ name: 'Construction record', reasons: [e.message], depths: '', verbatim: null }));
+  for (const list of LIST_KEYS) {
+    rows.lists[list].forEach((row, index) => {
+      const reasons = errors.filter((e) => e.list === list && e.rowKey === row.key).map((e) => e.message);
+      if (reasons.length === 0) return;
+      const depths = LISTS[list].fields
+        .filter((f) => f.kind === 'number' && f.depth && (row.values[f.key] ?? '').trim() !== '')
+        .map((f) => `${f.label} ${(row.values[f.key] ?? '').trim()}`)
+        .join(', ');
+      const v = row.original.verbatim;
+      out.push({ name: rowName(list, index), reasons, depths, verbatim: typeof v === 'string' && v.trim() ? v : null });
+    });
+  }
+  return out;
+}
+
 /**
  * Whether the working copy has changes to save: the record as entered differs from the saved one,
  * or typed text does not read. A depth error alone in a stored row (an imported inverted interval)
@@ -656,13 +697,18 @@ export function standaloneSvg(svg: string, background: string): string {
 export const LIGHT_COLOURS = { line: '#e1e5ea', muted: '#5d6773', ink: '#15191e', surface: '#ffffff' } as const;
 
 /**
- * The schematic as a standalone SVG file: the engine's default size, the light palette inlined
- * whatever the screen's theme (so the file reads the same on paper and on any viewer), on a white
+ * The schematic as a standalone SVG file: the engine's default size (or `size`, drawn at that size
+ * so its 11 px labels stay 11 px, as the printed dossier needs), the light palette inlined whatever
+ * the screen's theme (so the file reads the same on paper and on any viewer), on a white
  * background. '' when there is nothing to draw.
  */
-export function schematicExport(drawing: WellboreInput, unit: DepthUnit): string {
+export function schematicExport(
+  drawing: WellboreInput,
+  unit: DepthUnit,
+  size?: Pick<WellboreSvgOptions, 'width' | 'height'>,
+): string {
   const { line, muted, ink, surface } = LIGHT_COLOURS;
-  const svg = renderWellboreSVG(drawing, { unit, resolvedColors: { line, muted, ink } });
+  const svg = renderWellboreSVG(drawing, { unit, ...size, resolvedColors: { line, muted, ink } });
   return svg ? standaloneSvg(svg, surface) : '';
 }
 
