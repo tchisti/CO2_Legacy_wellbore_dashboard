@@ -35,13 +35,25 @@ describe('KpiRow', () => {
     expect(tile('Drafts: 0 wells').getAttribute('href')).toBe('/wells?state=draft');
     expect(tile('Stale revision: 1 well').getAttribute('href')).toBe('/wells?state=stale');
     expect(tile('Unknown-heavy: 0 wells').getAttribute('href')).toBe('/wells?minUnknown=4');
-    // No register filter exists for this state yet: the tile opens the register unfiltered.
-    expect(tile('Record changed: 3 wells').getAttribute('href')).toBe('/wells');
+  });
+
+  it('has no "Record changed" tile: that state is a Well page badge, not a KPI (spec §5.1)', () => {
+    render(<KpiRow stats={STATS} rankLabels={RANKS} />);
+    expect(screen.getAllByRole('link')).toHaveLength(9);
+    expect(screen.queryByRole('link', { name: /Record changed/ })).toBeNull();
+    expect(screen.queryByText(/Record changed/)).toBeNull();
+  });
+
+  it('sets every count in the mono number face (spec §7)', () => {
+    const { container } = render(<KpiRow stats={STATS} rankLabels={RANKS} />);
+    const counts = [...container.querySelectorAll('[data-kpi-count]')];
+    expect(counts.map((c) => c.textContent)).toEqual(['7', '4', '1', '0', '0', '2', '0', '1', '0']);
+    for (const c of counts) expect(c.classList.contains('num')).toBe(true);
+    expect(tile('Low: 4 wells').querySelector('[data-kpi-count]')?.textContent).toBe('4');
   });
 
   it('keeps zero tiles in place, marked as zero; only a non-zero stale count is amber', () => {
     const { rerender } = render(<KpiRow stats={STATS} rankLabels={RANKS} />);
-    expect(screen.getAllByRole('link')).toHaveLength(10);
     expect(tile('High: 0 wells').hasAttribute('data-zero')).toBe(true);
     expect(tile('Low: 4 wells').hasAttribute('data-zero')).toBe(false);
     expect(tile('Stale revision: 1 well').getAttribute('data-tone')).toBe('warn');

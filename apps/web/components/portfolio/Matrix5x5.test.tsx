@@ -29,11 +29,12 @@ const cellRect = (container: HTMLElement, key: string) => container.querySelecto
 describe('Matrix5x5', () => {
   it('names each populated cell by L, C, cell value, band and count, and links it to the filtered register', () => {
     render(<Matrix5x5 counts={counts()} methodology={DEFAULT_METHODOLOGY} hrefFor={hrefFor} />);
+    // Document (= tab) order follows the reading order: top row (L 5) first, left to right (WCAG 2.4.3).
     const links = screen.getAllByRole('link');
     expect(links.map((a) => a.getAttribute('aria-label'))).toEqual([
+      'L 5 × C 1, cell 5, Moderate: 2 wells',
       'L 2 × C 2, cell 4, Low: 4 wells',
       'L 2 × C 3, cell 6, Moderate: 1 well',
-      'L 5 × C 1, cell 5, Moderate: 2 wells',
     ]);
     expect(screen.getByRole('link', { name: 'L 2 × C 3, cell 6, Moderate: 1 well' }).getAttribute('href')).toBe(
       '/wells?Cr=3&Lr=2',
@@ -42,7 +43,10 @@ describe('Matrix5x5', () => {
 
   it('empty cells are not links, and without hrefFor no cell is', () => {
     const { container, rerender } = render(<Matrix5x5 counts={counts()} methodology={DEFAULT_METHODOLOGY} hrefFor={hrefFor} />);
-    expect(container.querySelectorAll('[data-cell]')).toHaveLength(25);
+    const cells = [...container.querySelectorAll('[data-cell]')].map((c) => c.getAttribute('data-cell'));
+    expect(cells).toHaveLength(25);
+    expect(cells.slice(0, 6)).toEqual(['5-1', '5-2', '5-3', '5-4', '5-5', '4-1']);
+    expect(cells.at(-1)).toBe('1-5');
     expect(container.querySelector('[data-cell="1-1"]')!.tagName.toLowerCase()).toBe('g');
     rerender(<Matrix5x5 counts={counts()} methodology={DEFAULT_METHODOLOGY} />);
     expect(screen.queryAllByRole('link')).toHaveLength(0);

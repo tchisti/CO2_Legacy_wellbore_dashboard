@@ -1,7 +1,9 @@
 // The Portfolio's count row (spec §4.1): how many wells, how many in each rank (with a small
-// rank-colour accent, spec §7), then quieter tiles for the derived states (§5.1). Every tile links
-// into the Wells register filtered to exactly the wells it counts, so a number is one click from
-// its wells. A zero stays in place, muted. Only a stale revision, when there is one, is amber.
+// rank-colour accent, spec §7), then quieter tiles for the derived states that are KPIs (§5.1:
+// unscored, drafts, stale revision, plus unknown-heavy; "record changed" is not a KPI, it shows on
+// the Well page and in Needs attention). Every tile links into the Wells register filtered to
+// exactly the wells it counts, so a number is one click from its wells. Counts are in the mono
+// number face (§7). A zero stays in place, muted. Only a stale revision, when there is one, is amber.
 import Link from 'next/link';
 import type { CSSProperties } from 'react';
 import { HistoryIcon } from 'lucide-react';
@@ -56,14 +58,6 @@ export function KpiRow({ stats, rankLabels }: { stats: PortfolioStats; rankLabel
       href: wellsFilterHref({ minUnknown: UNKNOWN_HEAVY_MIN }),
       hint: `Current assessments with ${UNKNOWN_HEAVY_MIN} or more parameters Unknown`,
     },
-    {
-      key: 'recordChanged',
-      label: 'Record changed',
-      count: stats.recordChanged,
-      // The register has no filter for this state yet, so the tile opens it unfiltered.
-      href: wellsHref(),
-      hint: 'Wells whose record was edited after their current assessment (the Wells register has no filter for this yet)',
-    },
   ];
 
   return (
@@ -72,7 +66,9 @@ export function KpiRow({ stats, rankLabels }: { stats: PortfolioStats; rankLabel
       <div className="flex grow flex-wrap">
         <Link href={wellsHref()} aria-label={plural(stats.total, 'well')} data-kpi="total" className={cn(TILE, 'grow-0 pr-6')}>
           <span className="flex items-baseline gap-1.5">
-            <span className="text-2xl leading-8 font-semibold text-ink">{stats.total}</span>
+            <span data-kpi-count className="num text-2xl leading-8 font-semibold text-ink">
+              {stats.total}
+            </span>
             <span className="text-sm text-muted-foreground">{stats.total === 1 ? 'well' : 'wells'}</span>
           </span>
           <span className="text-xs text-muted-foreground">in this area of review</span>
@@ -91,7 +87,10 @@ export function KpiRow({ stats, rankLabels }: { stats: PortfolioStats; rankLabel
                 data-zero={count === 0 || undefined}
                 className={TILE}
               >
-                <span className={cn('text-2xl leading-8 font-semibold', count === 0 ? 'text-muted-foreground' : 'text-ink')}>
+                <span
+                  data-kpi-count
+                  className={cn('num text-2xl leading-8 font-semibold', count === 0 ? 'text-muted-foreground' : 'text-ink')}
+                >
                   {count}
                 </span>
                 <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -128,8 +127,9 @@ export function KpiRow({ stats, rankLabels }: { stats: PortfolioStats; rankLabel
               className={cn(TILE, warn && 'border border-warn-line bg-warn-bg hover:bg-warn-bg/70')}
             >
               <span
+                data-kpi-count
                 className={cn(
-                  'text-lg leading-8 font-medium',
+                  'num text-lg leading-8 font-medium',
                   warn ? 'text-warn' : zero ? 'text-muted-foreground' : 'text-ink',
                 )}
               >

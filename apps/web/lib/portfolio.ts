@@ -34,7 +34,10 @@ export type PortfolioStats = {
   draft: number;
   stale: number;
   unknownHeavy: number;
-  /** Current finals whose record was edited after they were assessed (no register filter yet). */
+  /**
+   * Current finals whose record was edited after they were assessed. Not a KPI (spec §5.1: an info
+   * badge on the Well page); such wells are listed under Needs attention.
+   */
   recordChanged: number;
   /** Current finals per cell: `matrix[Lr - 1][Cr - 1]`. Drafts and unscored wells are not in it. */
   matrix: number[][];

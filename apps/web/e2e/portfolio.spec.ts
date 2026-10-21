@@ -24,6 +24,8 @@ test.describe('with the Fort Saskatchewan fixture', () => {
     await expect(counts(page).getByRole('link', { name: 'High: 0 wells', exact: true })).toBeVisible();
     await expect(counts(page).getByRole('link', { name: 'Very High: 0 wells', exact: true })).toBeVisible();
     await expect(counts(page).getByRole('link', { name: 'Unscored: 0 wells', exact: true })).toBeVisible();
+    // "Record changed" is a Well page badge, not a KPI (spec §5.1).
+    await expect(counts(page).getByRole('link', { name: /Record changed/ })).toHaveCount(0);
     await expect(matrix(page).getByRole('link', { name: CELL_2_3, exact: true })).toBeVisible();
     await expect(attention(page).getByRole('link', { name: /100\/13-05-056-22W4\/00/ })).toContainText('Assessed under 1.0.0');
     await expect(drivers(page).locator('[data-driver]').first()).toHaveAttribute('data-driver', 'penetration');

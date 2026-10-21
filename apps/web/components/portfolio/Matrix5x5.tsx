@@ -5,7 +5,8 @@
 // as a light tint (spec §7: rank colours only for rank), stronger where wells sit, with the count
 // in mono and the cell value (L × C) small in the corner. Drawn as one vector SVG, so it prints
 // crisply. With `hrefFor`, every cell that holds wells is a link (Tab, then Enter) into the Wells
-// register filtered to that cell; empty cells are not links.
+// register filtered to that cell; empty cells are not links. Cells are emitted top row first, left
+// to right, so the tab order follows the reading order (WCAG 2.4.3).
 import type { MouseEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { bandFor, type Methodology } from '@lwa/engine';
@@ -24,6 +25,8 @@ const WIDTH = PLOT_X + PLOT + 2;
 const HEIGHT = PLOT_Y + PLOT + 42; // room for the consequence ticks and title
 
 const RATINGS = Array.from({ length: MATRIX_SIZE }, (_, i) => i + 1);
+/** Likelihood rows as drawn and as tabbed through: 5 (top) down to 1, matching the reading order. */
+const ROWS_TOP_DOWN = [...RATINGS].reverse();
 const cellX = (Cr: number) => PLOT_X + (Cr - 1) * (CELL + GAP);
 const cellY = (Lr: number) => PLOT_Y + (MATRIX_SIZE - Lr) * (CELL + GAP);
 
@@ -109,7 +112,7 @@ export function Matrix5x5({
           Consequence (C)
         </text>
 
-        {RATINGS.flatMap((Lr) =>
+        {ROWS_TOP_DOWN.flatMap((Lr) =>
           RATINGS.map((Cr) => {
             const count = counts[Lr - 1]?.[Cr - 1] ?? 0;
             const band = bandFor(Lr * Cr, methodology);
