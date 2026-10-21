@@ -6,19 +6,29 @@
 // own document, so it brings the global styles and the saved theme itself; there is no shell to
 // link through, so the way back is a plain link that reloads the app on Portfolio. The error goes
 // to the logging hook (lib/log.ts).
-import { useState } from 'react';
+//
+// The font variables (--font-inter, --font-jetbrains-mono) come from next/font on the root layout's
+// <html>, which this document replaces: without them the theme's font stacks would be invalid and
+// the page would fall back to the browser's serif. It defines them as the system stacks instead.
+import { useState, type CSSProperties } from 'react';
 import { TriangleAlertIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useReportError } from '@/lib/log';
 import { readStoredTheme } from '@/lib/theme';
 import './globals.css';
 
+/** System fonts in place of the layout's web fonts (app/globals.css builds its stacks on these). */
+const FALLBACK_FONTS = {
+  '--font-inter': 'ui-sans-serif, system-ui, sans-serif',
+  '--font-jetbrains-mono': 'ui-monospace, "SFMono-Regular", Menlo, monospace',
+} as const;
+
 export default function GlobalError({ error, reset }: { error: unknown; reset: () => void }) {
   useReportError(error, 'global-error-boundary');
   const [theme] = useState(readStoredTheme);
   const detail = error instanceof Error && error.message ? error.message : null;
   return (
-    <html lang="en" data-theme={theme === 'dark' ? 'dark' : undefined}>
+    <html lang="en" data-theme={theme === 'dark' ? 'dark' : undefined} style={FALLBACK_FONTS as CSSProperties}>
       <head>
         <title>Something went wrong · Legacy Well Assessment</title>
       </head>

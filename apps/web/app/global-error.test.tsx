@@ -31,6 +31,14 @@ describe('global error boundary (app/global-error.tsx)', () => {
     expect(screen.getByText('Cannot read the shell')).toBeTruthy();
   });
 
+  it('defines the font variables the root layout would have, as system stacks, so the page is not set in serif', () => {
+    silenceConsole();
+    render(<GlobalError error={new Error('x')} reset={() => {}} />);
+    const style = document.documentElement.style;
+    expect(style.getPropertyValue('--font-inter')).toBe('ui-sans-serif, system-ui, sans-serif');
+    expect(style.getPropertyValue('--font-jetbrains-mono')).toMatch(/monospace$/);
+  });
+
   it('Try again calls reset', async () => {
     silenceConsole();
     const reset = vi.fn();

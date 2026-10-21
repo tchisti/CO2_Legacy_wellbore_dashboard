@@ -14,6 +14,8 @@ export const HOOK_MARKER = '__lwa';
 export const E2E_BUILD_MARKER = '.e2e-build';
 
 const TEXT = /\.(?:js|mjs|html|txt|json|css|map)$/;
+/** The app's code: an export with none of it is not an export (an empty or half-copied out/). */
+const SCRIPT = /\.(?:js|mjs)$/;
 
 function* files(dir) {
   for (const name of readdirSync(dir)) {
@@ -23,18 +25,24 @@ function* files(dir) {
   }
 }
 
-/** The problems with `outDir` as a deployable export: empty when it carries no e2e hooks. */
+/**
+ * The problems with `outDir` as a deployable export: empty when it carries no e2e hooks. An export
+ * with no JavaScript at all is a problem too, so an empty or broken out/ cannot pass unscanned.
+ */
 export function e2eHookProblems(outDir) {
   if (!existsSync(outDir)) return [`${outDir} does not exist: build the export first`];
   const problems = [];
   if (existsSync(path.join(outDir, E2E_BUILD_MARKER))) {
     problems.push(`${E2E_BUILD_MARKER} is present: out/ was built by \`pnpm build:e2e\``);
   }
+  let scripts = 0;
   for (const file of files(outDir)) {
+    if (SCRIPT.test(file)) scripts += 1;
     if (TEXT.test(file) && readFileSync(file, 'utf8').includes(HOOK_MARKER)) {
       problems.push(`${path.relative(outDir, file)} contains the e2e hook (${HOOK_MARKER})`);
     }
   }
+  if (scripts === 0) problems.push(`no JavaScript files in ${outDir}: nothing was scanned, build the export first`);
   return problems;
 }
 
@@ -42,7 +50,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const outDir = path.resolve(process.argv[2] ?? path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'out'));
   const problems = e2eHookProblems(outDir);
   if (problems.length > 0) {
-    console.error(`The export in ${outDir} must not ship the e2e hooks:\n${problems.map((p) => `- ${p}`).join('\n')}`);
+    console.error(`The export in ${outDir} fails the e2e-hook check (it must be a plain build, without the hooks):\n${problems.map((p) => `- ${p}`).join('\n')}`);
     process.exit(1);
   }
   console.log(`No e2e hooks in ${outDir}.`);

@@ -30,9 +30,23 @@ describe('assert-no-e2e-hooks', () => {
   });
 
   it('fails an export marked as an e2e build, and a missing export', () => {
-    const dir = exportDir({ [E2E_BUILD_MARKER]: 'next build with NEXT_PUBLIC_E2E=1\n' });
+    const dir = exportDir({
+      [E2E_BUILD_MARKER]: 'next build with NEXT_PUBLIC_E2E=1\n',
+      '_next/static/chunks/a.js': 'e.s(["f",0,function(e){}])',
+    });
     expect(e2eHookProblems(dir)).toEqual([`${E2E_BUILD_MARKER} is present: out/ was built by \`pnpm build:e2e\``]);
     expect(e2eHookProblems(path.join(dir, 'nope'))[0]).toMatch(/does not exist/);
+  });
+
+  it('fails an export with no JavaScript to scan: an empty out/, or one with only pages', () => {
+    const empty = exportDir({});
+    expect(e2eHookProblems(empty)).toEqual([`no JavaScript files in ${empty}: nothing was scanned, build the export first`]);
+    const pagesOnly = exportDir({ 'index.html': '<html></html>', '404.html': '<html></html>', 'icon.svg': '<svg/>' });
+    expect(e2eHookProblems(pagesOnly)).toEqual([
+      `no JavaScript files in ${pagesOnly}: nothing was scanned, build the export first`,
+    ]);
+    // One script is enough to scan (an .mjs counts as well as a .js).
+    expect(e2eHookProblems(exportDir({ 'index.html': '', '_next/x.mjs': 'export {}' }))).toEqual([]);
   });
 
   it('looks for the property the hook really sets (lib/e2e-hooks.ts)', () => {
