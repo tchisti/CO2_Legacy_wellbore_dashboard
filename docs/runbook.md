@@ -137,15 +137,18 @@ v2 is served by GitHub Pages from `main` (root). The v3 branch keeps the v2 file
 `3d-reviewer.html`, `scoring.js`, `methodology.json`, `wells.json`, `tools/`) **on purpose**:
 removing them from `main` before Pages serves another branch would take the team's v2 link down.
 
+The annotated tag **`v2-final`** already exists locally, on the `v2-static` commit (`a5efd0c`, the
+final v2 state). Neither the branch nor the tag is on GitHub yet.
+
 The repository owner does this, once, **before** any v2 file is removed from `main`:
 
-1. GitHub → the repository → **Settings → Pages → Build and deployment**.
-2. Source: **Deploy from a branch**; Branch: **`v2-static`**, folder **`/ (root)`**; Save. (The branch
-   must be pushed to GitHub first.)
-3. Wait for the Pages deployment to finish, then check the link still answers:
+1. Push the branch and its tag, with or before the switch: `git push origin v2-static v2-final`.
+2. GitHub → the repository → **Settings → Pages → Build and deployment**.
+3. Source: **Deploy from a branch**; Branch: **`v2-static`**, folder **`/ (root)`**; Save.
+4. Wait for the Pages deployment to finish, then check the link still answers:
    `curl -sI https://tchisti.github.io/CO2_Legacy_wellbore_dashboard/ | head -1` prints a `200` line,
    and the page is v2.
-4. Only then may a later change delete the v2 files from `main` and tag `v2-static` as `v2-final`.
+5. Only after the switch is verified may a later change delete the v2 files from `main`.
 
 Until that switch, the v2 files stay on `feat/v3-phase1` and on `main`, and nothing in v3 depends on
 them.
