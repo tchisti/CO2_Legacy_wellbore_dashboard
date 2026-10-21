@@ -185,6 +185,18 @@ export function createLocalStore(opts: LocalStoreOptions): Store {
     }
   }
 
+  /*
+   * TRANSACTION RULE — every write goes through commit() (mutate() is commit() with a stamp), and
+   * `fn` runs inside one Dexie (IndexedDB) transaction. IndexedDB commits a transaction as soon as
+   * no request is pending, so inside `fn` (and everything it calls) await only Dexie operations, or
+   * helpers that do their Dexie work before they resolve. Any other async work (fetch, file reads,
+   * timers, crypto.subtle, awaiting a promise that does no IndexedDB work) must happen before
+   * commit() is called, or be wrapped in Dexie.waitFor(). Breaking this ends the transaction early:
+   * the next write throws PrematureCommitError (Task 16: no-op upsertByLicence matches awaited an
+   * async helper that did no Dexie work, and the write after them lost the transaction; see
+   * patchedFields).
+   */
+
   /** Runs `fn` in one read-write transaction over every table, then notifies once. */
   async function commit<T>(fn: () => Promise<T>): Promise<T> {
     await init();
@@ -198,7 +210,7 @@ export function createLocalStore(opts: LocalStoreOptions): Store {
     return result;
   }
 
-  /** A commit stamped with the time and the actor. */
+  /** A commit stamped with the time and the actor. `fn` follows commit()'s transaction rule above. */
   function mutate<T>(fn: (stamp: Stamp) => Promise<T>): Promise<T> {
     return commit(() => fn({ at: clock(), actorName: opts.actor() }));
   }

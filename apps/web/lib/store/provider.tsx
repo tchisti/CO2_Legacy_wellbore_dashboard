@@ -59,6 +59,11 @@ export function toError(e: unknown): Error {
   return e instanceof Error ? e : new Error(String(e));
 }
 
+/** Whether two reads of the profile say the same thing (the store hands back a new object each time). */
+function sameProfile(a: ReviewerProfile | null, b: ReviewerProfile | null): boolean {
+  return a === b || (a !== null && b !== null && a.name === b.name && a.initials === b.initials);
+}
+
 export function StoreProvider({
   children,
   createStore = defaultFactory,
@@ -88,13 +93,17 @@ export function StoreProvider({
     const { store, actor } = session;
     let active = true;
     let seq = 0;
-    /** Reads the profile; the latest read wins, so a slow early read cannot undo a newer one. */
+    /**
+     * Reads the profile; the latest read wins, so a slow early read cannot undo a newer one. Every
+     * store write triggers a read, so an unchanged profile keeps its object: the context value, and
+     * every consumer, then stay as they are.
+     */
     const readProfile = async (): Promise<void> => {
       const mine = ++seq;
       const p = await store.profile.get();
       if (!active || mine !== seq) return;
       actor.set(p);
-      setProfileState(p);
+      setProfileState((prev) => (sameProfile(prev, p) ? prev : p));
     };
     readProfile().then(
       () => {

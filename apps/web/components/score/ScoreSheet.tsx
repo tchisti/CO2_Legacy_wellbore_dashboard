@@ -16,6 +16,8 @@
 // by the browser's Back button; a reload or tab close asks first (beforeunload). Finalise saves the
 // draft and finalises it under the current methodology; it stays disabled until every parameter
 // is decided (a score, or a deliberate Unknown) and every scored parameter has a justification.
+// The first finalise of a browser session in a project also offers "Export a backup" in its
+// success toast (spec §10; lib/backup-reminder.ts).
 //
 // "Show schematic" (spec §4.4: the schematic is viewable in a split pane while scoring) widens the
 // sheet to the full viewport with the well's saved construction drawn, read-only and in metres,
@@ -43,6 +45,7 @@ import { ScoreRow } from '@/components/score/ScoreRow';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { toastFinalised } from '@/lib/backup-reminder';
 import { schematicInput } from '@/lib/construction-edit';
 import { fmtDate } from '@/lib/format';
 import {
@@ -294,7 +297,7 @@ export function ScoreSheet({
       }
       return;
     }
-    toast.success('Assessment finalised');
+    toastFinalised(store, well.projectId);
     close();
   };
 

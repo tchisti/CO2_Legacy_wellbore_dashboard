@@ -26,6 +26,22 @@ function wrapperFor(createStore: StoreFactory) {
   };
 }
 
+/** A factory whose store counts completed profile reads (the provider reads after every write). */
+function countingFactory() {
+  const make = freshFactory();
+  const counter = { reads: 0 };
+  const factory: StoreFactory = (actor) => {
+    const store = make(actor);
+    const get = async () => {
+      const p = await store.profile.get();
+      counter.reads += 1;
+      return p;
+    };
+    return { ...store, profile: { ...store.profile, get } };
+  };
+  return { factory, counter };
+}
+
 /** A promise with its resolve/reject handles, for queries the test settles by hand. */
 function deferred<T>() {
   let resolve!: (v: T) => void;
@@ -74,6 +90,20 @@ describe('StoreProvider', () => {
       </StoreProvider>,
     );
     expect(await screen.findByText('Failed: IndexedDB is blocked')).toBeTruthy();
+    expect(screen.queryByText('Ready')).toBeNull();
+  });
+
+  it('without renderError, a store that cannot be opened shows its error message', async () => {
+    const broken: StoreFactory = (actor) => {
+      const store = createLocalStore({ dbName: 'unused', actor });
+      return { ...store, profile: { ...store.profile, get: () => Promise.reject(new Error('IndexedDB is blocked')) } };
+    };
+    render(
+      <StoreProvider createStore={broken}>
+        <p>Ready</p>
+      </StoreProvider>,
+    );
+    expect(await screen.findByText('IndexedDB is blocked')).toBeTruthy();
     expect(screen.queryByText('Ready')).toBeNull();
   });
 });
@@ -215,6 +245,40 @@ describe('useProfile', () => {
     await waitFor(() => expect(result.current.profile).toEqual({ name: 'E. Twoe', initials: 'ET' }));
     const p = await result.current.store.projects.create({ name: 'Signed' });
     expect(p.createdBy).toBe('E. Twoe');
+  });
+
+  it('a store write that does not touch the profile keeps the context value: no consumer re-renders', async () => {
+    const { factory, counter } = countingFactory();
+    const seen: (object | null)[] = [];
+    const handle: { store: Store | null } = { store: null };
+    function Probe() {
+      const { profile } = useProfile();
+      handle.store = useStore();
+      seen.push(profile);
+      return null;
+    }
+    render(
+      <StoreProvider createStore={factory}>
+        <Probe />
+      </StoreProvider>,
+    );
+    await waitFor(() => expect(handle.store).not.toBeNull());
+    const store = handle.store!;
+    await act(() => store.profile.set({ name: 'T. Chisti', initials: 'TC' }));
+    await waitFor(() => expect(seen.at(-1)).toEqual({ name: 'T. Chisti', initials: 'TC' }));
+    const renders = seen.length;
+    const profile = seen.at(-1);
+
+    const reads = counter.reads;
+    await act(() => store.projects.create({ name: 'Unrelated write' }));
+    await waitFor(() => expect(counter.reads).toBe(reads + 1)); // the provider re-read the profile…
+    await act(async () => {}); // …and settled its state
+    expect(seen.length).toBe(renders); // …without a new context value
+    expect(seen.at(-1)).toBe(profile);
+
+    // a real change still comes through
+    await act(() => store.profile.set({ name: 'T. Chisti', initials: 'TCH' }));
+    await waitFor(() => expect(seen.at(-1)).toEqual({ name: 'T. Chisti', initials: 'TCH' }));
   });
 
   it('a profile read that fails after a write is reported through the logging hook, not thrown', async () => {

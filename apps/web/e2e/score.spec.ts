@@ -147,6 +147,28 @@ test.describe('score flow', () => {
     ).toContainText('Lease road open year-round.');
   });
 
+  test('the first finalise of a session offers "Export a backup", which downloads the project file; the next finalise does not', async ({
+    page,
+  }) => {
+    const id = await addWell(page, NEW_WELL);
+    let sheet = await openScore(page, id, NEW_WELL.licence, 'Score');
+    await chooseUnknown(sheet, keysExcept());
+    await finalise(page, sheet);
+    const toast = page.locator('[data-sonner-toast]').filter({ hasText: 'Assessment finalised' });
+    await expect(toast).toContainText('This browser holds the only copy of the project.');
+    const downloading = page.waitForEvent('download');
+    await toast.getByRole('button', { name: 'Export a backup' }).click();
+    const download = await downloading;
+    expect(download.suggestedFilename()).toMatch(/^fort-saskatchewan-wabamun-hub-aor-\d{4}-\d{2}-\d{2}\.lwa\.json$/);
+    await expect(page.getByText(`Backup saved as ${download.suggestedFilename()}`)).toBeVisible();
+
+    // Same browser session, same project: the reminder has been shown.
+    sheet = await openScore(page, id, NEW_WELL.licence, 'Re-assess');
+    await finalise(page, sheet);
+    await expect(page.locator('[data-sonner-toast]').filter({ hasText: 'Assessment finalised' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Export a backup' })).toHaveCount(0);
+  });
+
   test('suggestion chip "Suggested 5 · from Type 3" appears on Penetration for a Type 3 well; one click applies it and prefills the justification', async ({
     page,
   }) => {
