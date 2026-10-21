@@ -5,9 +5,10 @@
 // - Numbers are plain decimals with a point ("53.7637"): no hex, no exponent, no thousands
 //   separator, no comma. Blank is an error: every field of a row is required.
 // - Rows keep the stored id; added rows get a new one (`inj_<uuid>`, `fm_<uuid>`; the engine's
-//   newId covers only prj/wel/asm/aud), so ids stay unique and a saved project always re-imports.
+//   newId covers only prj/wel/asm/aud, so these use its randomUuid, which also works on a page
+//   served over plain HTTP), so ids stay unique and a saved project always re-imports.
 // - The formation column is ordered by row position: `order` is the row's index when it is read.
-import type { Project } from '@lwa/engine';
+import { randomUuid, type Project } from '@lwa/engine';
 import { numberText } from '@/lib/construction-edit';
 
 export type Injector = Project['injectors'][number];
@@ -62,11 +63,11 @@ export function readDecimal(text: string, messages: { blank: string; example: st
 /* ---------- ids ---------- */
 
 export function newInjectorId(): string {
-  return `inj_${crypto.randomUUID()}`;
+  return `inj_${randomUuid()}`;
 }
 
 export function newFormationId(): string {
-  return `fm_${crypto.randomUUID()}`;
+  return `fm_${randomUuid()}`;
 }
 
 /* ---------- injectors ---------- */

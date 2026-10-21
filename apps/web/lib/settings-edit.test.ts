@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Project } from '@lwa/engine';
 import {
   DEFAULT_AOR_RADIUS_M,
@@ -88,6 +88,24 @@ describe('ids', () => {
     expect(newInjectorId()).toMatch(/^inj_[0-9a-f-]{36}$/);
     expect(newFormationId()).toMatch(/^fm_[0-9a-f-]{36}$/);
     expect(newInjectorId()).not.toBe(newInjectorId());
+  });
+
+  describe('on a page without crypto.randomUUID (served over plain HTTP, not a secure context)', () => {
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it('still generates distinct version 4 ids', () => {
+      const getRandomValues = globalThis.crypto.getRandomValues.bind(globalThis.crypto);
+      vi.stubGlobal('crypto', { getRandomValues });
+      const v4 = '[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}';
+      const injectorId = newInjectorId();
+      const formationId = newFormationId();
+      expect(injectorId).toMatch(new RegExp(`^inj_${v4}$`));
+      expect(formationId).toMatch(new RegExp(`^fm_${v4}$`));
+      expect(blankInjectorRow().id).toMatch(new RegExp(`^inj_${v4}$`));
+      expect(newInjectorId()).not.toBe(injectorId);
+    });
   });
 });
 
