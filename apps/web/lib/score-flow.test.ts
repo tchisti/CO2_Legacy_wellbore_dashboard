@@ -120,6 +120,20 @@ describe('initialScoreState', () => {
     expect(missingDecisions(s)).toEqual(PARAM_KEYS.filter((k) => k !== 'cement' && k !== 'usdw'));
   });
 
+  it('continuing a re-assessment draft (a draft over a current final) counts every row as decided, Unknown rows included', () => {
+    const draft = final({ status: 'draft', computed: null, assessedAt: null, scores: { ...FT_SASK_SCORES, scvf: null } });
+    const s = initialScoreState(draft, SUGGESTIONS, 'draft-reassess');
+    expect(s.scores).toEqual({ ...FT_SASK_SCORES, scvf: null });
+    expect(s.justifications).toEqual(draft.justifications);
+    expect(s.override).toBe('Re-enter and re-plug');
+    expect([...s.decided].sort()).toEqual([...PARAM_KEYS].sort());
+    expect(missingDecisions(s)).toEqual([]);
+    // Nothing is carried: the rows are the draft's, not the final's.
+    expect(s.carriedFrom).toBeNull();
+    for (const k of PARAM_KEYS) expect(carriedNote(s, k)).toBeNull();
+    expect(isDirty(s)).toBe(false);
+  });
+
   it('does not share the previous assessment\'s objects', () => {
     const prev = final();
     const s = initialScoreState(prev, {}, 'reassess');

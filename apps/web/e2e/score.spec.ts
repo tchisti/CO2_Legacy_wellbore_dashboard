@@ -329,6 +329,26 @@ test.describe('score flow', () => {
     expect(events).toBe(1); // the one draft created on the first close
   });
 
+  test('continuing a re-assessment draft keeps every row decided (spec §5.1: no default score is for the first assessment only)', async ({
+    page,
+  }) => {
+    let sheet = await openScore(page, FT_SASK.id, FT_SASK.licence, 'Re-assess');
+    await radio(sheet, 'plugQuality', '2').click();
+    await justification(sheet, 'plugQuality').fill('Two plugs tagged; the third untested.');
+    await radio(sheet, 'scvf', 'Unknown').click();
+    await sheet.getByRole('button', { name: 'Close' }).click();
+    await expect(page.getByText('Draft saved')).toBeVisible();
+    await expect(sheet).toBeHidden();
+
+    sheet = await openScore(page, FT_SASK.id, FT_SASK.licence, 'Continue draft');
+    await expect(sheet).toContainText('Continuing the re-assessment draft saved');
+    await expect(radio(sheet, 'plugQuality', '2')).toHaveAttribute('aria-checked', 'true');
+    await expect(justification(sheet, 'plugQuality')).toHaveValue('Two plugs tagged; the third untested.');
+    await expect(radio(sheet, 'scvf', 'Unknown')).toHaveAttribute('aria-checked', 'true');
+    await expect(notYetScored(sheet)).toHaveCount(0);
+    for (const { key } of PARAMS) await expect(row(sheet, key).getByRole('radio', { checked: true })).toHaveCount(1);
+  });
+
   test("leaving with the browser's Back button still saves unsaved changes as the draft", async ({ page }) => {
     const id = await addWell(page, NEW_WELL);
     const sheet = await openScore(page, id, NEW_WELL.licence, 'Score');

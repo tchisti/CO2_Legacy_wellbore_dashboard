@@ -6,8 +6,10 @@
 //   undecided parameter is stored as null and counts as Unknown in the live result, but Unknown
 //   is a deliberate click: finalise needs every parameter decided, as a score or as Unknown.
 // - Re-assessment starts from the current final with every parameter decided, and each row reads
-//   "carried from <date>" until the reviewer changes that row's score or justification. A draft
-//   is continued with its scored rows decided; its Unknown rows must be chosen again.
+//   "carried from <date>" until the reviewer changes that row's score or justification. "No
+//   default score" applies to a well's first assessment only (spec §5.1), so a re-assessment draft
+//   (a draft over a current final) is continued with every row decided too; a first-assessment
+//   draft is continued with its scored rows decided, and its Unknown rows must be chosen again.
 // - Suggestions are shown, never applied by themselves: only applySuggestion (a reviewer's click)
 //   turns one into a score.
 // - Finalise needs a justification for every parameter that has a score; Unknown never does.
@@ -28,8 +30,12 @@ import {
 import { MISSING, fmtDate } from '@/lib/format';
 import type { DraftInput } from '@/lib/store/store';
 
-/** Where the sheet's first values come from: nothing (`new`), the well's draft, or its current final. */
-export type ScoreMode = 'new' | 'draft' | 'reassess';
+/**
+ * Where the sheet's first values come from: nothing (`new`), the well's current final
+ * (`reassess`), or its draft: `draft` for a first assessment's draft, `draft-reassess` for a
+ * draft made while the well has a current final.
+ */
+export type ScoreMode = 'new' | 'draft' | 'draft-reassess' | 'reassess';
 
 export type Justifications = Assessment['justifications'];
 
@@ -72,9 +78,10 @@ const normalOverride = (text: string | null): string | null => text?.trim() || n
 
 /**
  * The flow's opening state. `new` starts every parameter undecided with nothing written, whatever
- * `prev` is; `draft` and `reassess` copy the scores, justifications and override of `prev` (the
- * draft or the current final). `reassess` counts every row as decided and carried from the final's
- * date; `draft` counts only the rows with a score as decided.
+ * `prev` is; the other modes copy the scores, justifications and override of `prev` (the draft or
+ * the current final). `reassess` counts every row as decided and carried from the final's date;
+ * `draft-reassess` counts every row as decided, carrying nothing; `draft` counts only the rows
+ * with a score as decided.
  */
 export function initialScoreState(prev: Assessment | null, suggestions: Suggestions, mode: ScoreMode): ScoreState {
   const from = mode === 'new' ? null : prev;
@@ -89,7 +96,9 @@ export function initialScoreState(prev: Assessment | null, suggestions: Suggesti
     carriedFrom: mode === 'reassess' && from ? from.assessedAt : null,
     touched: new Set(),
     decided: new Set(
-      mode === 'reassess' && from ? PARAM_KEYS : PARAM_KEYS.filter((k) => entered.scores[k] !== null),
+      (mode === 'reassess' || mode === 'draft-reassess') && from
+        ? PARAM_KEYS
+        : PARAM_KEYS.filter((k) => entered.scores[k] !== null),
     ),
     baseline: entered,
   };

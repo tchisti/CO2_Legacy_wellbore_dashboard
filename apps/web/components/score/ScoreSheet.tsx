@@ -6,8 +6,9 @@
 // and ends with the recommended action and its override; the footer saves a draft or finalises.
 //
 // What the sheet starts from is fixed when it opens: a first assessment starts with nothing
-// decided; a draft is continued as saved (its Unknown rows undecided again); a re-assessment
-// starts from the current final with every row decided and "carried from <date>". Suggestions are
+// decided; a first assessment's draft is continued as saved (its Unknown rows undecided again); a
+// re-assessment starts from the current final with every row decided and "carried from <date>",
+// and a re-assessment's draft is continued as saved with every row decided. Suggestions are
 // derived once, from the record and the project's injectors, and saved with the draft; none is
 // ever applied without a click.
 //
@@ -81,6 +82,7 @@ function undecidedText(n: number): string {
 
 function modeText(mode: ScoreMode, prev: Assessment | null, revision: string): string {
   if (mode === 'draft' && prev) return `Continuing the draft saved ${fmtDate(prev.updatedAt)}`;
+  if (mode === 'draft-reassess' && prev) return `Continuing the re-assessment draft saved ${fmtDate(prev.updatedAt)}`;
   if (mode === 'reassess' && prev) {
     const under = prev.methodologyRevision === revision ? '' : ` (assessed under ${prev.methodologyRevision})`;
     return `Re-assessing the final of ${fmtDate(prev.assessedAt)}${under}`;
@@ -142,7 +144,7 @@ export function ScoreSheet({
 
   // Fixed when the sheet opens; later store changes (a saved draft) do not restart the flow.
   const [opening] = useState(() => {
-    const mode: ScoreMode = draft ? 'draft' : current ? 'reassess' : 'new';
+    const mode: ScoreMode = draft ? (current ? 'draft-reassess' : 'draft') : current ? 'reassess' : 'new';
     const injectors = project?.injectors ?? [];
     const suggestions = suggest({
       classification: well.classification,
