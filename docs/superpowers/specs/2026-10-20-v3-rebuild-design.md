@@ -407,6 +407,7 @@ These change what gets built. Defaults are what this document assumes.
 - Test fixture wells beyond the five real ones.
 - `methodologyRevision` is stored as a string; migrated wells that reference rev 1.0.0 keep it (no v3-shaped 1.0.0 rulebook exists) and simply show as stale.
 - Injector lat/lon for the Enbridge POC AOR are derived from the local flat-earth origin in `data-enbridge.js`; verify against the source AccuMap export before Phase 2 Map work.
+- Domain schemas (Zod) live in the engine, `packages/engine/src/domain.ts`, not in `apps/web/lib/schemas` as §6.3 sketches: the migration script (`scripts/migrate-v2.ts`) imports them without Next.js, and the app imports them from `@lwa/engine`.
 
 ## 13. References carried over
 

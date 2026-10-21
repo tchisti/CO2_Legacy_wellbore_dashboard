@@ -1,36 +1,28 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# apps/web
 
-## Getting Started
+The Legacy Well Assessment app. Setup, commands, the reviewer profile, backup and the v2 migration
+are in the [root README](../../README.md); operations in [`docs/runbook.md`](../../docs/runbook.md).
 
-First, run the development server:
+## Notes for working on the app
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
-
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- **Static export.** `next.config.ts` sets `output: 'export'`: `pnpm build` writes `out/`, and there
+  are no route handlers, server actions or dynamic segments. Detail pages read their ids from the
+  query string, and every internal link goes through `lib/routes.ts` (`wellHref`, `wellReportHref`,
+  `wellsHref`, `portfolioReportHref`). Nothing may touch IndexedDB while a page prerenders: the
+  store opens in the browser (`lib/store/provider.tsx`).
+- **Data access** goes through the `Store` interface (`lib/store/store.ts`); `LocalStore`
+  (`lib/store/local-store.ts`, Dexie) is the Phase 1 adapter, and `lib/store/contract.ts` is the
+  suite any adapter must pass. The domain schemas live in `@lwa/engine` (`packages/engine/src/domain.ts`).
+- **e2e hooks.** With `NEXT_PUBLIC_E2E=1` (`pnpm build:e2e`, and `next dev` under Playwright) the
+  app exposes `window.__lwa` (`lib/e2e-hooks.ts`) so tests can seed the store. A plain build drops
+  that code; `pnpm check:no-e2e-hooks` fails if `out/` carries it, was built by `build:e2e`, or holds
+  no scripts. CI runs it after the plain build. `pnpm e2e:static` builds with the hooks and runs
+  Playwright against the export on port 3100; `pnpm e2e` uses `next dev`.
+- **Tests.** `pnpm test` (Vitest, jsdom, `fake-indexeddb`) fails below the store's coverage gate
+  (`vitest.config.mts`). The Playwright suites include `e2e/a11y.spec.ts` (axe on every route, both
+  themes), `e2e/responsive.spec.ts` (390 px and 1024 px) and `e2e/perf.spec.ts` (500 wells).
+- **Theme.** Light by default; dark only when the user picks it (`data-theme="dark"` on `<html>`,
+  kept in localStorage). Colours are tokens in `app/globals.css`; the four rank colours are used
+  for rank only. Reports (`app/report/*`) always render and print in the light palette.
+- **shadcn/ui.** Components live in `components/ui`. After `shadcn add`, change any
+  `import { cn } from "cn"` to `import { cn } from "@/lib/utils"` (see `AGENTS.md`).
