@@ -7,6 +7,7 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { ProjectProvider } from '@/lib/project-context';
 import { createLocalStore } from '@/lib/store/local-store';
 import { StoreProvider } from '@/lib/store/provider';
+import type { Store } from '@/lib/store/store';
 
 const nav = vi.hoisted(() => ({ search: '' }));
 vi.mock('next/navigation', () => ({
@@ -27,14 +28,16 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
+/** The page's store, with the projects list failing to read (a blocked or corrupt database). */
+function withFailingProjects(store: Store): Store {
+  return { ...store, projects: { ...store.projects, list: () => Promise.reject(new Error('IndexedDB read failed')) } };
+}
+
 let dbCount = 0;
-async function renderReport(search: string) {
-  dbCount += 1;
-  const dbName = `lwa-portfolio-report-test-${dbCount}`;
-  await createLocalStore({ dbName, actor: () => 'seed' }).importProject(FIXTURE, 'merge');
+function renderPage(dbName: string, search: string, wrap: (s: Store) => Store = (s) => s) {
   nav.search = search;
-  const view = render(
-    <StoreProvider createStore={(actor) => createLocalStore({ dbName, actor })}>
+  return render(
+    <StoreProvider createStore={(actor) => wrap(createLocalStore({ dbName, actor }))}>
       <ProjectProvider>
         <TooltipProvider>
           <PortfolioReportPage />
@@ -42,6 +45,13 @@ async function renderReport(search: string) {
       </ProjectProvider>
     </StoreProvider>,
   );
+}
+
+async function renderReport(search: string) {
+  dbCount += 1;
+  const dbName = `lwa-portfolio-report-test-${dbCount}`;
+  await createLocalStore({ dbName, actor: () => 'seed' }).importProject(FIXTURE, 'merge');
+  const view = renderPage(dbName, search);
   await screen.findByRole('heading', { level: 1, name: 'Portfolio report' });
   return view;
 }
@@ -93,6 +103,8 @@ describe('portfolio report', () => {
     for (const row of registerRows()) expect(row.querySelector('[data-rank="Low"]')).toBeTruthy();
     const counts = container.querySelector<HTMLElement>('[data-section="counts"]')!;
     expect(counts.querySelector('[data-kpi="total"] [data-kpi-count]')?.textContent).toBe('4');
+    // Four of the area's five wells, not "4 wells in this area of review".
+    expect(counts.querySelector('[data-kpi="total"]')?.textContent).toBe('4of 5 wellsin this area of review');
     expect(counts.querySelector('[data-kpi="rank:Moderate"] [data-kpi-count]')?.textContent).toBe('0');
   });
 
@@ -103,6 +115,22 @@ describe('portfolio report', () => {
     const report = container.querySelector<HTMLElement>('article')!;
     expect(within(report).queryAllByRole('link')).toHaveLength(0);
     expect(report.querySelector('[data-section="matrix"] svg [data-cell="2-2"]')?.getAttribute('data-count')).toBe('1');
+  });
+
+  it('unfiltered, the total is all the wells of the area of review', async () => {
+    const { container } = await renderReport('');
+    expect(container.querySelector('[data-kpi="total"]')?.textContent).toBe('5wellsin this area of review');
+  });
+
+  it('a failed projects read is an error with the detail and a way back, never an endless loading state', async () => {
+    dbCount += 1;
+    const dbName = `lwa-portfolio-report-test-${dbCount}`;
+    await createLocalStore({ dbName, actor: () => 'seed' }).importProject(FIXTURE, 'merge');
+    renderPage(dbName, 'rank=Low', withFailingProjects);
+    expect(await screen.findByRole('heading', { level: 1, name: 'The project could not be read' })).toBeTruthy();
+    expect(screen.getByText(/IndexedDB read failed/)).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Back to Wells' }).getAttribute('href')).toBe('/wells?rank=Low');
+    expect(screen.queryByRole('status')).toBeNull();
   });
 
   it('says so when no well matches the filter', async () => {

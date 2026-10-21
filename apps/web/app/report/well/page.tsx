@@ -8,7 +8,13 @@ import { Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Dossier } from '@/components/report/DossierSections';
-import { ReportFrame, ReportMessage, ReportStatus, usePrintedAt } from '@/components/report/ReportFrame';
+import {
+  ProjectReadError,
+  ReportFrame,
+  ReportMessage,
+  ReportStatus,
+  usePrintedAt,
+} from '@/components/report/ReportFrame';
 import { Button } from '@/components/ui/button';
 import { loadWell } from '@/lib/load-well';
 import { useProjects } from '@/lib/project-context';
@@ -34,10 +40,11 @@ function WellNotFound({ reason }: { reason: string }) {
 }
 
 function WellReport({ id }: { id: string }) {
-  const { projects, activeProject } = useProjects();
+  const { projects, activeProject, error: projectsError } = useProjects();
   const printedAt = usePrintedAt();
   const page = useStoreQuery((s) => (id ? loadWell(s, id) : Promise.resolve(null)), [id]);
 
+  if (projectsError) return <ProjectReadError error={projectsError} backHref={wellsHref()} />;
   if (page.loading || !projects) return <ReportStatus>{LOADING}</ReportStatus>;
   if (page.error) return <WellNotFound reason={`The well could not be read: ${page.error.message}`} />;
   if (!page.data) return <WellNotFound reason="No well with this link is stored in this browser. It may have been deleted." />;

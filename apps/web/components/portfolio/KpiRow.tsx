@@ -3,7 +3,8 @@
 // unscored, drafts, stale revision, plus unknown-heavy; "record changed" is not a KPI, it shows on
 // the Well page and in Needs attention). Every tile links into the Wells register filtered to
 // exactly the wells it counts, so a number is one click from its wells; on a printed report
-// (`linked={false}`) the same tiles are plain text. Counts are in the mono number face (§7). A zero
+// (`linked={false}`) the same tiles are plain text. When the counts are of a filtered selection
+// (`areaTotal`, a filtered report) the total says so: "4 of 5 wells in this area of review". Counts are in the mono number face (§7). A zero
 // stays in place, muted. Only a stale revision, when there is one, is amber.
 import Link from 'next/link';
 import type { CSSProperties, ReactNode } from 'react';
@@ -61,6 +62,7 @@ export function KpiRow({
   rankLabels,
   linked = true,
   stacked = false,
+  areaTotal,
 }: {
   stats: PortfolioStats;
   rankLabels: readonly string[];
@@ -68,7 +70,10 @@ export function KpiRow({
   linked?: boolean;
   /** The state counts always on a row of their own (a column narrower than the window, e.g. a printed page). */
   stacked?: boolean;
+  /** Every well of the area of review, when `stats` counts a filtered selection of them. */
+  areaTotal?: number;
 }) {
+  const totalNoun = (n: number) => (n === 1 ? 'well' : 'wells');
   const states: StateTile[] = [
     {
       key: 'unscored',
@@ -105,12 +110,20 @@ export function KpiRow({
     <div role="group" aria-label="Portfolio counts" className="flex flex-wrap rounded-lg border bg-surface p-1">
       {/* Two groups that wrap as wholes: the wells and their ranks, then the states (on their own row below xl). */}
       <div className="flex grow flex-wrap">
-        <Tile linked={linked} href={wellsHref()} label={plural(stats.total, 'well')} data-kpi="total" className="grow-0 pr-6">
+        <Tile
+          linked={linked}
+          href={wellsHref()}
+          label={areaTotal === undefined ? plural(stats.total, 'well') : `${stats.total} of ${plural(areaTotal, 'well')}`}
+          data-kpi="total"
+          className="grow-0 pr-6"
+        >
           <span className="flex items-baseline gap-1.5">
             <span data-kpi-count className="num text-2xl leading-8 font-semibold text-ink">
               {stats.total}
             </span>
-            <span className="text-sm text-muted-foreground">{stats.total === 1 ? 'well' : 'wells'}</span>
+            <span className="text-sm text-muted-foreground">
+              {areaTotal === undefined ? totalNoun(stats.total) : `of ${areaTotal} ${totalNoun(areaTotal)}`}
+            </span>
           </span>
           <span className="text-xs text-muted-foreground">in this area of review</span>
         </Tile>

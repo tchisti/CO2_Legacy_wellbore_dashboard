@@ -88,4 +88,20 @@ describe('KpiRow', () => {
     expect(states().className).not.toContain('xl:');
     expect(states().className).toContain('basis-full');
   });
+
+  it('with areaTotal (a filtered report) reads "n of N wells in this area of review"; without it, "N wells"', () => {
+    const { container, rerender } = render(<KpiRow stats={{ ...STATS, total: 4 }} rankLabels={RANKS} linked={false} areaTotal={5} />);
+    const total = () => container.querySelector('[data-kpi="total"]')!;
+    expect(total().textContent).toBe('4of 5 wellsin this area of review');
+    expect(total().querySelector('[data-kpi-count]')?.textContent).toBe('4');
+    rerender(<KpiRow stats={{ ...STATS, total: 1 }} rankLabels={RANKS} linked={false} areaTotal={1} />);
+    expect(total().textContent).toBe('1of 1 wellin this area of review');
+    rerender(<KpiRow stats={STATS} rankLabels={RANKS} linked={false} />);
+    expect(total().textContent).toBe('7wellsin this area of review');
+  });
+
+  it('a linked total with areaTotal names both numbers', () => {
+    render(<KpiRow stats={{ ...STATS, total: 4 }} rankLabels={RANKS} areaTotal={5} />);
+    expect(tile('4 of 5 wells').getAttribute('href')).toBe('/wells');
+  });
 });

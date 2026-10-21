@@ -54,6 +54,25 @@ export function ReportMessage({ title, children, action }: { title: string; chil
   );
 }
 
+/**
+ * What a report shows when the projects cannot be read (ShellGate leaves reports to handle this
+ * themselves): the error and the way back, never an endless loading line.
+ */
+export function ProjectReadError({ error, backHref }: { error: Error; backHref: string }) {
+  return (
+    <ReportMessage
+      title="The project could not be read"
+      action={
+        <Button asChild variant="outline">
+          <Link href={backHref}>Back to Wells</Link>
+        </Button>
+      }
+    >
+      This browser could not read the project the report is made from: {error.message}
+    </ReportMessage>
+  );
+}
+
 export function ReportFrame({
   title,
   back,

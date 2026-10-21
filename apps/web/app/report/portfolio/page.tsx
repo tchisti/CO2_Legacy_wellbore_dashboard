@@ -14,7 +14,13 @@ import { Matrix5x5 } from '@/components/portfolio/Matrix5x5';
 import { BandTable } from '@/components/methodology/BandTable';
 import { RegisterTable } from '@/components/report/RegisterTable';
 import { ReportFooter } from '@/components/report/ReportFooter';
-import { ReportFrame, ReportMessage, ReportStatus, usePrintedAt } from '@/components/report/ReportFrame';
+import {
+  ProjectReadError,
+  ReportFrame,
+  ReportMessage,
+  ReportStatus,
+  usePrintedAt,
+} from '@/components/report/ReportFrame';
 import { ReportHeader, ReportSection } from '@/components/report/ReportHeader';
 import { Button } from '@/components/ui/button';
 import { fmtDate, plural } from '@/lib/format';
@@ -23,14 +29,21 @@ import { useProjects } from '@/lib/project-context';
 import { filterDescription } from '@/lib/report';
 import { wellsHref } from '@/lib/routes';
 import { useRegister } from '@/lib/use-register';
-import { DEFAULT_SORT, applyFilters, filtersFromQuery, filtersToQuery, sortRows } from '@/lib/wells-view';
+import {
+  DEFAULT_SORT,
+  applyFilters,
+  filtersFromQuery,
+  filtersToQuery,
+  hasActiveFilters,
+  sortRows,
+} from '@/lib/wells-view';
 
 const LOADING = 'Loading the portfolio…';
 
 function PortfolioReport() {
   const query = useSearchParams().toString();
   const filters = useMemo(() => filtersFromQuery(new URLSearchParams(query)), [query]);
-  const { projects, activeProject } = useProjects();
+  const { projects, activeProject, error: projectsError } = useProjects();
   const { data, error } = useRegister(activeProject?.id ?? null);
   const printedAt = usePrintedAt();
   const backHref = wellsHref(filtersToQuery(filters));
@@ -41,6 +54,7 @@ function PortfolioReport() {
     return { rows, stats: portfolioStats(rows, data.finals, data.methodology) };
   }, [data, filters]);
 
+  if (projectsError) return <ProjectReadError error={projectsError} backHref={backHref} />;
   if (error) {
     return (
       <ReportMessage
@@ -104,7 +118,13 @@ function PortfolioReport() {
       </ReportHeader>
 
       <div data-section="counts" data-keep>
-        <KpiRow stats={stats} rankLabels={methodology.matrix.bands.map((b) => b.label)} linked={false} stacked />
+        <KpiRow
+          stats={stats}
+          rankLabels={methodology.matrix.bands.map((b) => b.label)}
+          linked={false}
+          stacked
+          areaTotal={hasActiveFilters(filters) ? data.rows.length : undefined}
+        />
       </div>
 
       {stats.finals === 0 ? (

@@ -72,6 +72,7 @@ test.describe('with the Fort Saskatchewan fixture', () => {
     await expect(page.locator('[data-filter]')).toHaveText('All wells');
     const counts = page.locator('[data-section="counts"]');
     await expect(counts.locator('[data-kpi="total"] [data-kpi-count]')).toHaveText('5');
+    await expect(counts.locator('[data-kpi="total"]')).not.toContainText('of 5 wells'); // unfiltered: just "5 wells"
     await expect(counts.locator('[data-kpi="rank:Low"] [data-kpi-count]')).toHaveText('4');
     await expect(counts.locator('[data-kpi="rank:Moderate"] [data-kpi-count]')).toHaveText('1');
     await expect(counts.getByRole('link')).toHaveCount(0);
@@ -135,6 +136,10 @@ test.describe('with the Fort Saskatchewan fixture', () => {
     await expect(page).toHaveURL(/\/report\/portfolio\?rank=Low$/);
     await expect(page.locator('[data-filter]')).toHaveText('Filter: Rank Low');
     await expect(registerRows(page)).toHaveCount(4);
+    // The counts are of the filter's wells, and say how many of the area's wells that is.
+    const total = page.locator('[data-section="counts"] [data-kpi="total"]');
+    await expect(total.locator('[data-kpi-count]')).toHaveText('4');
+    await expect(total).toContainText('of 5 wells');
     await expect(page.getByRole('navigation', { name: 'Sections' })).toHaveCount(0);
     await expect(toolbar(page).getByRole('link', { name: 'Back to Wells' })).toHaveAttribute('href', '/wells?rank=Low');
   });

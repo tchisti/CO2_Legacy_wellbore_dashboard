@@ -34,9 +34,18 @@ afterEach(() => {
   localStorage.clear();
 });
 
+/** The page's store, with the projects list failing to read (a blocked or corrupt database). */
+function withFailingProjects(store: Store): Store {
+  return { ...store, projects: { ...store.projects, list: () => Promise.reject(new Error('IndexedDB read failed')) } };
+}
+
 let dbCount = 0;
 /** Seeds the Fort Saskatchewan fixture (plus `seed`), then renders the dossier of `id`. */
-async function renderDossier(id: string, seed?: (s: Store) => Promise<string | void>) {
+async function renderDossier(
+  id: string,
+  seed?: (s: Store) => Promise<string | void>,
+  wrap: (s: Store) => Store = (s) => s,
+) {
   dbCount += 1;
   const dbName = `lwa-well-report-test-${dbCount}`;
   const store = createLocalStore({ dbName, actor: () => 'J. Doe' });
@@ -44,7 +53,7 @@ async function renderDossier(id: string, seed?: (s: Store) => Promise<string | v
   const seeded = seed ? await seed(store) : undefined;
   nav.search = `id=${encodeURIComponent(typeof seeded === 'string' ? seeded : id)}`;
   const view = render(
-    <StoreProvider createStore={(actor) => createLocalStore({ dbName, actor })}>
+    <StoreProvider createStore={(actor) => wrap(createLocalStore({ dbName, actor }))}>
       <ProjectProvider>
         <TooltipProvider>
           <WellReportPage />
@@ -263,6 +272,14 @@ describe('well dossier', () => {
     expect(within(section(container, 'methodology')).getByRole('table', { name: /Scoring parameters/ })).toBeTruthy();
     expect(within(section(container, 'methodology')).getByRole('table', { name: /Rank bands/ })).toBeTruthy();
     expect(section(container, 'summary').textContent).toContain('so this assessment is stale');
+  });
+
+  it('a failed projects read is an error with the detail and a way back, never an endless loading state', async () => {
+    await renderDossier(FT_SASK.id, undefined, withFailingProjects);
+    expect(await screen.findByRole('heading', { level: 1, name: 'The project could not be read' })).toBeTruthy();
+    expect(screen.getByText(/IndexedDB read failed/)).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Back to Wells' }).getAttribute('href')).toBe('/wells');
+    expect(screen.queryByRole('status')).toBeNull();
   });
 
   it('an unknown id is "Well not found" with a link back to Wells', async () => {
