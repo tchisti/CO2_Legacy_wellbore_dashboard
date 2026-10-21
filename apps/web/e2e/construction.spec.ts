@@ -60,6 +60,9 @@ async function addWell(page: Page, input: Record<string, unknown>): Promise<stri
   );
 }
 
+const sectionsNav = (page: Page) => page.getByRole('navigation', { name: 'Sections' });
+const discardDialog = (page: Page) => page.getByRole('alertdialog', { name: 'Discard unsaved construction changes?' });
+
 async function viewBox(locator: Locator): Promise<string | null> {
   return locator.getAttribute('viewBox');
 }
@@ -344,5 +347,146 @@ test.describe('construction tab', () => {
     await expect(page.getByRole('tooltip')).toHaveText('No construction records yet');
     await toggle.click({ force: true });
     await expect(sheet.getByRole('group', { name: 'Wellbore schematic' })).toHaveCount(0);
+  });
+  test('the header Re-assess link keeps the Construction tab and its unsaved rows', async ({ page }) => {
+    await openConstruction(page, FT_SASK.id);
+    await pasteReport(page, PLUG_REPORT);
+    await page.getByRole('region', { name: 'Well summary' }).getByRole('link', { name: 'Re-assess', exact: true }).click();
+    const sheet = page.getByRole('dialog', { name: `Score ${FT_SASK.licence}` });
+    await expect(sheet).toBeVisible();
+    await expect(page).toHaveURL(/[?&]tab=construction(&|$)/);
+    await expect(discardDialog(page)).toHaveCount(0); // staying on the tab is not leaving it
+    await page.keyboard.press('Escape');
+    await expect(sheet).toBeHidden();
+    await expect(page.getByRole('tab', { name: 'Construction' })).toHaveAttribute('aria-selected', 'true');
+    await expect(dataRows(page, 'Plugs')).toHaveCount(1);
+    await expect(unsaved(page)).toBeVisible();
+  });
+
+  test('a link out of the page with unsaved changes asks first: Keep editing stays, Discard changes goes', async ({ page }) => {
+    await openConstruction(page, FT_SASK.id);
+    await pasteReport(page, PLUG_REPORT);
+
+    await sectionsNav(page).getByRole('link', { name: 'Wells' }).click();
+    await expect(discardDialog(page)).toBeVisible();
+    await discardDialog(page).getByRole('button', { name: 'Keep editing' }).click();
+    await expect(discardDialog(page)).toBeHidden();
+    await expect(page).toHaveURL(/[?&]tab=construction(&|$)/);
+    await expect(dataRows(page, 'Plugs')).toHaveCount(1);
+    await expect(unsaved(page)).toBeVisible();
+
+    await page.getByRole('link', { name: 'Wells' }).first().click(); // "← Wells" or the nav: both are guarded
+    await discardDialog(page).getByRole('button', { name: 'Discard changes' }).click();
+    await expect(page).toHaveURL(/\/wells$/);
+
+    // Discarded means gone: nothing is offered back on the next visit.
+    await openConstruction(page, FT_SASK.id);
+    await expect(page.getByRole('heading', { name: 'No construction records' })).toBeVisible();
+    await expect(page.getByText('Unsaved construction changes were restored')).toHaveCount(0);
+  });
+
+  test('with nothing unsaved, links leave without asking', async ({ page }) => {
+    await storeConstruction(page, FT_SASK.id, STORED);
+    await openConstruction(page, FT_SASK.id);
+    await expect(dataRows(page, 'Plugs')).toHaveCount(1);
+    await sectionsNav(page).getByRole('link', { name: 'Wells' }).click();
+    await expect(page).toHaveURL(/\/wells$/);
+    await expect(discardDialog(page)).toHaveCount(0);
+  });
+
+  test('leaving by the browser Back button keeps the working copy: Forward offers it back, restored and unsaved', async ({ page }) => {
+    await page.goto('/wells');
+    await page.locator('tbody tr').filter({ hasText: FT_SASK.licence }).locator('td[data-column="name"]').click();
+    await expect(page).toHaveURL(new RegExp(`/wells/view\\?id=${FT_SASK.id}$`));
+    await page.getByRole('tab', { name: 'Construction' }).click();
+    await expect(page).toHaveURL(/[?&]tab=construction(&|$)/);
+    await pasteReport(page, PLUG_REPORT);
+    await page.getByLabel('Plug 1: Sacks').fill('30');
+
+    await page.goBack();
+    await expect(page).toHaveURL(/\/wells$/);
+    await page.goForward();
+    await expect(page.getByText('Unsaved construction changes were restored')).toBeVisible();
+    await expect(page.getByLabel('Plug 1: Sacks')).toHaveValue('30');
+    await expect(dataRows(page, 'Plugs').first().locator('[data-verbatim]')).toContainText('1463–1448 m');
+    await expect(unsaved(page)).toBeVisible();
+    const stored = await page.evaluate(async (id) => (await window.__lwa!.store.wells.get(id))!.construction, FT_SASK.id);
+    expect(stored).toBeNull(); // never written into the record
+
+    // The banner's Save saves it and the banner goes.
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(page.getByText('Construction saved')).toBeVisible();
+    await expect(page.getByText('Unsaved construction changes were restored')).toHaveCount(0);
+    await page.reload();
+    await expect(page.getByLabel('Plug 1: Sacks')).toHaveValue('30');
+    await expect(page.getByText('Unsaved construction changes were restored')).toHaveCount(0);
+  });
+
+  test('a restored copy can be discarded from its banner', async ({ page }) => {
+    await page.goto('/wells');
+    await page.locator('tbody tr').filter({ hasText: FT_SASK.licence }).locator('td[data-column="name"]').click();
+    await page.getByRole('tab', { name: 'Construction' }).click();
+    await expect(page).toHaveURL(/[?&]tab=construction(&|$)/); // the tab's URL write lands before Back
+    await pasteReport(page, PLUG_REPORT);
+    await page.goBack();
+    await expect(page).toHaveURL(/\/wells$/);
+    await page.goForward();
+    await expect(page.getByText('Unsaved construction changes were restored')).toBeVisible();
+    await page.getByRole('button', { name: 'Discard', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'No construction records' })).toBeVisible();
+    await page.reload();
+    await expect(page.getByRole('heading', { name: 'No construction records' })).toBeVisible();
+  });
+
+  test('an inverted interval is refused until swapped; a depth below TD is only a warning', async ({ page }) => {
+    await openConstruction(page, FT_SASK.id);
+    await page.getByRole('button', { name: 'Add rows' }).click();
+    await section(page, 'Plugs').getByRole('button', { name: 'Add row to Plugs' }).click();
+    await page.getByLabel('Plug 1: Top (m)').fill('1463');
+    await page.getByLabel('Plug 1: Bottom (m)').fill('1448');
+    await expect(page.getByText('Top (m) is deeper than Bottom (m).')).toBeVisible();
+    await expect(page.getByLabel('Plug 1: Top (m)')).toHaveAttribute('aria-invalid', 'true');
+    await expect(page.getByLabel('Plug 1: Bottom (m)')).toHaveAttribute('aria-invalid', 'true');
+    await expect(saveButton(page)).toBeDisabled();
+    await expect(svg(page).locator('[data-kind="plug"]')).toHaveCount(0);
+    await expect(stat(page, 'longest')).toHaveText('—'); // never a negative length
+
+    await dataRows(page, 'Plugs').first().getByRole('button', { name: 'Swap top and bottom' }).click();
+    await expect(page.getByLabel('Plug 1: Top (m)')).toHaveValue('1448');
+    await expect(page.getByLabel('Plug 1: Bottom (m)')).toHaveValue('1463');
+    await expect(page.getByText('Top (m) is deeper than Bottom (m).')).toHaveCount(0);
+    await expect(svg(page).locator('[data-kind="plug"]')).toHaveCount(1);
+
+    await page.getByLabel('Plug 1: Bottom (m)').fill('1500');
+    await expect(dataRows(page, 'Plugs').first()).toContainText('Bottom (m) is below TD (1463.3 m).');
+    await expect(saveButton(page)).toBeEnabled();
+    await saveButton(page).click();
+    await expect(page.getByText('Construction saved')).toBeVisible();
+    const stored = await page.evaluate(async (id) => (await window.__lwa!.store.wells.get(id))!.construction, FT_SASK.id);
+    expect(stored!.plugs).toEqual([{ top_m: 1448, bottom_m: 1500, source: 'manual' }]);
+  });
+
+  test('dark theme: packers are drawn in the ink colour, and Export SVG still uses the light palette', async ({ page }) => {
+    await storeConstruction(page, FT_SASK.id, { ...STORED, packers: [{ depth_m: 1000 }] });
+    await page.evaluate(() => localStorage.setItem('lwa.theme', 'dark'));
+    await openConstruction(page, FT_SASK.id);
+    expect(await page.evaluate(() => document.documentElement.dataset.theme)).toBe('dark');
+    const fills = await svg(page)
+      .locator('[data-kind="packer"] polygon')
+      .first()
+      .evaluate((el) => ({
+        packer: getComputedStyle(el).fill,
+        surface: getComputedStyle(document.body).getPropertyValue('--surface').trim(),
+      }));
+    expect(fills.packer).toBe('rgb(229, 232, 236)'); // --ink in the dark theme
+    expect(fills.surface).toBe('#16191d');
+
+    const downloading = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Export SVG' }).click();
+    const text = readFileSync(await (await downloading).path(), 'utf8');
+    expect(text).toMatch(/^<svg [^>]*><rect width="100%" height="100%" fill="#ffffff"\/>/);
+    expect(text).toContain('fill="#15191e"');
+    expect(text).not.toContain('#16191d');
+    expect(text).not.toContain('var(--');
   });
 });

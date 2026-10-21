@@ -19,6 +19,7 @@ import { HistoryTab } from '@/components/well/HistoryTab';
 import { WellHeader } from '@/components/well/WellHeader';
 import { WellTabs } from '@/components/well/WellTabs';
 import { EditWellDialog } from '@/components/wells/EditWellDialog';
+import { clearUnsavedConstruction } from '@/lib/construction-session';
 import { assessmentState } from '@/lib/derived';
 import { useProjects } from '@/lib/project-context';
 import { wellHref, wellsHref, type WellTab } from '@/lib/routes';
@@ -118,6 +119,7 @@ function WellView({ id }: { id: string }) {
           currentRevision={methodology.revision}
           wellTypes={methodology.wellTypes}
           projectName={activeProject?.name}
+          tab={tab}
           onEdit={() => setEditing(true)}
         />
       </div>
@@ -142,6 +144,7 @@ function WellView({ id }: { id: string }) {
         open={pendingTab !== null}
         onKeep={() => setPendingTab(null)}
         onDiscard={() => {
+          clearUnsavedConstruction(well.id); // discarded: not offered back on the next visit
           if (pendingTab) setTab(pendingTab);
           setPendingTab(null);
           setConstructionDirty(false);

@@ -1,6 +1,9 @@
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { WellboreSchema, parseWellboreReport, type Wellbore } from '@lwa/engine';
 import {
+  LIGHT_COLOURS,
   LIST_KEYS,
   addRow,
   applyParsed,
@@ -8,11 +11,13 @@ import {
   exportFilename,
   parseDecimal,
   removeRow,
+  reviveRows,
   rowForSvgId,
   rowSource,
   rowsFromWellbore,
   safeColour,
   sameConstruction,
+  schematicExport,
   schematicInput,
   setHeader,
   setValue,
@@ -20,6 +25,7 @@ import {
   standaloneSvg,
   summariseReport,
   svgIdOf,
+  swapValues,
   toConstruction,
   wellboreFromRows,
   type ConstructionRows,
@@ -197,13 +203,13 @@ describe('editing the rows', () => {
     const bad = setValue(rows, 'plugs', key, 'top_m', '1400,5');
     const result = wellboreFromRows(bad);
     expect(result.errors).toEqual([
-      { list: 'plugs', rowKey: key, field: 'top_m', message: expect.stringContaining('point as the decimal separator') },
+      { list: 'plugs', rowKey: key, field: 'top_m', kind: 'input', message: expect.stringContaining('point as the decimal separator') },
     ]);
     expect(result.wellbore.plugs).toEqual([FULL.plugs[1]]); // not saved
     expect(result.drawing.plugs).toEqual([null, FULL.plugs[1]]); // the second plug keeps its index (data-id plug:1)
 
     const badTd = wellboreFromRows(setHeader(rows, 'td', 'deep'));
-    expect(badTd.errors).toEqual([{ list: null, rowKey: null, field: 'td', message: expect.stringContaining('point') }]);
+    expect(badTd.errors).toEqual([{ list: null, rowKey: null, field: 'td', kind: 'input', message: expect.stringContaining('point') }]);
   });
 
   it('applyParsedToRows appends the parsed rows, fills an empty TD from the well, and keeps text as typed (even invalid)', () => {
@@ -325,4 +331,104 @@ describe('schematic helpers', () => {
     expect(sourceLabel('bridge')).toBe('Imported');
     expect(sourceLabel(undefined)).toBeNull();
   });
+});
+
+describe('depth sanity', () => {
+  const withPlug = (plug: Record<string, unknown>, td: number | null = 1500) =>
+    rowsFromWellbore(emptyWellbore({ td, plugs: [plug as Wellbore['plugs'][number]] }));
+
+  it('an inverted plug (top below bottom) is an error with a swap, kept out of the saved record and the drawing', () => {
+    const rows = withPlug({ n: 1, top_m: 1463, bottom_m: 1448, source: 'extractor', verbatim: 'P1 1463/1448' });
+    const key = rows.lists.plugs[0]!.key;
+    const result = wellboreFromRows(rows);
+    expect(result.errors).toEqual([
+      { list: 'plugs', rowKey: key, field: 'top_m', kind: 'depth', swap: ['top_m', 'bottom_m'], message: 'Top (m) is deeper than Bottom (m).' },
+    ]);
+    expect(result.wellbore.plugs).toEqual([]);
+    expect(result.drawing.plugs).toEqual([null]);
+    // As stored, the row is not an edit: the record as entered still holds it.
+    expect(result.record.plugs).toHaveLength(1);
+    expect(sameConstruction(toConstruction(result.record), toConstruction(wellboreFromRows(rows).record))).toBe(true);
+
+    const swapped = swapValues(rows, 'plugs', key, 'top_m', 'bottom_m');
+    expect(rowSource(swapped.lists.plugs[0]!)).toBe('manual');
+    const fixed = wellboreFromRows(swapped);
+    expect(fixed.errors).toEqual([]);
+    expect(fixed.wellbore.plugs[0]).toMatchObject({ top_m: 1448, bottom_m: 1463, source: 'manual', verbatim: 'P1 1463/1448' });
+  });
+
+  it.each([
+    ['casings', { top_m: 200, shoe_m: 186 }, 'top_m', 'shoe_m', 'Top (m) is deeper than Shoe (m).'],
+    ['perforations', { top_m: 1310, bottom_m: 1300 }, 'top_m', 'bottom_m', 'Top (m) is deeper than Bottom (m).'],
+    ['zones', { kind: 'salt', top_m: 700, bottom_m: 600 }, 'top_m', 'bottom_m', 'Top (m) is deeper than Bottom (m).'],
+  ] as const)('an inverted %s row is an error with a swap', (list, row, a, b, message) => {
+    const rows = rowsFromWellbore(emptyWellbore({ td: 1500, [list]: [row] }));
+    expect(wellboreFromRows(rows).errors).toEqual([
+      { list, rowKey: rows.lists[list][0]!.key, field: a, kind: 'depth', swap: [a, b], message },
+    ]);
+  });
+
+  it('a typed inversion is caught too; equal depths are fine', () => {
+    const added = addRow(rowsFromWellbore(emptyWellbore({ td: 1500 })), 'plugs');
+    let rows = setValue(added.rows, 'plugs', added.key, 'top_m', '1463');
+    rows = setValue(rows, 'plugs', added.key, 'bottom_m', '1448');
+    expect(wellboreFromRows(rows).errors.map((e) => e.kind)).toEqual(['depth']);
+    expect(wellboreFromRows(setValue(rows, 'plugs', added.key, 'bottom_m', '1463')).errors).toEqual([]);
+  });
+
+  it('a stored negative depth is an error (typed ones are refused as input)', () => {
+    const rows = withPlug({ top_m: -5, bottom_m: 10 });
+    expect(wellboreFromRows(rows).errors).toEqual([
+      { list: 'plugs', rowKey: rows.lists.plugs[0]!.key, field: 'top_m', kind: 'depth', message: 'Top (m) must be 0 or more.' },
+    ]);
+  });
+
+  it('a depth below TD is a warning that does not block saving; TD falls back to the well', () => {
+    const rows = withPlug({ top_m: 1448, bottom_m: 1520 }, null);
+    const key = rows.lists.plugs[0]!.key;
+    const result = wellboreFromRows(rows, 1463.3);
+    expect(result.errors).toEqual([]);
+    expect(result.warnings).toEqual([{ list: 'plugs', rowKey: key, field: 'bottom_m', message: 'Bottom (m) is below TD (1463.3 m).' }]);
+    expect(result.wellbore.plugs).toHaveLength(1);
+    expect(wellboreFromRows(rows).warnings).toEqual([]); // no TD anywhere: nothing to compare with
+  });
+});
+
+describe('export', () => {
+  it('always uses the light palette: light background and ink, no CSS variables', () => {
+    const svg = schematicExport({ td: 1500, packers: [{ depth_m: 1000 }], formations: [{ name: 'Nisku', top_m: 1100 }] }, 'm');
+    expect(svg).toMatch(/^<svg [^>]*><rect width="100%" height="100%" fill="#ffffff"\/>/);
+    expect(svg).toContain(`fill="${LIGHT_COLOURS.ink}"`);
+    expect(svg).toContain(`stroke="${LIGHT_COLOURS.line}"`);
+    expect(svg).not.toContain('var(--');
+    expect(svg).toContain('viewBox="0 0 760 920"');
+  });
+
+  it('the light palette matches the light theme tokens in app/globals.css', () => {
+    const css = readFileSync(path.join(__dirname, '..', 'app', 'globals.css'), 'utf8');
+    const root = css.slice(css.indexOf(':root {'), css.indexOf('}', css.indexOf(':root {')));
+    const token = (name: string) => new RegExp(`--${name}:\\s*(#[0-9a-f]{6})`).exec(root)?.[1];
+    expect(LIGHT_COLOURS).toEqual({ line: token('line'), muted: token('muted'), ink: token('ink'), surface: token('surface') });
+  });
+});
+
+describe('reviveRows', () => {
+  it('revives a stored working copy as typed, with fresh row keys', () => {
+    const base = rowsFromWellbore(FULL);
+    const typed = setValue(base, 'plugs', base.lists.plugs[0]!.key, 'top_m', '14OO');
+    const revived = reviveRows(JSON.parse(JSON.stringify(typed)));
+    expect(revived).not.toBeNull();
+    expect(revived!.lists.plugs.map((r) => r.values.top_m)).toEqual(['14OO', '1200']);
+    expect(revived!.lists.plugs[0]!.key).not.toBe(typed.lists.plugs[0]!.key);
+    const keys = LIST_KEYS.flatMap((k) => revived!.lists[k].map((r) => r.key));
+    expect(new Set(keys).size).toBe(keys.length);
+    expect(wellboreFromRows(revived!).record).toEqual(wellboreFromRows(typed).record);
+  });
+
+  it.each([null, 'x', {}, { td: '', kbElev: '', lists: {}, base: {} }, { td: 1, kbElev: '', lists: {}, base: {} }])(
+    'refuses what is not a working copy: %j',
+    (data) => {
+      expect(reviveRows(data)).toBeNull();
+    },
+  );
 });

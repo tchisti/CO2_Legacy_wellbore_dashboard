@@ -9,7 +9,16 @@
 // row the schematic highlights is marked here. Everything is controlled: the values, their errors
 // and every edit belong to the editor (lib/construction-edit.ts).
 import { useEffect, useId, useRef, type FocusEvent, type ReactNode } from 'react';
-import { FileTextIcon, ImportIcon, PencilLineIcon, PlusIcon, XIcon, type LucideIcon } from 'lucide-react';
+import {
+  ArrowUpDownIcon,
+  FileTextIcon,
+  ImportIcon,
+  PencilLineIcon,
+  PlusIcon,
+  TriangleAlertIcon,
+  XIcon,
+  type LucideIcon,
+} from 'lucide-react';
 import type { WellboreOpenHole } from '@lwa/engine';
 import { StateBadge } from '@/components/domain/StateBadge';
 import { Button } from '@/components/ui/button';
@@ -31,6 +40,7 @@ import {
   type EditRow,
   type FieldError,
   type FieldSpec,
+  type FieldWarning,
   type ListKey,
 } from '@/lib/construction-edit';
 import { fmtDepth } from '@/lib/format';
@@ -50,6 +60,8 @@ export type FocusRequest = { key: string; seq: number };
 type RowHandlers = {
   onValue: (list: ListKey, key: string, field: string, text: string) => void;
   onRemove: (list: ListKey, key: string) => void;
+  /** Exchanges an inverted interval's two depths. */
+  onSwap: (list: ListKey, key: string, a: string, b: string) => void;
   /** A row's schematic data-id while the pointer is over it; null when it leaves. */
   onHover: (id: string | null) => void;
   /** A row's schematic data-id while focus is inside it; null when focus leaves. */
@@ -148,11 +160,15 @@ function Verbatim({ text }: { text: string }) {
   );
 }
 
+/** "top", "bottom", "shoe": a field's label without its unit, for the swap button's name. */
+const plainLabel = (f: FieldSpec | undefined, key: string): string => (f?.label ?? key).replace(/\s*\(.*\)$/, '').toLowerCase();
+
 function RowBody({
   list,
   row,
   index,
   errors,
+  warnings,
   highlighted,
   handlers,
 }: {
@@ -160,6 +176,7 @@ function RowBody({
   row: EditRow;
   index: number;
   errors: readonly FieldError[];
+  warnings: readonly FieldWarning[];
   highlighted: boolean;
   handlers: RowHandlers;
 }) {
@@ -169,7 +186,13 @@ function RowBody({
   const id = svgIdOf(list, index);
   const verbatim = typeof row.original.verbatim === 'string' && row.original.verbatim ? row.original.verbatim : null;
   const type = typeof row.original.type === 'string' ? row.original.type : undefined;
-  const errorOf = (field: string) => errors.find((e) => e.field === field);
+  /** The error a field belongs to: its own, or an inverted interval it is half of. */
+  const errorOf = (field: string) => errors.find((e) => e.field === field || e.swap?.includes(field));
+  const fieldOf = (key: string) => spec.fields.find((f) => f.key === key);
+  const errorIdOf = (field: string): string | undefined => {
+    const e = errorOf(field);
+    return e ? `${baseId}-${e.field}` : undefined;
+  };
   const leave = (e: FocusEvent<HTMLElement>) => {
     if (!(e.relatedTarget instanceof Node && e.currentTarget.contains(e.relatedTarget))) handlers.onFocusRow(null);
   };
@@ -191,7 +214,7 @@ function RowBody({
               field={f}
               value={row.values[f.key] ?? ''}
               label={`${name}: ${f.label}`}
-              errorId={errorOf(f.key) ? `${baseId}-${f.key}` : undefined}
+              errorId={errorIdOf(f.key)}
               placeholder={f.key === 'name' ? type : undefined}
               onChange={(text) => handlers.onValue(list, row.key, f.key, text)}
             />
@@ -212,12 +235,35 @@ function RowBody({
           </div>
         </td>
       </tr>
-      {verbatim || errors.length > 0 ? (
+      {verbatim || errors.length > 0 || warnings.length > 0 ? (
         <tr>
           <td colSpan={spec.fields.length + 1} className="px-2 pt-0 pb-1.5">
             {errors.map((e) => (
-              <p key={e.field} id={`${baseId}-${e.field}`} className="text-xs text-danger">
-                {spec.fields.find((f) => f.key === e.field)?.label ?? e.field}: {e.message}
+              <p key={`${e.kind}-${e.field}`} className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-danger">
+                <span id={`${baseId}-${e.field}`}>
+                  {e.kind === 'input' ? `${fieldOf(e.field)?.label ?? e.field}: ${e.message}` : e.message}
+                </span>
+                {e.swap ? (
+                  <Button
+                    variant="outline"
+                    size="xs"
+                    onClick={() => handlers.onSwap(list, row.key, e.swap![0], e.swap![1])}
+                    className="h-5 text-ink"
+                  >
+                    <ArrowUpDownIcon aria-hidden="true" />
+                    Swap
+                    <span className="sr-only">
+                      {' '}
+                      {plainLabel(fieldOf(e.swap[0]), e.swap[0])} and {plainLabel(fieldOf(e.swap[1]), e.swap[1])}
+                    </span>
+                  </Button>
+                ) : null}
+              </p>
+            ))}
+            {warnings.map((w) => (
+              <p key={`warn-${w.field}`} className="flex items-center gap-1 text-xs text-warn">
+                <TriangleAlertIcon aria-hidden="true" className="size-3 shrink-0" />
+                {w.message}
               </p>
             ))}
             {verbatim ? <Verbatim text={verbatim} /> : null}
@@ -232,6 +278,7 @@ function ListSection({
   list,
   rows,
   errors,
+  warnings,
   highlightIndex,
   onAdd,
   handlers,
@@ -239,6 +286,7 @@ function ListSection({
   list: ListKey;
   rows: readonly EditRow[];
   errors: readonly FieldError[];
+  warnings: readonly FieldWarning[];
   /** The row the schematic highlights, if it is in this list. */
   highlightIndex: number | null;
   onAdd: (list: ListKey) => void;
@@ -294,6 +342,7 @@ function ListSection({
                 row={row}
                 index={i}
                 errors={errors.filter((e) => e.rowKey === row.key)}
+                warnings={warnings.filter((w) => w.rowKey === row.key)}
                 highlighted={highlightIndex === i}
                 handlers={handlers}
               />
@@ -337,6 +386,7 @@ function openHoleText(oh: WellboreOpenHole): string {
 export function RowsTable({
   rows,
   errors,
+  warnings,
   fallbackTd,
   tdMessageId,
   highlightId,
@@ -347,6 +397,8 @@ export function RowsTable({
 }: {
   rows: ConstructionRows;
   errors: readonly FieldError[];
+  /** Depths below TD: shown on their rows, never blocking. */
+  warnings: readonly FieldWarning[];
   /** The well record's TD: drawn with when the record has none, and shown as the TD input's placeholder. */
   fallbackTd: number | null;
   /** The schematic's "add a total depth" message, which then describes the TD input. */
@@ -455,6 +507,7 @@ export function RowsTable({
           list={list}
           rows={rows.lists[list]}
           errors={errors.filter((e) => e.list === list)}
+          warnings={warnings.filter((w) => w.list === list)}
           highlightIndex={highlighted?.list === list ? highlighted.index : null}
           onAdd={onAdd}
           handlers={handlers}

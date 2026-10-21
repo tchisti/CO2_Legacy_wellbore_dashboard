@@ -5,13 +5,20 @@
 // under 1024 px). The tab edits a working copy of the well's construction record: pasting a report
 // or editing rows changes only the copy, the schematic and statistics draw the copy as it stands,
 // "Save construction" writes it with one audited update, and "Discard changes" goes back to the
-// stored record. While the copy has unsaved changes the page asks before a reload or tab close
-// (beforeunload) and before another tab of the well page (DiscardConstructionDialog, wired by the
-// page through onDirtyChange). The schematic draws with the record's TD, else the well's.
+// stored record. While the copy has unsaved changes it is never lost without a word:
+// - a reload or tab close asks first (beforeunload);
+// - another tab of the well page asks first (DiscardConstructionDialog, wired by the page through
+//   onDirtyChange), and so does any same-origin link that would leave this tab (a capture-phase
+//   click guard; links that keep the tab, such as the header's score link, are let through);
+// - and for what cannot be intercepted (the browser's Back button) the copy is kept in
+//   sessionStorage while it has changes and offered back, with a banner, on the next visit. It is
+//   never written into the record; a save or a discard clears it.
+// The schematic draws with the record's TD, else the well's.
 import { useEffect, useId, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { CircleDotIcon, ClipboardPasteIcon, LayersIcon, XIcon } from 'lucide-react';
-import { parseWellboreReport, renderWellboreSVG, type DepthUnit, type Well, type Wellbore } from '@lwa/engine';
+import { CircleDotIcon, ClipboardPasteIcon, HistoryIcon, LayersIcon, XIcon } from 'lucide-react';
+import { parseWellboreReport, type DepthUnit, type Well, type Wellbore } from '@lwa/engine';
 import { PasteReportDialog } from '@/components/construction/PasteReportDialog';
 import { RowsTable, type FocusRequest } from '@/components/construction/RowsTable';
 import { Schematic } from '@/components/construction/Schematic';
@@ -36,21 +43,26 @@ import {
   removeRow,
   rowForSvgId,
   rowsFromWellbore,
-  safeColour,
   sameConstruction,
+  schematicExport,
   schematicInput,
   setHeader,
   setValue,
-  standaloneSvg,
   summariseReport,
+  swapValues,
   toConstruction,
   wellboreFromRows,
   type ConstructionRows,
   type ListKey,
   type ReportSummary,
 } from '@/lib/construction-edit';
+import {
+  clearUnsavedConstruction,
+  readUnsavedConstruction,
+  saveUnsavedConstruction,
+} from '@/lib/construction-session';
 import { plural } from '@/lib/format';
-import { wellReportHref } from '@/lib/routes';
+import { isWellTabUrl, wellReportHref } from '@/lib/routes';
 import { toError, useStore } from '@/lib/store/provider';
 
 /** Asks before leaving the Construction tab with unsaved changes (the page shows it on a tab change). */
@@ -88,16 +100,6 @@ export function DiscardConstructionDialog({
       </DialogContent>
     </Dialog>
   );
-}
-
-/** The current theme's colours for a standalone SVG (no CSS variables left in the file). */
-function resolvedColours(): { colours: { line: string; muted: string; ink: string }; background: string } {
-  const style = getComputedStyle(document.documentElement);
-  const read = (name: string, fallback: string) => safeColour(style.getPropertyValue(name), fallback);
-  return {
-    colours: { line: read('--line', '#e1e5ea'), muted: read('--muted', '#5d6773'), ink: read('--ink', '#15191e') },
-    background: read('--surface', '#ffffff'),
-  };
 }
 
 function download(text: string, filename: string): void {
@@ -164,15 +166,30 @@ export function ConstructionEditor({
   onDirtyChange?: (dirty: boolean) => void;
 }) {
   const store = useStore();
+  const router = useRouter();
   const tdMessageId = useId();
   const stored = well.construction;
 
-  const [rows, setRows] = useState<ConstructionRows>(() => rowsFromWellbore(stored));
+  // A working copy kept from an earlier visit (see construction-session.ts) is offered back when it
+  // still differs from the saved record; one that matches it is stale and dropped.
+  const [kept] = useState<ConstructionRows | null>(() => {
+    const copy = readUnsavedConstruction(well.id);
+    if (!copy) return null;
+    const r = wellboreFromRows(copy, well.td_m);
+    if (r.errors.some((e) => e.kind === 'input') || !sameConstruction(toConstruction(r.record), stored)) return copy;
+    clearUnsavedConstruction(well.id);
+    return null;
+  });
+  const [rows, setRows] = useState<ConstructionRows>(() => kept ?? rowsFromWellbore(stored));
+  /** The working copy came back from an earlier visit (shown as a banner while it has changes). */
+  const [restored, setRestored] = useState(kept !== null);
   /** The record the working copy is measured against: as stored, or as just saved. */
   const [baseline, setBaseline] = useState<Wellbore | null>(stored);
   const [seenKey, setSeenKey] = useState(() => constructionKey(stored));
   /** The editor shows once there is a record, or once the reviewer starts one. */
-  const [started, setStarted] = useState(stored !== null);
+  const [started, setStarted] = useState(stored !== null || kept !== null);
+  /** Where a link the reviewer clicked would go, while the discard dialog asks. */
+  const [leaveTo, setLeaveTo] = useState<string | null>(null);
   const [unit, setUnit] = useState<DepthUnit>('m');
   const [zoom, setZoom] = useState<Zoom>(1);
   const [hoverId, setHoverId] = useState<string | null>(null);
@@ -182,10 +199,14 @@ export function ConstructionEditor({
   const [parsed, setParsed] = useState<ReportSummary | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const result = useMemo(() => wellboreFromRows(rows), [rows]);
+  const result = useMemo(() => wellboreFromRows(rows, well.td_m), [rows, well.td_m]);
+  /** What Save writes (Save is blocked while there are errors, so it is the record as entered). */
   const construction = toConstruction(result.wellbore);
   const errorCount = result.errors.length;
-  const dirty = errorCount > 0 || !sameConstruction(construction, baseline);
+  // Unsaved: the record as entered differs from the saved one, or typed text does not read. A
+  // depth error alone in a stored row (an imported inverted interval) is not an edit.
+  const dirty =
+    result.errors.some((e) => e.kind === 'input') || !sameConstruction(toConstruction(result.record), baseline);
 
   // The stored record changed under the tab (it is re-read after every store change): a clean
   // working copy follows it; one with unsaved changes is kept and measured against the new record.
@@ -203,6 +224,31 @@ export function ConstructionEditor({
     onDirtyChange?.(dirty);
   }, [dirty, onDirtyChange]);
   useEffect(() => () => onDirtyChange?.(false), [onDirtyChange]);
+
+  // Kept while it has changes, so leaving by Back does not lose it; cleared once it has none.
+  useEffect(() => {
+    if (dirty) saveUnsavedConstruction(well.id, rows);
+    else clearUnsavedConstruction(well.id);
+  }, [dirty, rows, well.id]);
+
+  // A same-origin link that would leave this tab asks first (capture phase, before Next's Link
+  // navigates). Modified clicks, new-tab and download links, and links that keep this tab pass.
+  useEffect(() => {
+    if (!dirty) return;
+    const onClick = (e: MouseEvent) => {
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      const link = e.target instanceof Element ? e.target.closest('a[href]') : null;
+      if (!(link instanceof HTMLAnchorElement) || link.hasAttribute('download')) return;
+      if (link.target && link.target !== '_self') return;
+      const url = new URL(link.href, window.location.href);
+      if (url.origin !== window.location.origin || isWellTabUrl(url, well.id, 'construction')) return;
+      e.preventDefault();
+      e.stopPropagation();
+      setLeaveTo(`${url.pathname}${url.search}${url.hash}`);
+    };
+    document.addEventListener('click', onClick, true);
+    return () => document.removeEventListener('click', onClick, true);
+  }, [dirty, well.id]);
 
   // A reload or tab close cannot keep the working copy, so the browser asks first while it has changes.
   useEffect(() => {
@@ -240,16 +286,17 @@ export function ConstructionEditor({
     if (row) setFocusRequest({ key: row.key, seq: (focusRequest?.seq ?? 0) + 1 });
   };
 
+  /** A standalone file in the light palette, whatever the screen's theme. */
   const onExport = () => {
-    if (!drawing) return;
-    const { colours, background } = resolvedColours();
-    const svg = renderWellboreSVG(drawing, { unit, resolvedColors: colours });
-    if (svg) download(standaloneSvg(svg, background), exportFilename(well.licence));
+    const svg = drawing ? schematicExport(drawing, unit) : '';
+    if (svg) download(svg, exportFilename(well.licence));
   };
 
   const discard = () => {
+    clearUnsavedConstruction(well.id);
     setRows(rowsFromWellbore(baseline));
     setStarted(baseline !== null);
+    setRestored(false);
     setParsed(null);
     setHoverId(null);
     setFocusId(null);
@@ -264,6 +311,8 @@ export function ConstructionEditor({
       setSeenKey(constructionKey(saved));
       setRows(rowsFromWellbore(saved));
       setStarted(saved !== null);
+      setRestored(false);
+      clearUnsavedConstruction(well.id);
       toast.success('Construction saved');
     } catch (e) {
       toast.error(`The construction could not be saved: ${toError(e).message}`);
@@ -272,7 +321,24 @@ export function ConstructionEditor({
     }
   };
 
-  const pasteDialog = <PasteReportDialog open={pasteOpen} onOpenChange={setPasteOpen} onParse={onParse} />;
+  const leaveDialog = (
+    <DiscardConstructionDialog
+      open={leaveTo !== null}
+      onKeep={() => setLeaveTo(null)}
+      onDiscard={() => {
+        const to = leaveTo;
+        clearUnsavedConstruction(well.id); // discarded: not offered back on the next visit
+        setLeaveTo(null);
+        if (to) router.push(to);
+      }}
+    />
+  );
+  const dialogs = (
+    <>
+      <PasteReportDialog open={pasteOpen} onOpenChange={setPasteOpen} onParse={onParse} />
+      {leaveDialog}
+    </>
+  );
 
   if (!started) {
     return (
@@ -295,7 +361,7 @@ export function ConstructionEditor({
           Paste an abandonment or casing report to read its plugs, casings and perforations into rows, or add the rows
           by hand. The wellbore schematic is drawn from them.
         </EmptyState>
-        {pasteDialog}
+        {dialogs}
       </>
     );
   }
@@ -351,10 +417,30 @@ export function ConstructionEditor({
             <p className="text-right text-xs text-danger">Fix {plural(errorCount, 'value')} before saving</p>
           ) : null}
         </div>
+        {restored && dirty ? (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-warn-line bg-warn-bg px-3 py-2.5 text-[13px] text-warn">
+            <p className="flex items-center gap-2">
+              <HistoryIcon aria-hidden="true" className="size-4 shrink-0" />
+              <span>
+                <span className="font-medium">Unsaved construction changes were restored</span>
+                <span className="text-warn/90"> from your last visit to this tab. They are not saved yet.</span>
+              </span>
+            </p>
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="outline" onClick={discard} disabled={busy}>
+                Discard
+              </Button>
+              <Button size="sm" onClick={() => void save()} disabled={errorCount > 0 || busy}>
+                Save
+              </Button>
+            </div>
+          </div>
+        ) : null}
         {parsed ? <ParseResult summary={parsed} onDismiss={() => setParsed(null)} /> : null}
         <RowsTable
           rows={rows}
           errors={result.errors}
+          warnings={result.warnings}
           fallbackTd={well.td_m}
           tdMessageId={canDraw ? undefined : tdMessageId}
           highlightId={highlightId}
@@ -363,11 +449,12 @@ export function ConstructionEditor({
           onValue={(list, key, field, text) => setRows(setValue(rows, list, key, field, text))}
           onAdd={onAdd}
           onRemove={(list, key) => setRows(removeRow(rows, list, key))}
+          onSwap={(list, key, a, b) => setRows(swapValues(rows, list, key, a, b))}
           onHover={setHoverId}
           onFocusRow={setFocusId}
         />
       </div>
-      {pasteDialog}
+      {dialogs}
     </div>
   );
 }

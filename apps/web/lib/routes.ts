@@ -47,6 +47,18 @@ export function wellHref(id: string, opts: { tab?: WellTab; score?: boolean } = 
   return `/wells/view${queryString({ id, tab, score: opts.score ? '1' : undefined })}`;
 }
 
+/**
+ * Whether a link's URL shows this well's `tab` (whatever else its query says, e.g. score=1): following
+ * it keeps the tab mounted. The well page may be served as /wells/view, /wells/view/ or /wells/view.html.
+ */
+export function isWellTabUrl(url: URL, id: string, tab: WellTab): boolean {
+  return (
+    /^\/wells\/view(?:\/|\.html)?$/.test(url.pathname) &&
+    url.searchParams.get('id') === id &&
+    parseWellTab(url.searchParams.get('tab')) === tab
+  );
+}
+
 export function wellReportHref(id: string): string {
   return `/report/well${queryString({ id })}`;
 }

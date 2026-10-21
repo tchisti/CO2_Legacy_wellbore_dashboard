@@ -15,7 +15,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { attribution, revisionNote } from '@/lib/assessment-view';
 import type { AssessmentState } from '@/lib/derived';
 import { MISSING, fmt1, fmtCoord, fmtDate } from '@/lib/format';
-import { wellHref, wellReportHref } from '@/lib/routes';
+import { wellHref, wellReportHref, type WellTab } from '@/lib/routes';
 import { cn } from '@/lib/utils';
 
 function Fact({ label, children, className }: { label: string; children: ReactNode; className?: string }) {
@@ -68,6 +68,7 @@ export function WellHeader({
   currentRevision,
   wellTypes,
   projectName,
+  tab,
   onEdit,
 }: {
   well: Well;
@@ -79,6 +80,8 @@ export function WellHeader({
   /** Classification descriptions, from the current methodology. */
   wellTypes: Methodology['wellTypes'];
   projectName?: string | null;
+  /** The tab shown under the header: opening the score flow keeps it (and whatever is unsaved on it). */
+  tab?: WellTab;
   onEdit: () => void;
 }) {
   const computed = current?.computed ?? null;
@@ -174,7 +177,7 @@ export function WellHeader({
         </div>
         <div className="flex flex-wrap gap-2 lg:justify-end">
           <Button asChild>
-            <Link href={wellHref(well.id, { score: true })} scroll={false}>
+            <Link href={wellHref(well.id, { tab, score: true })} scroll={false}>
               {primary}
             </Link>
           </Button>

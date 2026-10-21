@@ -11,10 +11,21 @@
 // - A row is `manual` once any of its values differs from what it started with, and goes back to
 //   its own source when the values do; it keeps its `verbatim` either way. Rows added by hand are
 //   manual.
+// - Depths must make sense before a row is saved or drawn: an interval whose top is deeper than
+//   its bottom (a casing's shoe) is an error with a one-click swap, and a negative depth is an
+//   error. A depth below TD is only a warning: TD itself may be the value that is wrong.
 // - A pasted report only ever adds (applyParsed): parsed rows are appended to each list, existing
 //   rows are never changed or removed, the open hole is taken only when the record has none, and
 //   the pasted text is appended to `sourceText`.
-import { WellboreSchema, type Wellbore, type WellboreInput, type WellboreSource } from '@lwa/engine';
+import {
+  WellboreSchema,
+  renderWellboreSVG,
+  type DepthUnit,
+  type Wellbore,
+  type WellboreInput,
+  type WellboreSource,
+} from '@lwa/engine';
+import { fmtDepth } from '@/lib/format';
 
 export const LIST_KEYS = ['casings', 'plugs', 'perforations', 'formations', 'packers', 'zones', 'notes'] as const;
 export type ListKey = (typeof LIST_KEYS)[number];
@@ -30,13 +41,30 @@ export type NumberField = {
   integer?: boolean;
   /** Emptied, the field is stored as null (the schema allows it) instead of being left out. */
   nullable?: boolean;
+  /** A depth below the surface (metres): never negative, and compared with TD. */
+  depth?: boolean;
 };
 export type TextField = { key: string; label: string; short?: string; kind: 'text'; wide?: boolean };
 export type SelectOption = { value: string; label: string };
 export type SelectField = { key: string; label: string; short?: string; kind: 'select'; options: readonly SelectOption[] };
 export type FieldSpec = NumberField | TextField | SelectField;
 
-const depth = (key: string, label: string, nullable = false): NumberField => ({ key, label, kind: 'number', min: 0, nullable });
+const depth = (key: string, label: string, nullable = false): NumberField => ({
+  key,
+  label,
+  kind: 'number',
+  min: 0,
+  nullable,
+  depth: true,
+});
+
+/** Each list's interval, shallow end first: a row whose first depth is deeper than its second is inverted. */
+const INTERVALS: Partial<Record<ListKey, readonly [string, string]>> = {
+  casings: ['top_m', 'shoe_m'],
+  plugs: ['top_m', 'bottom_m'],
+  perforations: ['top_m', 'bottom_m'],
+  zones: ['top_m', 'bottom_m'],
+};
 
 export const PLUG_KINDS: readonly SelectOption[] = [
   { value: 'cement', label: 'Cement' },
@@ -257,6 +285,13 @@ export function removeRow(rows: ConstructionRows, list: ListKey, key: string): C
   return updateList(rows, list, (xs) => xs.filter((r) => r.key !== key));
 }
 
+/** Exchanges two fields' values (an inverted interval's top and bottom). */
+export function swapValues(rows: ConstructionRows, list: ListKey, key: string, a: string, b: string): ConstructionRows {
+  return updateList(rows, list, (xs) =>
+    xs.map((r) => (r.key === key ? { ...r, values: { ...r.values, [a]: r.values[b] ?? '', [b]: r.values[a] ?? '' } } : r)),
+  );
+}
+
 /* ---------- from the rows to a record ---------- */
 
 export type FieldError = {
@@ -264,18 +299,64 @@ export type FieldError = {
   list: ListKey | null;
   rowKey: string | null;
   field: string;
+  /**
+   * `input`: typed text that cannot be stored (it is always an edit). `depth`: a value that reads
+   * but makes no sense as a depth (inverted interval, negative), whether typed or stored.
+   */
+  kind: 'input' | 'depth';
+  /** For an inverted interval, the two fields to exchange. */
+  swap?: readonly [string, string];
   message: string;
 };
 
+/** Worth a look, but no reason to block saving. */
+export type FieldWarning = { list: ListKey; rowKey: string; field: string; message: string };
+
 export type RowsResult = {
-  /** The record to save: valid rows only. */
+  /** The record to save: rows without errors only (Save is blocked while there are errors). */
   wellbore: Wellbore;
-  /** What to draw: the same lists with each left-out row as null, so data-id indices match the editor's rows. */
+  /** The record as entered: every row that reads, depth errors included. What "unsaved changes" is measured on. */
+  record: Wellbore;
+  /** What to draw: `wellbore`'s lists with each left-out row as null, so data-id indices match the editor's rows. */
   drawing: WellboreInput;
   errors: FieldError[];
+  warnings: FieldWarning[];
 };
 
-/** A row's record, or its errors. Unchanged fields keep their stored values exactly. */
+const labelOf = (list: ListKey, field: string): string => LISTS[list].fields.find((f) => f.key === field)?.label ?? field;
+
+/** A row's depth errors: negative depths, and an interval whose top is deeper than its bottom. */
+function depthErrors(list: ListKey, rowKey: string, record: Readonly<Record<string, unknown>>): FieldError[] {
+  const errors: FieldError[] = [];
+  for (const f of LISTS[list].fields) {
+    const v = record[f.key];
+    if (f.kind === 'number' && f.depth && typeof v === 'number' && v < 0) {
+      errors.push({ list, rowKey, field: f.key, kind: 'depth', message: `${labelOf(list, f.key)} must be 0 or more.` });
+    }
+  }
+  const pair = INTERVALS[list];
+  if (pair) {
+    const [a, b] = pair;
+    const top = record[a];
+    const bottom = record[b];
+    if (typeof top === 'number' && typeof bottom === 'number' && top > bottom) {
+      errors.push({
+        list,
+        rowKey,
+        field: a,
+        kind: 'depth',
+        swap: pair,
+        message: `${labelOf(list, a)} is deeper than ${labelOf(list, b)}.`,
+      });
+    }
+  }
+  return errors;
+}
+
+/**
+ * A row's record (null when its text does not read, or it is a blank row added here) and its
+ * errors. Unchanged fields keep their stored values exactly.
+ */
 function rowRecord(list: ListKey, row: EditRow): { record: Record<string, unknown> | null; errors: FieldError[] } {
   const errors: FieldError[] = [];
   const out: Record<string, unknown> = { ...row.original };
@@ -288,7 +369,7 @@ function rowRecord(list: ListKey, row: EditRow): { record: Record<string, unknow
     if (f.kind === 'number') {
       const r = parseDecimal(text, f);
       if (!r.ok) {
-        errors.push({ list, rowKey: row.key, field: f.key, message: r.message });
+        errors.push({ list, rowKey: row.key, field: f.key, kind: 'input', message: r.message });
         continue;
       }
       value = r.value ?? (f.nullable ? null : undefined);
@@ -301,40 +382,44 @@ function rowRecord(list: ListKey, row: EditRow): { record: Record<string, unknow
   if (errors.length > 0) return { record: null, errors };
   if (row.added && Object.values(row.values).every((t) => t.trim() === '')) return { record: null, errors };
   if (changed) out.source = 'manual';
-  return { record: out, errors };
+  return { record: out, errors: depthErrors(list, row.key, out) };
 }
 
 function headerValue(text: string, stored: number | null | undefined, spec: NumberField, errors: FieldError[]): number | null | undefined {
   if (text === toText(stored)) return stored;
   const r = parseDecimal(text, spec);
   if (r.ok) return r.value;
-  errors.push({ list: null, rowKey: null, field: spec.key, message: r.message });
+  errors.push({ list: null, rowKey: null, field: spec.key, kind: 'input', message: r.message });
   return null;
 }
 
 const EMPTY: Wellbore = WellboreSchema.parse({});
 
-export function wellboreFromRows(rows: ConstructionRows): RowsResult {
+/**
+ * The working copy as records (see RowsResult), its errors, and its warnings: depths below TD,
+ * the record's TD or else `fallbackTd` (the well's).
+ */
+export function wellboreFromRows(rows: ConstructionRows, fallbackTd: number | null = null): RowsResult {
   const errors: FieldError[] = [];
   const td = headerValue(rows.td, rows.base.td, TD_FIELD, errors);
   const kbElev = headerValue(rows.kbElev, rows.base.kbElev, KB_FIELD, errors);
-  const records = mapLists((k) => rows.lists[k].map((row) => rowRecord(k, row)));
+  const records = mapLists((k) => rows.lists[k].map((row) => ({ row, ...rowRecord(k, row) })));
   for (const k of LIST_KEYS) for (const r of records[k]) errors.push(...r.errors);
+  const valid = (r: { record: Record<string, unknown> | null; errors: FieldError[] }) => r.record !== null && r.errors.length === 0;
 
-  const parsed = WellboreSchema.safeParse({
-    ...rows.base,
-    td,
-    kbElev,
-    ...mapLists((k) => records[k].flatMap((r) => (r.record ? [r.record] : []))),
-  });
-  if (!parsed.success) {
-    errors.push({ list: null, rowKey: null, field: 'record', message: `The construction record does not read: ${parsed.error.message}` });
-    return { wellbore: { ...EMPTY, td: td ?? null }, drawing: { td: td ?? null }, errors };
+  const header = { ...rows.base, td, kbElev };
+  const asRecord = WellboreSchema.safeParse({ ...header, ...mapLists((k) => records[k].flatMap((r) => (r.record ? [r.record] : []))) });
+  const toSave = WellboreSchema.safeParse({ ...header, ...mapLists((k) => records[k].flatMap((r) => (valid(r) && r.record ? [r.record] : []))) });
+  if (!asRecord.success || !toSave.success) {
+    const issue = (asRecord.success ? null : asRecord.error) ?? (toSave.success ? null : toSave.error);
+    errors.push({ list: null, rowKey: null, field: 'record', kind: 'input', message: `The construction record does not read: ${issue?.message ?? ''}` });
+    const empty = { ...EMPTY, td: td ?? null };
+    return { wellbore: empty, record: empty, drawing: { td: td ?? null }, errors, warnings: [] };
   }
-  const wellbore = parsed.data;
+  const wellbore = toSave.data;
   const drawn = <T,>(k: ListKey, kept: readonly T[]): (T | null)[] => {
     let i = 0;
-    return records[k].map((r) => (r.record ? (kept[i++] ?? null) : null));
+    return records[k].map((r) => (valid(r) ? (kept[i++] ?? null) : null));
   };
   const drawing: WellboreInput = {
     ...wellbore,
@@ -346,7 +431,23 @@ export function wellboreFromRows(rows: ConstructionRows): RowsResult {
     zones: drawn('zones', wellbore.zones),
     notes: drawn('notes', wellbore.notes),
   };
-  return { wellbore, drawing, errors };
+
+  const warnings: FieldWarning[] = [];
+  const limit = wellbore.td ?? fallbackTd;
+  if (typeof limit === 'number' && limit > 0) {
+    for (const k of LIST_KEYS) {
+      for (const r of records[k]) {
+        if (!valid(r) || !r.record) continue;
+        for (const f of LISTS[k].fields) {
+          const v = r.record[f.key];
+          if (f.kind === 'number' && f.depth && typeof v === 'number' && v > limit) {
+            warnings.push({ list: k, rowKey: r.row.key, field: f.key, message: `${f.label} is below TD (${fmtDepth(limit, 'm')}).` });
+          }
+        }
+      }
+    }
+  }
+  return { wellbore, record: asRecord.data, drawing, errors, warnings };
 }
 
 /** The record as stored: null when it holds nothing (no rows, no TD or KB, no open hole, no pasted text). */
@@ -423,7 +524,7 @@ export function applyParsed(existing: Wellbore | null, parsed: Partial<Wellbore>
  * gives (the parsed value, else the well's TD).
  */
 export function applyParsedToRows(rows: ConstructionRows, parsed: Partial<Wellbore>, fallbackTd: number | null): ConstructionRows {
-  const { wellbore: current, errors } = wellboreFromRows(rows);
+  const { record: current, errors } = wellboreFromRows(rows);
   const next = applyParsed(current, parsed, fallbackTd);
   const invalid = new Set(errors.filter((e) => e.list === null).map((e) => e.field));
   const header = (field: 'td' | 'kbElev'): string =>
@@ -542,8 +643,62 @@ export function standaloneSvg(svg: string, background: string): string {
   return svg.replace(/^<svg[^>]*>/, (open) => `${open}<rect width="100%" height="100%" fill="${safeColour(background, '#ffffff')}"/>`);
 }
 
+/** The light theme's tokens (app/globals.css :root; a unit test keeps them equal). Exports always use them. */
+export const LIGHT_COLOURS = { line: '#e1e5ea', muted: '#5d6773', ink: '#15191e', surface: '#ffffff' } as const;
+
+/**
+ * The schematic as a standalone SVG file: the engine's default size, the light palette inlined
+ * whatever the screen's theme (so the file reads the same on paper and on any viewer), on a white
+ * background. '' when there is nothing to draw.
+ */
+export function schematicExport(drawing: WellboreInput, unit: DepthUnit): string {
+  const { line, muted, ink, surface } = LIGHT_COLOURS;
+  const svg = renderWellboreSVG(drawing, { unit, resolvedColors: { line, muted, ink } });
+  return svg ? standaloneSvg(svg, surface) : '';
+}
+
 /** "100_07-21-055-22W4_00-schematic.svg": the licence with anything but letters, digits, '.', '_' and '-' replaced. */
 export function exportFilename(licence: string): string {
   const safe = licence.replace(/[^A-Za-z0-9._-]+/g, '_');
   return `${safe || 'wellbore'}-schematic.svg`;
+}
+
+/* ---------- a working copy kept between visits ---------- */
+
+const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
+
+function reviveList(list: ListKey, data: unknown): EditRow[] | null {
+  if (!Array.isArray(data)) return null;
+  const out: EditRow[] = [];
+  for (const item of data) {
+    if (!isObject(item) || !isObject(item.values) || !isObject(item.original)) return null;
+    const original = { ...item.original };
+    const values: Record<string, string> = {};
+    for (const f of LISTS[list].fields) {
+      const v = item.values[f.key];
+      values[f.key] = typeof v === 'string' ? v : toText(original[f.key]);
+    }
+    out.push({ key: nextKey(), values, original, added: item.added === true });
+  }
+  return out;
+}
+
+/**
+ * A working copy read back from storage (JSON of ConstructionRows), or null when it is not one.
+ * Rows get fresh keys, so they never collide with rows made in this page.
+ */
+export function reviveRows(data: unknown): ConstructionRows | null {
+  if (!isObject(data) || typeof data.td !== 'string' || typeof data.kbElev !== 'string') return null;
+  if (!isObject(data.lists) || !isObject(data.base)) return null;
+  const base = WellboreSchema.safeParse(data.base);
+  if (!base.success) return null;
+  const lists = data.lists;
+  const revived = mapLists((k) => reviveList(k, lists[k]));
+  if (LIST_KEYS.some((k) => revived[k] === null)) return null;
+  return {
+    td: data.td,
+    kbElev: data.kbElev,
+    lists: mapLists((k) => revived[k] ?? []),
+    base: headerOf(base.data),
+  };
 }

@@ -149,6 +149,8 @@ export function Schematic({
           style={zoom === 1 ? undefined : { width: `${zoom * 100}%` }}
           className={cn(
             'text-ink [&>svg]:block [&>svg]:h-auto [&>svg]:w-full',
+            // The engine draws packers black, which vanishes on the dark surface: use the ink colour.
+            '[&_[data-kind=packer]_polygon]:fill-ink',
             onSelect && '[&_[data-id]]:cursor-pointer',
           )}
           // Safe to inject: renderWellboreSVG builds the markup from numbers and from text it

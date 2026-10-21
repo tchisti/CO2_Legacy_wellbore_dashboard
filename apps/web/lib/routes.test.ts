@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   ROUTES,
   WELL_TABS,
+  isWellTabUrl,
   newWellHref,
   parseWellTab,
   portfolioReportHref,
@@ -35,6 +36,16 @@ describe('routes', () => {
     expect(wellHref('wel_1', { score: false })).toBe('/wells/view?id=wel_1');
     expect(wellHref('wel_1', { tab: 'history', score: true })).toBe('/wells/view?id=wel_1&score=1&tab=history');
     expect(wellHref('a b', {})).toBe('/wells/view?id=a%20b');
+  });
+
+  it('isWellTabUrl: a link that stays on this well\'s tab (score=1 or not)', () => {
+    const at = (href: string) => new URL(href, 'http://localhost:3000');
+    expect(isWellTabUrl(at('/wells/view?id=wel_1&tab=construction&score=1'), 'wel_1', 'construction')).toBe(true);
+    expect(isWellTabUrl(at('/wells/view/?tab=construction&id=wel_1'), 'wel_1', 'construction')).toBe(true);
+    expect(isWellTabUrl(at('/wells/view?id=wel_1&score=1'), 'wel_1', 'construction')).toBe(false); // the assessment tab
+    expect(isWellTabUrl(at('/wells/view?id=wel_2&tab=construction'), 'wel_1', 'construction')).toBe(false);
+    expect(isWellTabUrl(at('/wells'), 'wel_1', 'construction')).toBe(false);
+    expect(isWellTabUrl(at('/report/well?id=wel_1'), 'wel_1', 'construction')).toBe(false);
   });
 
   it('wellsHref without a query, or with only empty values, is the bare path', () => {
