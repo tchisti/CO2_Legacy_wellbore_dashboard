@@ -261,7 +261,7 @@ test.describe('with the Fort Saskatchewan fixture', () => {
     await expect(importButton(page)).toBeEnabled(); // merge needs no confirmation
 
     await backup(page).getByRole('radio', { name: /^Replace/ }).check();
-    await expect(backup(page)).toContainText('1 well in this project is not in the file and will be deleted.');
+    await expect(backup(page).locator('[data-replace-preview]')).toHaveText('1 well will be deleted.');
     await expect(importButton(page)).toBeDisabled();
     const typed = backup(page).getByLabel('Type the project name to confirm');
     await typed.fill('Fort Saskatchewan');
@@ -280,7 +280,68 @@ test.describe('with the Fort Saskatchewan fixture', () => {
     await importButton(page).click();
 
     await expect(importResult(page)).toContainText('0 created, 5 updated, 1 deleted');
+    await expect(importResult(page)).toContainText('0 assessments and 0 history events added, 0 assessments deleted');
     expect((await storeCounts(page, FIXTURE_PROJECT_ID)).wells).toBe(5);
+  });
+
+  test('replace discloses a final assessment it deletes: one finalised after the export, before and after Import', async ({
+    page,
+  }) => {
+    // This browser received the fixture's export, then finalised a re-assessment of one well.
+    const WELL_ID = 'wel_v2_W-4A62O7';
+    const reassessed = await page.evaluate(async (id) => {
+      const { store } = window.__lwa!;
+      const draft = await store.assessments.saveDraft(id, {
+        scores: {
+          plugQuality: 3,
+          cement: null,
+          barriers: null,
+          scvf: null,
+          age: null,
+          complexity: null,
+          data: null,
+          penetration: null,
+          plume: null,
+          usdw: null,
+          access: null,
+        },
+        justifications: { plugQuality: 'Re-assessed after the export.' },
+        override: null,
+        suggestions: {},
+      });
+      return (await store.assessments.finalise(draft.id)).id;
+    }, WELL_ID);
+    const before = await storeCounts(page, FIXTURE_PROJECT_ID);
+    expect(before.assessments).toBe(6);
+
+    // Restoring the older file with Replace: the preview names the final before Import is enabled.
+    await backup(page).getByLabel('Import project file').setInputFiles(FIXTURE_PATH);
+    await backup(page).getByRole('radio', { name: /^Replace/ }).check();
+    await expect(backup(page).locator('[data-replace-preview]')).toHaveText(
+      '1 assessment (including 1 final assessment) will be deleted.',
+    );
+    await expect(importButton(page)).toBeDisabled();
+    await backup(page).getByLabel('Type the project name to confirm').fill(FIXTURE_NAME);
+    await importButton(page).click();
+
+    await expect(importResult(page)).toContainText('0 created, 5 updated, 0 deleted');
+    await expect(importResult(page)).toContainText('0 assessments and 0 history events added, 1 assessment deleted');
+    await expect(
+      page.locator('[data-sonner-toast]').filter({ hasText: '0 assessments and 0 history events added, 1 assessment deleted' }),
+    ).toBeVisible();
+    const after = await storeCounts(page, FIXTURE_PROJECT_ID);
+    expect(after.assessments).toBe(5);
+    const ids = await page.evaluate(
+      async (id) => (await window.__lwa!.store.assessments.listForWell(id)).map((a) => a.id),
+      WELL_ID,
+    );
+    expect(ids).not.toContain(reassessed);
+  });
+
+  test('replace with a file that holds everything says nothing will be deleted', async ({ page }) => {
+    await backup(page).getByLabel('Import project file').setInputFiles(FIXTURE_PATH);
+    await backup(page).getByRole('radio', { name: /^Replace/ }).check();
+    await expect(backup(page).locator('[data-replace-preview]')).toHaveText('Nothing will be deleted.');
   });
 
   test('an import file with a broken reference shows the problem list and changes nothing', async ({ page }) => {

@@ -37,12 +37,15 @@ export type ImportMode = 'merge' | 'replace';
  * Counts for one import. Wells: `created` (new to the store) or `updated` (matched by licence,
  * whether or not the incoming fields were newer). Assessments and audit events: `added` (the
  * import changed the store) or `skipped` (the store already had it, or could not take it — see
- * `warnings`).
+ * `warnings`). `removed`: what a replace deleted because the file does not have it — the
+ * project's wells whose licence is not in the file (with all their assessments), and the kept
+ * wells' assessments, finals included, whose ids are not in the file. Always zero for a merge.
  */
 export type ImportResult = {
   wells: { created: number; updated: number };
   assessments: { added: number; skipped: number };
   auditEvents: { added: number; skipped: number };
+  removed: { wells: number; assessments: number };
   warnings: string[];
 };
 

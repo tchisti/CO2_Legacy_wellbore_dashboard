@@ -72,7 +72,7 @@ export default function SettingsPage() {
 
           <SettingsSection
             id="profile"
-            description="Your identity is local to this browser in Phase 1 (there is no sign-in yet) and is not verified. Your name is recorded as the reviewer on the assessments you finalise, and on every change you make."
+            description="Your profile is kept in this browser only and is not verified: there is no sign-in. Your name is recorded as the reviewer on the assessments you finalise and on every change you make."
           >
             <ReviewerProfilePanel />
           </SettingsSection>

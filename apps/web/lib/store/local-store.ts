@@ -604,7 +604,7 @@ export function createLocalStore(opts: LocalStoreOptions): Store {
     importProject: async (data, mode) => {
       const file = parseProjectExport(data); // ImportError before anything is written
       return mutate(async (stamp) => {
-        const { result, removed } = await applyImport(db, file, mode);
+        const result = await applyImport(db, file, mode);
         await db.auditEvents.add(
           auditEvent(stamp, {
             projectId: file.project.id,
@@ -617,7 +617,7 @@ export function createLocalStore(opts: LocalStoreOptions): Store {
               wells: result.wells,
               assessments: result.assessments,
               auditEvents: result.auditEvents,
-              removed,
+              removed: result.removed,
               warnings: result.warnings,
             },
           }),

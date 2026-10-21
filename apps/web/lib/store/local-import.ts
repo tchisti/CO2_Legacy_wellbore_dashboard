@@ -129,12 +129,6 @@ export interface ImportTables {
   auditEvents: Table<AuditEvent, string>;
 }
 
-export type ImportOutcome = {
-  result: ImportResult;
-  /** What replace mode deleted because the file does not have it. */
-  removed: { wells: number; assessments: number };
-};
-
 const atOrAfter = (a: string, b: string): boolean => Date.parse(a) >= Date.parse(b);
 const after = (a: string, b: string): boolean => Date.parse(a) > Date.parse(b);
 
@@ -142,16 +136,16 @@ const after = (a: string, b: string): boolean => Date.parse(a) > Date.parse(b);
  * Writes a validated file into the store. Must run inside one read-write transaction over the
  * five tables (the caller's), so a failure part-way leaves the store as it was.
  */
-export async function applyImport(db: ImportTables, file: ProjectExport, mode: ImportMode): Promise<ImportOutcome> {
+export async function applyImport(db: ImportTables, file: ProjectExport, mode: ImportMode): Promise<ImportResult> {
   const replace = mode === 'replace';
   const pid = file.project.id;
   const result: ImportResult = {
     wells: { created: 0, updated: 0 },
     assessments: { added: 0, skipped: 0 },
     auditEvents: { added: 0, skipped: 0 },
+    removed: { wells: 0, assessments: 0 },
     warnings: [],
   };
-  const removed = { wells: 0, assessments: 0 };
 
   // Project: matched by id. Merge applies the file's fields only when they are at least as new.
   const storedProject = await db.projects.get(pid);
@@ -174,8 +168,7 @@ export async function applyImport(db: ImportTables, file: ProjectExport, mode: I
       .map((a) => a.id);
     await db.assessments.bulkDelete([...droppedAssessments, ...stray]);
     await db.wells.bulkDelete(dropped);
-    removed.wells = dropped.length;
-    removed.assessments = droppedAssessments.length + stray.length;
+    result.removed = { wells: dropped.length, assessments: droppedAssessments.length + stray.length };
   }
   const storedByKey = new Map(storedWells.map((w) => [licenceKey(w.licence), w]));
 
@@ -259,5 +252,5 @@ export async function applyImport(db: ImportTables, file: ProjectExport, mode: I
     }
   }
 
-  return { result, removed };
+  return result;
 }

@@ -2,9 +2,9 @@
 // writes the whole project as one `.lwa.json` file; reading a file the user picked turns "the wrong
 // kind of file" into a plain sentence before the store sees it. The store does the full validation
 // (Store.importProject throws ImportError listing every problem and writes nothing).
-import type { ProjectExport } from '@lwa/engine';
+import type { Assessment, ProjectExport, Well } from '@lwa/engine';
 import { plural } from '@/lib/format';
-import type { ImportResult, Store } from '@/lib/store/store';
+import { licenceKey, type ImportMode, type ImportResult, type Store } from '@/lib/store/store';
 
 const FORMAT = 'lwa-project';
 
@@ -103,6 +103,8 @@ export type ExportSummary = {
   exportedBy: string | null;
   /** The licences of the file's wells (those that are strings), in file order. */
   licences: string[];
+  /** The ids of the file's assessments (those that are strings), in file order. */
+  assessmentIds: string[];
 };
 
 export function describeExport(data: unknown): ExportSummary {
@@ -111,6 +113,7 @@ export function describeExport(data: unknown): ExportSummary {
   const text = (v: unknown): string | null => (typeof v === 'string' ? v : null);
   const count = (v: unknown): number | null => (Array.isArray(v) ? v.length : null);
   const wells: unknown[] = Array.isArray(file.wells) ? file.wells : [];
+  const assessments: unknown[] = Array.isArray(file.assessments) ? file.assessments : [];
   return {
     projectId: text(project.id),
     projectName: text(project.name),
@@ -120,17 +123,59 @@ export function describeExport(data: unknown): ExportSummary {
     exportedAt: text(file.exportedAt),
     exportedBy: text(file.exportedBy),
     licences: wells.flatMap((w) => (isRecord(w) && typeof w.licence === 'string' ? [w.licence] : [])),
+    assessmentIds: assessments.flatMap((a) => (isRecord(a) && typeof a.id === 'string' ? [a.id] : [])),
+  };
+}
+
+/** What a replace import would delete: wells, assessments, and how many of those are finals. */
+export type ReplaceDeletions = { wells: number; assessments: number; finals: number };
+
+/**
+ * What importing a file in replace mode would delete from the stored project, by the store's
+ * rule (Store.importProject, ImportResult.removed): every well whose licence is not in the file,
+ * with all its assessments, and every other assessment of the project whose id is not in the
+ * file, finals included. `stored` is the project as this browser has it (empty when it has none).
+ */
+export function replaceDeletions(
+  stored: { wells: readonly Pick<Well, 'id' | 'licence'>[]; assessments: readonly Pick<Assessment, 'id' | 'wellId' | 'status'>[] },
+  file: Pick<ExportSummary, 'licences' | 'assessmentIds'>,
+): ReplaceDeletions {
+  const fileLicences = new Set(file.licences.map(licenceKey));
+  const fileAssessments = new Set(file.assessmentIds);
+  const dropped = new Set(stored.wells.filter((w) => !fileLicences.has(licenceKey(w.licence))).map((w) => w.id));
+  const deleted = stored.assessments.filter((a) => dropped.has(a.wellId) || !fileAssessments.has(a.id));
+  return {
+    wells: dropped.size,
+    assessments: deleted.length,
+    finals: deleted.filter((a) => a.status === 'final').length,
   };
 }
 
 /**
- * An import's result in two lines: "0 created, 5 updated" (", 2 deleted" when a replace removed
- * wells) and "0 assessments and 0 history events added".
+ * "2 wells and 3 assessments (including 2 final assessments) will be deleted.", leaving out the
+ * parts that are zero; "Nothing will be deleted." when all are.
  */
-export function importSummary(result: ImportResult, deleted = 0): { wells: string; added: string } {
+export function replacePreviewText({ wells, assessments, finals }: ReplaceDeletions): string {
+  const parts: string[] = [];
+  if (wells > 0) parts.push(plural(wells, 'well'));
+  if (assessments > 0) {
+    const including = finals > 0 ? ` (including ${plural(finals, 'final assessment')})` : '';
+    parts.push(`${plural(assessments, 'assessment')}${including}`);
+  }
+  return parts.length === 0 ? 'Nothing will be deleted.' : `${parts.join(' and ')} will be deleted.`;
+}
+
+/**
+ * An import's result in two lines: "0 created, 5 updated" and "0 assessments and 0 history events
+ * added". A replace also says what it deleted (the store's `removed`), zero included:
+ * "0 created, 5 updated, 1 deleted" and "…added, 2 assessments deleted".
+ */
+export function importSummary(result: ImportResult, mode: ImportMode): { wells: string; added: string } {
   const { created, updated } = result.wells;
+  const replace = mode === 'replace';
+  const added = `${plural(result.assessments.added, 'assessment')} and ${plural(result.auditEvents.added, 'history event')} added`;
   return {
-    wells: `${created} created, ${updated} updated${deleted > 0 ? `, ${deleted} deleted` : ''}`,
-    added: `${plural(result.assessments.added, 'assessment')} and ${plural(result.auditEvents.added, 'history event')} added`,
+    wells: `${created} created, ${updated} updated${replace ? `, ${result.removed.wells} deleted` : ''}`,
+    added: replace ? `${added}, ${plural(result.removed.assessments, 'assessment')} deleted` : added,
   };
 }

@@ -5,24 +5,33 @@
 // `.lwa.json` file (lib/backup.ts). Import reads a picked file, says what it holds (and whether it
 // is another project), and imports it only once the reviewer has chosen how:
 // - Merge (the default) adds new wells and history and updates matching wells by licence;
-// - Replace makes the file the project, deleting wells and assessments the file does not have,
-//   and needs the project's name typed first.
+// - Replace makes the file the project, deleting wells and assessments the file does not have
+//   (finals included). Before Import is enabled it says exactly what would go, and it needs the
+//   project's name typed; the result reports what the store deleted.
 // The store validates the file in full and writes nothing when anything is wrong (ImportError);
 // every problem is listed. A file of another project is imported as that project, which then
 // becomes the active one.
 import { useId, useRef, useState, type ChangeEvent } from 'react';
 import { DownloadIcon, FileJsonIcon, InfoIcon, UploadIcon, XIcon } from 'lucide-react';
 import { toast } from 'sonner';
-import type { Project, Well } from '@lwa/engine';
+import type { Project } from '@lwa/engine';
 import { ImportProblems, NOT_IMPORTED } from '@/components/projects/ImportProblems';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { describeExport, downloadExport, importSummary, readExportFile, type ExportSummary } from '@/lib/backup';
+import {
+  describeExport,
+  downloadExport,
+  importSummary,
+  readExportFile,
+  replaceDeletions,
+  replacePreviewText,
+  type ExportSummary,
+} from '@/lib/backup';
 import { fmtDate, plural } from '@/lib/format';
 import { useProjectId, useProjects } from '@/lib/project-context';
 import { toError, useStore, useStoreQuery } from '@/lib/store/provider';
-import { ImportError, licenceKey, type ImportMode } from '@/lib/store/store';
+import { ImportError, type ImportMode } from '@/lib/store/store';
 import { cn } from '@/lib/utils';
 
 type Picked = { fileName: string; data: unknown; summary: ExportSummary; seq: number };
@@ -78,13 +87,11 @@ export function BackupPanel({ project }: { project: Project }) {
     }
   }
 
-  async function runImport(file: Picked, mode: ImportMode, target: Project | null) {
+  async function runImport(file: Picked, mode: ImportMode) {
     setBusy('importing');
     try {
-      // Replace deletes the stored wells the file does not have: those not matched (`updated`).
-      const before = mode === 'replace' && target ? (await store.wells.list(target.id)).length : null;
       const result = await store.importProject(file.data, mode);
-      const lines = importSummary(result, before === null ? 0 : Math.max(0, before - result.wells.updated));
+      const lines = importSummary(result, mode);
       const fileProjectId = file.summary.projectId;
       const switchTo = fileProjectId && fileProjectId !== project.id ? fileProjectId : null;
       toast.success('Project imported', {
@@ -176,7 +183,7 @@ export function BackupPanel({ project }: { project: Project }) {
             projects={projects ?? []}
             busy={busy === 'importing'}
             onCancel={() => setPicked(null)}
-            onImport={(mode, target) => runImport(picked, mode, target)}
+            onImport={(mode) => runImport(picked, mode)}
           />
         ) : null}
         {outcome?.kind === 'failed' ? <ImportProblems message={outcome.message} problems={outcome.problems} /> : null}
@@ -200,7 +207,7 @@ function ImportReview({
   projects: readonly Project[];
   busy: boolean;
   onCancel: () => void;
-  onImport: (mode: ImportMode, target: Project | null) => void;
+  onImport: (mode: ImportMode) => void;
 }) {
   const id = useId();
   const { fileName, summary } = picked;
@@ -210,11 +217,21 @@ function ImportReview({
   const target = projects.find((p) => p.id === summary.projectId) ?? null;
   const otherProject = summary.projectId !== null && summary.projectId !== activeProjectId;
   const confirmName = target?.name ?? summary.projectName ?? '';
-  const confirmed = mode === 'merge' || (confirmName !== '' && typed === confirmName);
 
-  const stored = useStoreQuery((s) => (target ? s.wells.list(target.id) : Promise.resolve<Well[]>([])), [target?.id]);
-  const fileLicences = new Set(summary.licences.map(licenceKey));
-  const toDelete = stored.data?.filter((w) => !fileLicences.has(licenceKey(w.licence))).length;
+  // What Replace would delete: the stored project against the file (none when this browser lacks it).
+  const stored = useStoreQuery(
+    async (s) => {
+      if (!target) return { wells: [], assessments: [] };
+      const wells = await s.wells.list(target.id);
+      const assessments = (await Promise.all(wells.map((w) => s.assessments.listForWell(w.id)))).flat();
+      return { wells, assessments };
+    },
+    [target?.id],
+  );
+  const deletions = stored.data ? replaceDeletions(stored.data, summary) : null;
+  const deletes = deletions !== null && deletions.wells + deletions.assessments > 0;
+  // Replace is enabled only once its preview is shown and the name is typed exactly.
+  const confirmed = mode === 'merge' || (deletions !== null && confirmName !== '' && typed === confirmName);
 
   const facts = [
     summary.projectName,
@@ -285,21 +302,22 @@ function ImportReview({
           {option(
             'replace',
             'Replace',
-            'The file becomes the project: wells and assessments not in the file are deleted. The history is kept.',
+            'The file becomes the project: wells and assessments not in the file, finals included, are deleted. The history is kept.',
           )}
         </div>
       </fieldset>
 
       {mode === 'replace' ? (
         <div className="grid gap-2">
-          <p className={cn('text-xs', toDelete ? 'text-destructive' : 'text-muted-foreground')}>
-            {!target
-              ? 'This browser does not have this project yet, so nothing will be deleted.'
-              : toDelete === undefined
-                ? 'Counting the wells that are not in the file…'
-                : toDelete === 0
-                  ? 'Every well in this project is in the file; none will be deleted.'
-                  : `${plural(toDelete, 'well')} in this project ${toDelete === 1 ? 'is' : 'are'} not in the file and will be deleted.`}
+          <p
+            data-replace-preview
+            className={cn('text-xs', deletes || stored.error ? 'text-destructive' : 'text-muted-foreground')}
+          >
+            {deletions
+              ? replacePreviewText(deletions)
+              : stored.error
+                ? `What Replace would delete could not be worked out: ${stored.error.message}`
+                : 'Working out what Replace would delete…'}
           </p>
           <div className="grid max-w-sm gap-1.5">
             <Label htmlFor={`${id}-confirm`}>Type the project name to confirm</Label>
@@ -327,7 +345,7 @@ function ImportReview({
           type="button"
           variant={mode === 'replace' ? 'destructive' : 'default'}
           disabled={!confirmed || busy}
-          onClick={() => onImport(mode, target)}
+          onClick={() => onImport(mode)}
         >
           {busy ? 'Importing…' : 'Import'}
         </Button>

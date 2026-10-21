@@ -279,7 +279,7 @@ test.describe('with the Fort Saskatchewan fixture', () => {
       const button = page.getByRole('button', { name });
       await expect(button).toBeDisabled();
       await button.focus(); // still reachable from the keyboard, and it says why it does nothing
-      await expect(button).toHaveAccessibleDescription('Available soon');
+      await expect(button).toHaveAccessibleDescription('Not available');
       await page.keyboard.press('Enter');
       await expect(page).toHaveURL(/\/wells$/);
       await expect(page.getByRole('dialog')).toHaveCount(0);

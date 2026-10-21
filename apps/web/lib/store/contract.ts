@@ -634,6 +634,7 @@ export function runStoreContract(makeStore: StoreFactory): void {
         wells: { created: 2, updated: 0 },
         assessments: { added: 3, skipped: 0 },
         auditEvents: { added: file.auditEvents.length, skipped: 0 },
+        removed: { wells: 0, assessments: 0 },
         warnings: [],
       });
       expect(await dump(b, p.id)).toEqual(expected);
@@ -663,6 +664,7 @@ export function runStoreContract(makeStore: StoreFactory): void {
         wells: { created: 0, updated: 2 },
         assessments: { added: 0, skipped: file.assessments.length },
         auditEvents: { added: 0, skipped: file.auditEvents.length },
+        removed: { wells: 0, assessments: 0 },
         warnings: [],
       });
       expect(await dump(b, p.id)).toEqual(snapshot);
@@ -732,6 +734,8 @@ export function runStoreContract(makeStore: StoreFactory): void {
 
       const result = await b.importProject(file, 'replace');
       expect(result.wells).toEqual({ created: 0, updated: 2 });
+      // the extra well with its draft, and w1's draft: what the file does not have
+      expect(result.removed).toEqual({ wells: 1, assessments: 2 });
       expect(await b.projects.get(p.id)).toEqual(file.project);
       expect(byId(await b.wells.list(p.id))).toEqual(byId(file.wells));
       expect(await b.wells.get(extra.id)).toBeNull();
@@ -742,6 +746,41 @@ export function runStoreContract(makeStore: StoreFactory): void {
       // the audit trail is never deleted
       const eventsAfter = (await b.audit.list({})).map((e) => e.id);
       expect(eventsAfter).toEqual(expect.arrayContaining(eventsBefore.map((e) => e.id)));
+    });
+
+    it('importProject replace removes a stored final the file does not have, and counts it in removed.assessments', async () => {
+      const a = open();
+      const p = await newProject(a);
+      const { well, final } = await scoredWell(a, p.id, LICENCE);
+      const file = clone(await a.exportProject(p.id));
+
+      const b = open();
+      await b.importProject(file, 'merge');
+      const draft = await b.assessments.saveDraft(well.id, draftInput(scoresAll(4), justifyAll()));
+      const reassessed = await b.assessments.finalise(draft.id);
+      expect(await b.assessments.current(well.id)).toEqual(reassessed);
+
+      const result = await b.importProject(file, 'replace');
+      expect(result.removed).toEqual({ wells: 0, assessments: 1 });
+      expect(result.wells).toEqual({ created: 0, updated: 1 });
+      expect(await b.assessments.listForWell(well.id)).toEqual([final]);
+      expect(await b.assessments.current(well.id)).toEqual(final);
+      // the import's audit event (newest first) records the same figures
+      const [imported] = (await b.audit.list({ projectId: p.id })).filter((e) => e.action === 'import');
+      expect(imported?.diff.after).toMatchObject({ mode: 'replace', removed: { wells: 0, assessments: 1 } });
+    });
+
+    it('importProject merge removes nothing: removed is zero', async () => {
+      const a = open();
+      const p = await newProject(a);
+      await scoredWell(a, p.id, LICENCE);
+      const file = clone(await a.exportProject(p.id));
+      const b = open();
+      await b.importProject(file, 'merge');
+      await b.wells.create(p.id, { licence: LICENCE_2 });
+      const result = await b.importProject(file, 'merge');
+      expect(result.removed).toEqual({ wells: 0, assessments: 0 });
+      expect(await b.wells.list(p.id)).toHaveLength(2);
     });
 
     it('importProject rejects an invalid file with one ImportError listing every problem, and writes nothing', async () => {

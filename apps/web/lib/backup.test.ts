@@ -10,6 +10,8 @@ import {
   importSummary,
   projectSlug,
   readExportFile,
+  replaceDeletions,
+  replacePreviewText,
 } from '@/lib/backup';
 import { createLocalStore } from '@/lib/store/local-store';
 
@@ -134,45 +136,135 @@ describe('describeExport', () => {
         '100/13-05-056-22W4/00',
         '100/03-17-056-22W4/00',
       ],
+      assessmentIds: [
+        'asm_v2_W-W8QB2S_1786118901621',
+        'asm_v2_W-ZVX8JD_1786122122318',
+        'asm_v2_W-4A62O7_1786119381843',
+        'asm_v2_W-LX242Q_1784908883221',
+        'asm_v2_W-4039S4_1786119633019',
+      ],
     });
   });
 
   it('leaves out what the value does not carry', () => {
-    expect(describeExport({ format: 'lwa-project', project: { name: 7 }, wells: [{ licence: 3 }, {}] })).toEqual({
+    expect(
+      describeExport({
+        format: 'lwa-project',
+        project: { name: 7 },
+        wells: [{ licence: 3 }, {}],
+        assessments: [{ id: 'asm_1' }, { id: 2 }, null],
+      }),
+    ).toEqual({
       projectId: null,
       projectName: null,
       wells: 2,
-      assessments: null,
+      assessments: 3,
       auditEvents: null,
       exportedAt: null,
       exportedBy: null,
       licences: [],
+      assessmentIds: ['asm_1'],
     });
     expect(describeExport(null).wells).toBeNull();
   });
 });
 
 describe('importSummary', () => {
-  const result = (wells: [number, number], assessments: number, events: number) => ({
+  const result = (
+    wells: [number, number],
+    assessments: number,
+    events: number,
+    removed: { wells: number; assessments: number } = { wells: 0, assessments: 0 },
+  ) => ({
     wells: { created: wells[0], updated: wells[1] },
     assessments: { added: assessments, skipped: 0 },
     auditEvents: { added: events, skipped: 2 },
+    removed,
     warnings: [],
   });
 
-  it('counts wells created and updated, then assessments and history events added', () => {
-    expect(importSummary(result([0, 5], 0, 0))).toEqual({
+  it('merge: counts wells created and updated, then assessments and history events added', () => {
+    expect(importSummary(result([0, 5], 0, 0), 'merge')).toEqual({
       wells: '0 created, 5 updated',
       added: '0 assessments and 0 history events added',
     });
-    expect(importSummary(result([1, 0], 1, 1))).toEqual({
+    expect(importSummary(result([1, 0], 1, 1), 'merge')).toEqual({
       wells: '1 created, 0 updated',
       added: '1 assessment and 1 history event added',
     });
   });
 
-  it('adds the wells a replace deleted', () => {
-    expect(importSummary(result([0, 5], 0, 0), 2).wells).toBe('0 created, 5 updated, 2 deleted');
-    expect(importSummary(result([0, 5], 0, 0), 0).wells).toBe('0 created, 5 updated');
+  it('replace: also says what the store deleted, zero included', () => {
+    expect(importSummary(result([0, 5], 0, 0, { wells: 2, assessments: 3 }), 'replace')).toEqual({
+      wells: '0 created, 5 updated, 2 deleted',
+      added: '0 assessments and 0 history events added, 3 assessments deleted',
+    });
+    expect(importSummary(result([0, 5], 0, 0, { wells: 0, assessments: 1 }), 'replace')).toEqual({
+      wells: '0 created, 5 updated, 0 deleted',
+      added: '0 assessments and 0 history events added, 1 assessment deleted',
+    });
+  });
+});
+
+describe('replaceDeletions', () => {
+  const stored = {
+    wells: [
+      { id: 'w1', licence: '100/01-01-055-22W4/00' },
+      { id: 'w2', licence: '100/02-01-055-22W4/00' },
+      { id: 'w3', licence: '100/03-01-055-22W4/00' },
+    ],
+    assessments: [
+      { id: 'a1', wellId: 'w1', status: 'final' as const },
+      { id: 'a1-re', wellId: 'w1', status: 'final' as const }, // a re-assessment the file does not have
+      { id: 'a2', wellId: 'w2', status: 'final' as const },
+      { id: 'a2-draft', wellId: 'w2', status: 'draft' as const },
+      { id: 'a3', wellId: 'w3', status: 'final' as const },
+      { id: 'a3-draft', wellId: 'w3', status: 'draft' as const },
+    ],
+  };
+
+  it('counts nothing when the file holds everything the project has', () => {
+    const file = {
+      licences: stored.wells.map((w) => w.licence),
+      assessmentIds: stored.assessments.map((a) => a.id),
+    };
+    expect(replaceDeletions(stored, file)).toEqual({ wells: 0, assessments: 0, finals: 0 });
+  });
+
+  it('counts a final on a kept well that the file does not have', () => {
+    const file = {
+      licences: stored.wells.map((w) => w.licence),
+      assessmentIds: stored.assessments.map((a) => a.id).filter((id) => id !== 'a1-re'),
+    };
+    expect(replaceDeletions(stored, file)).toEqual({ wells: 0, assessments: 1, finals: 1 });
+  });
+
+  it('counts dropped wells with all their assessments, plus stray assessments of kept wells', () => {
+    // w3 is not in the file (matched by licence, whitespace and case aside); w2's draft is not either.
+    const file = {
+      licences: [' 100/01-01-055-22w4/00 ', '100/02-01-055-22W4/00'],
+      assessmentIds: ['a1', 'a1-re', 'a2', 'a3'],
+    };
+    expect(replaceDeletions(stored, file)).toEqual({ wells: 1, assessments: 3, finals: 1 });
+  });
+
+  it('counts nothing for a project this browser does not have', () => {
+    expect(replaceDeletions({ wells: [], assessments: [] }, { licences: ['x'], assessmentIds: [] })).toEqual({
+      wells: 0,
+      assessments: 0,
+      finals: 0,
+    });
+  });
+});
+
+describe('replacePreviewText', () => {
+  it.each([
+    [{ wells: 0, assessments: 0, finals: 0 }, 'Nothing will be deleted.'],
+    [{ wells: 1, assessments: 0, finals: 0 }, '1 well will be deleted.'],
+    [{ wells: 0, assessments: 1, finals: 1 }, '1 assessment (including 1 final assessment) will be deleted.'],
+    [{ wells: 0, assessments: 2, finals: 0 }, '2 assessments will be deleted.'],
+    [{ wells: 2, assessments: 3, finals: 2 }, '2 wells and 3 assessments (including 2 final assessments) will be deleted.'],
+  ])('%j → %s', (counts, text) => {
+    expect(replacePreviewText(counts)).toBe(text);
   });
 });

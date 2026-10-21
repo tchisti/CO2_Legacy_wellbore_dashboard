@@ -40,7 +40,7 @@ function SoonButton({ icon: Icon, label }: { icon: typeof UploadIcon; label: str
           {label}
         </Button>
       </TooltipTrigger>
-      <TooltipContent>Available soon</TooltipContent>
+      <TooltipContent>Not available</TooltipContent>
     </Tooltip>
   );
 }
